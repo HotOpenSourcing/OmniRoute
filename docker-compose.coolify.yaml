@@ -79,7 +79,7 @@ services:
 
   cliproxyapi:
     container_name: cliproxyapi-coolify
-    image: ghcr.io/router-for-me/cliproxyapi:v6.9.7
+    image: ghcr.io/router-for-me/cliproxyapi:latest
     restart: unless-stopped
     environment:
       PORT: ${CLIPROXYAPI_PORT:-8317}
