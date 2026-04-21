@@ -10,9 +10,7 @@ COPY scripts/postinstall.mjs ./scripts/postinstall.mjs
 COPY scripts/postinstallSupport.mjs ./scripts/postinstallSupport.mjs
 COPY scripts/native-binary-compat.mjs ./scripts/native-binary-compat.mjs
 COPY scripts/postinstallSupport.mjs ./scripts/postinstallSupport.mjs
-# --include=dev: Coolify passes NODE_ENV=production as a build arg, which skips
-# devDependencies and breaks the `prepare` lifecycle script (husky install).
-RUN if [ -f package-lock.json ]; then npm ci --no-audit --no-fund --include=dev; else npm install --no-audit --no-fund --include=dev; fi
+RUN if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
 
 COPY . ./
 RUN mkdir -p /app/data && npm run build -- --webpack
