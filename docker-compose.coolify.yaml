@@ -90,6 +90,8 @@ services:
       - "${CLIPROXYAPI_PORT:-8317}"
     volumes:
       - ./config/cliproxyapi-config.yaml:/CLIProxyAPI/config.yaml
+      - cliproxyapi-coolify-auth:/root/.cli-proxy-api
+      - cliproxyapi-coolify-logs:/CLIProxyAPI/logs
       - cliproxyapi-coolify-data:/root/.cli-proxy-api
     healthcheck:
       test:
@@ -102,5 +104,9 @@ services:
 volumes:
   omniroute-coolify-data:
     name: omniroute-coolify-data
+  cliproxyapi-coolify-auth:
+    name: cliproxyapi-coolify-auth
+  cliproxyapi-coolify-logs:
+    name: cliproxyapi-coolify-logs
   cliproxyapi-coolify-data:
     name: cliproxyapi-coolify-data
