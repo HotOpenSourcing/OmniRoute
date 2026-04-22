@@ -1,0 +1,5 @@
+# Custom cliproxyapi image with config baked in
+# This avoids bind-mount conflicts with the config/ directory on the Docker host
+FROM kaelsen/cli-proxy-api:latest
+
+COPY cliproxyapi-deploy/cliproxyapi-config.yaml /CLIProxyAPI/config.yaml

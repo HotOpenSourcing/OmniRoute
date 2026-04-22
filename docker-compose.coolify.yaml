@@ -79,8 +79,11 @@ services:
 
   cliproxyapi:
     container_name: cliproxyapi-coolify
-    image: kaelsen/cli-proxy-api:latest
-    pull_policy: always
+    build:
+      context: .
+      dockerfile: bin/Dockerfile.cliproxyapi
+    image: cliproxyapi:coolify
+    pull_policy: never
     restart: unless-stopped
     environment:
       DEPLOY: production
@@ -89,7 +92,6 @@ services:
     expose:
       - "${CLIPROXYAPI_PORT:-8327}"
     volumes:
-      - ./cliproxyapi-deploy/cliproxyapi-config.yaml:/CLIProxyAPI/config.yaml:ro
       - cliproxyapi-coolify-logs:/CLIProxyAPI/logs
       - cliproxyapi-coolify-data:/root/.cli-proxy-api
     healthcheck:
