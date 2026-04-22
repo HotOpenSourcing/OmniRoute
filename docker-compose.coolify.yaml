@@ -89,7 +89,7 @@ services:
     expose:
       - "${CLIPROXYAPI_PORT:-8327}"
     volumes:
-      - ./cliproxyapi-config.yaml:/CLIProxyAPI/config.yaml
+      - ./deploy/cliproxyapi-config.yaml:/CLIProxyAPI/config.yaml:ro
       - cliproxyapi-coolify-logs:/CLIProxyAPI/logs
       - cliproxyapi-coolify-data:/root/.cli-proxy-api
     healthcheck:
