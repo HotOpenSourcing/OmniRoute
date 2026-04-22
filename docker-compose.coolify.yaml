@@ -89,10 +89,9 @@ services:
     expose:
       - "${CLIPROXYAPI_PORT:-8317}"
     volumes:
-      - ./cliproxyapi-config.yaml:/CLIProxyAPI/config.yaml
-      - cliproxyapi-coolify-auth:/root/.cli-proxy-api
-      - cliproxyapi-coolify-logs:/CLIProxyAPI/logs
+      - ./cliproxyapi-config.yaml:/CLIProxyAPI/config.yaml:ro
       - cliproxyapi-coolify-data:/root/.cli-proxy-api
+      - cliproxyapi-coolify-logs:/CLIProxyAPI/logs
     healthcheck:
       test:
         ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:${CLIPROXYAPI_PORT:-8317}/v1/models"]
@@ -104,9 +103,7 @@ services:
 volumes:
   omniroute-coolify-data:
     name: omniroute-coolify-data
-  cliproxyapi-coolify-auth:
-    name: cliproxyapi-coolify-auth
-  cliproxyapi-coolify-logs:
-    name: cliproxyapi-coolify-logs
   cliproxyapi-coolify-data:
     name: cliproxyapi-coolify-data
+  cliproxyapi-coolify-logs:
+    name: cliproxyapi-coolify-logs
