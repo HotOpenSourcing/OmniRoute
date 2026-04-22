@@ -79,11 +79,13 @@ services:
 
   cliproxyapi:
     container_name: cliproxyapi-coolify
-    image: ghcr.io/hotopensourcing/cliproxyapi:v6.9.31
+    image: kaelsen/cli-proxy-api:latest
+    pull_policy: always
     restart: unless-stopped
     environment:
-      PORT: ${CLIPROXYAPI_PORT:-8317}
+      DEPLOY: production
       HOST: 0.0.0.0
+      PORT: ${CLIPROXYAPI_PORT:-8317}
     expose:
       - "${CLIPROXYAPI_PORT:-8317}"
     volumes:
