@@ -20,7 +20,7 @@ Object.assign(process.env, {
 
 const { OAUTH_ENDPOINTS } = await import("../../open-sse/config/constants.ts");
 const { qoder } = await import("../../src/lib/oauth/providers/qoder.ts");
-const { QODER_CONFIG } = await import("../../src/lib/oauth/constants/oauth.ts");
+const { QODER_CONFIG, WINDSURF_CONFIG } = await import("../../src/lib/oauth/constants/oauth.ts");
 
 test("Qoder OAuth defaults no longer point to qoder.cn", () => {
   assert.doesNotMatch(QODER_CONFIG.authorizeUrl || "", /qoder\.cn/i);
@@ -39,4 +39,10 @@ test("Qoder OAuth provider returns null when browser auth is not configured", ()
   const authUrl = qoder.buildAuthUrl(QODER_CONFIG, "http://localhost:8080/callback", "state");
   assert.equal(typeof authUrl, "string");
   assert.doesNotMatch(authUrl || "", /qoder\.cn/i);
+});
+
+test("Windsurf OAuth endpoints stay empty until explicitly configured", () => {
+  assert.equal(OAUTH_ENDPOINTS.windsurf.auth, "");
+  assert.equal(OAUTH_ENDPOINTS.windsurf.token, "");
+  assert.equal(WINDSURF_CONFIG.enabled, false);
 });

@@ -53,6 +53,9 @@ export function generateAuthData(providerName, redirectUri) {
     flowType: provider.flowType,
     fixedPort: provider.fixedPort,
     callbackPath: provider.callbackPath || "/callback",
+    supported: authUrl !== null,
+    disabledMessage:
+      provider.config?.enabled === false ? provider.config?.disabledMessage : undefined,
   };
 }
 

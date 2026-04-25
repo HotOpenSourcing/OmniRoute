@@ -16,6 +16,7 @@ import { gemini } from "./gemini";
 import { antigravity } from "./antigravity";
 import { qoder } from "./qoder";
 import { qwen } from "./qwen";
+import { windsurf } from "./windsurf";
 import { kimiCoding } from "./kimi-coding";
 import { github } from "./github";
 import { kiro } from "./kiro";
@@ -30,6 +31,7 @@ export const PROVIDERS = {
   antigravity,
   qoder,
   qwen,
+  windsurf,
   "kimi-coding": kimiCoding,
   github,
   kiro,

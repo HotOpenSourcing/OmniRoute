@@ -14,6 +14,7 @@ import { VertexExecutor } from "./vertex.ts";
 import { CliproxyapiExecutor } from "./cliproxyapi.ts";
 import { PerplexityWebExecutor } from "./perplexity-web.ts";
 import { GrokWebExecutor } from "./grok-web.ts";
+import { WindsurfExecutor } from "./windsurf.ts";
 
 const executors = {
   antigravity: new AntigravityExecutor(),
@@ -24,6 +25,8 @@ const executors = {
   codex: new CodexExecutor(),
   cursor: new CursorExecutor(),
   cu: new CursorExecutor(), // Alias for cursor
+  windsurf: new WindsurfExecutor(),
+  ws: new WindsurfExecutor(), // Alias for windsurf
   pollinations: new PollinationsExecutor(),
   pol: new PollinationsExecutor(), // Alias
   "cloudflare-ai": new CloudflareAIExecutor(),
@@ -69,3 +72,4 @@ export { CliproxyapiExecutor } from "./cliproxyapi.ts";
 export { VertexExecutor } from "./vertex.ts";
 export { PerplexityWebExecutor } from "./perplexity-web.ts";
 export { GrokWebExecutor } from "./grok-web.ts";
+export { WindsurfExecutor } from "./windsurf.ts";

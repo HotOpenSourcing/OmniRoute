@@ -39,6 +39,7 @@ const {
   PROVIDERS: OAUTH_PROVIDER_IDS,
   QODER_CONFIG,
   QWEN_CONFIG,
+  WINDSURF_CONFIG,
 } = oauthModule;
 const { REGISTRY } = registryModule;
 
@@ -51,6 +52,7 @@ const EXPECTED_PROVIDER_KEYS = [
   "antigravity",
   "qoder",
   "qwen",
+  "windsurf",
   "kimi-coding",
   "github",
   "kiro",
@@ -66,6 +68,7 @@ const EXPECTED_CONFIG_BY_PROVIDER = {
   antigravity: ANTIGRAVITY_CONFIG,
   qoder: QODER_CONFIG,
   qwen: QWEN_CONFIG,
+  windsurf: WINDSURF_CONFIG,
   "kimi-coding": KIMI_CODING_CONFIG,
   github: GITHUB_CONFIG,
   kiro: KIRO_CONFIG,
@@ -81,6 +84,7 @@ const REQUIRED_FIELDS_BY_PROVIDER = {
   antigravity: ["authorizeUrl", "tokenUrl", "userInfoUrl", "scopes", "clientId"],
   qoder: ["extraParams"],
   qwen: ["deviceCodeUrl", "tokenUrl", "scope", "clientId"],
+  windsurf: ["codeChallengeMethod", "disabledMessage"],
   "kimi-coding": ["deviceCodeUrl", "tokenUrl", "clientId"],
   github: ["deviceCodeUrl", "tokenUrl", "userInfoUrl", "copilotTokenUrl", "clientId"],
   kiro: [
@@ -338,6 +342,45 @@ test("Qoder remains a safe special case when browser OAuth is disabled", () => {
   );
   assert.equal(typeof authUrl, "string");
   assert.ok(authUrl.startsWith("https://"));
+});
+
+test("Windsurf uses manual auth token fallback when browser OAuth is disabled", async () => {
+  assert.equal(WINDSURF_CONFIG.enabled, false);
+  assert.equal(WINDSURF_CONFIG.supportLevel, "oauth-ready-placeholder");
+  assert.equal(WINDSURF_CONFIG.observedInternalAuth, true);
+  assert.equal(WINDSURF_CONFIG.thirdPartyOAuthSupported, false);
+  assert.equal(
+    PROVIDERS.windsurf.buildAuthUrl(
+      WINDSURF_CONFIG,
+      "http://localhost/callback",
+      "state-123",
+      "challenge-456"
+    ),
+    "https://windsurf.com/editor/show-auth-token?workflow="
+  );
+  assert.match(
+    WINDSURF_CONFIG.disabledMessage,
+    /third-party Windsurf OAuth is unsupported by default/i
+  );
+  assert.equal(REGISTRY.windsurf.authType, "apikey");
+  assert.equal(REGISTRY.windsurf.runtimeCategory, "apikey");
+  assert.equal(REGISTRY.windsurf.oauth.clientIdEnv, "WINDSURF_OAUTH_CLIENT_ID");
+  assert.equal(PROVIDERS.windsurf.metadata.supportLevel, "experimental-manual-token");
+
+  useFetchSequence([jsonResponse({ api_key: "windsurf-api-key", name: "Windsurf User" })]);
+
+  const tokens = await PROVIDERS.windsurf.exchangeToken(
+    WINDSURF_CONFIG,
+    "firebase-token",
+    "http://localhost/callback",
+    "challenge-456"
+  );
+  const mapped = PROVIDERS.windsurf.mapTokens(tokens);
+
+  assert.equal(mapped.apiKey, "windsurf-api-key");
+  assert.equal(mapped.accessToken, "windsurf-api-key");
+  assert.equal(mapped.name, "Windsurf User");
+  assert.equal(mapped.providerSpecificData.authFlow, "windsurf-manual-auth-token");
 });
 
 test("Codex parses id_token metadata and prefers a team workspace when the JWT only marks the personal plan", async () => {

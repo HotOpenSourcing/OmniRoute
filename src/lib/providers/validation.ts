@@ -673,6 +673,63 @@ async function validateGigachatProvider({ apiKey, providerSpecificData = {} }: a
   });
 }
 
+async function validateWindsurfProvider({ apiKey, providerSpecificData = {} }: any) {
+  const baseUrl =
+    normalizeBaseUrl(providerSpecificData.apiServerUrl) || "https://server.codeium.com";
+
+  try {
+    const response = await validationWrite(
+      `${baseUrl}/exa.seat_management_pb.SeatManagementService/GetUserStatus`,
+      {
+        method: "POST",
+        headers: applyCustomUserAgent(
+          {
+            "Content-Type": "application/json",
+            "Connect-Protocol-Version": "1",
+            Accept: "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          providerSpecificData
+        ),
+        body: JSON.stringify({
+          metadata: {
+            apiKey,
+            ideName: "windsurf",
+            ideVersion: "1.108.2",
+            extensionName: "windsurf",
+            extensionVersion: "1.108.2",
+            locale: "en",
+          },
+        }),
+      }
+    );
+
+    if (response.ok) {
+      return { valid: true, error: null };
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      return { valid: false, error: "Invalid API key" };
+    }
+
+    if (response.status === 429) {
+      return {
+        valid: true,
+        error: null,
+        warning: "Rate limited, but credentials are valid",
+      };
+    }
+
+    if (response.status >= 400 && response.status < 500) {
+      return { valid: true, error: null };
+    }
+
+    return { valid: false, error: `Windsurf unavailable (${response.status})` };
+  } catch (error: any) {
+    return toValidationErrorResult(error);
+  }
+}
+
 async function validateOpenAICompatibleProvider({ apiKey, providerSpecificData = {} }: any) {
   const baseUrl = normalizeBaseUrl(providerSpecificData.baseUrl);
   if (!baseUrl) {
@@ -1290,6 +1347,7 @@ export async function validateProviderApiKey({ provider, apiKey, providerSpecifi
     databricks: validateDatabricksProvider,
     snowflake: validateSnowflakeProvider,
     gigachat: validateGigachatProvider,
+    windsurf: validateWindsurfProvider,
     "grok-web": validateGrokWebProvider,
     "perplexity-web": validatePerplexityWebProvider,
     vertex: async ({ apiKey }: any) => {

@@ -60,12 +60,11 @@ export async function GET(
     if (action === "authorize") {
       const redirectUri = searchParams.get("redirect_uri") || "http://localhost:8080/callback";
       const authData = generateAuthData(provider, redirectUri);
-      if (provider === "qoder" && !authData.authUrl) {
+      if (!authData.supported) {
         return NextResponse.json({
           ...authData,
           supported: false,
-          error:
-            "Qoder browser OAuth is experimental and disabled by default. Configure QODER_OAUTH_* environment variables or use a Personal Access Token.",
+          error: authData.disabledMessage || `${provider} OAuth is not enabled.`,
         });
       }
       return NextResponse.json(authData);
@@ -232,6 +231,18 @@ export async function POST(
       const normalizedState = typeof state === "string" && state.length > 0 ? state : undefined;
       const providerData = getProvider(provider);
 
+      if (providerData.config?.enabled === false && provider !== "windsurf") {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              providerData.config?.disabledMessage ||
+              `${provider} OAuth is intentionally disabled.`,
+          },
+          { status: 400 }
+        );
+      }
+
       if (providerData.flowType === "authorization_code_pkce" && !codeVerifier) {
         return NextResponse.json(
           {
@@ -291,6 +302,28 @@ export async function POST(
           });
         }
       }
+      if (!connection && provider === "windsurf") {
+        const existing = await getProviderConnections({ provider });
+        const match = existing.find((c: any) => {
+          if (c.authType !== "oauth") return false;
+          return (
+            safeEqual(c.providerSpecificData?.authFlow, tokenData.providerSpecificData?.authFlow) &&
+            safeEqual(
+              c.providerSpecificData?.apiServerUrl,
+              tokenData.providerSpecificData?.apiServerUrl
+            )
+          );
+        });
+        const matchId = typeof match?.id === "string" ? match.id : null;
+        if (matchId) {
+          connection = await updateProviderConnection(matchId, {
+            ...tokenData,
+            expiresAt,
+            testStatus: "active",
+            isActive: true,
+          });
+        }
+      }
       if (!connection) {
         connection = await createProviderConnection({
           provider,
@@ -317,6 +350,19 @@ export async function POST(
 
     if (action === "poll") {
       const { deviceCode, codeVerifier, extraData } = body;
+      const providerData = getProvider(provider);
+
+      if (providerData.config?.enabled === false) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              providerData.config?.disabledMessage ||
+              `${provider} OAuth is intentionally disabled.`,
+          },
+          { status: 400 }
+        );
+      }
 
       // Resolve proxy for this provider (provider-level → global → direct)
       const proxy = await resolveProxyForProvider(provider);

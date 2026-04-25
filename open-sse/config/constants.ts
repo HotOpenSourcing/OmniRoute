@@ -53,6 +53,10 @@ export const OAUTH_ENDPOINTS = {
     token: process.env.QODER_OAUTH_TOKEN_URL || "",
     auth: process.env.QODER_OAUTH_AUTHORIZE_URL || "",
   },
+  windsurf: {
+    token: process.env.WINDSURF_OAUTH_TOKEN_URL || "",
+    auth: process.env.WINDSURF_OAUTH_AUTHORIZE_URL || "",
+  },
   github: {
     token: "https://github.com/login/oauth/access_token",
     auth: "https://github.com/login/oauth/authorize",

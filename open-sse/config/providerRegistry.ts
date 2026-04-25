@@ -24,6 +24,7 @@ import {
   GLM_SHARED_HEADERS,
   GLM_SHARED_MODELS,
 } from "./glmProvider.ts";
+import { WINDSURF_MODELS } from "./windsurfModels.ts";
 import {
   CURSOR_REGISTRY_VERSION,
   getAntigravityProviderHeaders,
@@ -93,7 +94,9 @@ export interface RegistryEntry {
   extraHeaders?: Record<string, string>;
   requestDefaults?: ProviderRequestDefaults;
   oauth?: RegistryOAuth;
-  models: RegistryModel[];
+  runtimeCategory?: "apikey" | "oauth";
+  supportLevel?: string;
+  models: readonly RegistryModel[];
   modelsUrl?: string;
   chatPath?: string;
   clientVersion?: string;
@@ -457,6 +460,26 @@ export const REGISTRY: Record<string, RegistryEntry> = {
       { id: "qwen3-235b-a22b-instruct", name: "Qwen3 235B A22B Instruct" },
       { id: "qwen3-235b", name: "Qwen3 235B" },
     ],
+  },
+
+  windsurf: {
+    id: "windsurf",
+    alias: "ws",
+    format: "openai",
+    executor: "windsurf",
+    baseUrl: "https://server.codeium.com",
+    authType: "apikey",
+    authHeader: "bearer",
+    defaultContextLength: 200000,
+    runtimeCategory: "apikey",
+    supportLevel: "experimental-native-runtime",
+    oauth: {
+      clientIdEnv: "WINDSURF_OAUTH_CLIENT_ID",
+      clientSecretEnv: "WINDSURF_OAUTH_CLIENT_SECRET",
+      tokenUrl: process.env.WINDSURF_OAUTH_TOKEN_URL || "",
+      authUrl: process.env.WINDSURF_OAUTH_AUTHORIZE_URL || "",
+    },
+    models: WINDSURF_MODELS,
   },
 
   antigravity: {
@@ -2007,8 +2030,8 @@ export function generateLegacyProviders(): Record<string, LegacyProvider> {
 }
 
 /** Generate PROVIDER_MODELS map (alias → model list) */
-export function generateModels(): Record<string, RegistryModel[]> {
-  const models: Record<string, RegistryModel[]> = {};
+export function generateModels(): Record<string, readonly RegistryModel[]> {
+  const models: Record<string, readonly RegistryModel[]> = {};
   for (const entry of Object.values(REGISTRY)) {
     if (entry.models && entry.models.length > 0) {
       const key = entry.alias || entry.id;
@@ -2147,6 +2170,7 @@ export function getUnsupportedParams(provider: string, modelId: string): readonl
 export function getProviderCategory(provider: string): "oauth" | "apikey" {
   const entry = getRegistryEntry(provider);
   if (!entry) return "apikey"; // Safe default for unknown providers
+  if (entry.runtimeCategory) return entry.runtimeCategory;
   return entry.authType === "apikey" ? "apikey" : "oauth";
 }
 

@@ -7,7 +7,7 @@ export const PROVIDER_MODELS = generateModels();
 export const PROVIDER_ID_TO_ALIAS = generateAliasMap();
 
 // Helper functions
-export function getProviderModels(aliasOrId: string): RegistryModel[] {
+export function getProviderModels(aliasOrId: string): readonly RegistryModel[] {
   return PROVIDER_MODELS[aliasOrId] || [];
 }
 
@@ -47,7 +47,7 @@ export function getModelTargetFormat(aliasOrId: string, modelId: string): string
   return found?.targetFormat || null;
 }
 
-export function getModelsByProviderId(providerId: string): RegistryModel[] {
+export function getModelsByProviderId(providerId: string): readonly RegistryModel[] {
   const alias = PROVIDER_ID_TO_ALIAS[providerId] || providerId;
   return PROVIDER_MODELS[alias] || [];
 }

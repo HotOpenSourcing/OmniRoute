@@ -538,6 +538,11 @@ export default function OAuthModal({
       let errorParam = null;
       let errorDescription = null;
 
+      if (isManualTokenProvider) {
+        await exchangeTokens(input, state);
+        return;
+      }
+
       try {
         const url = new URL(input);
         code = url.searchParams.get("code");
@@ -671,7 +676,9 @@ export default function OAuthModal({
                 </div>
               )}
               <div>
-                <p className="text-sm font-medium mb-2">{t("step1OpenUrl")}</p>
+                <p className="text-sm font-medium mb-2">
+                  {isManualTokenProvider ? "Step 1: Open Windsurf token page" : t("step1OpenUrl")}
+                </p>
                 <div className="flex gap-2">
                   <Input
                     value={authData?.authUrl || ""}
@@ -689,19 +696,27 @@ export default function OAuthModal({
               </div>
 
               <div>
-                <p className="text-sm font-medium mb-2">{t("step2PasteCallback")}</p>
+                <p className="text-sm font-medium mb-2">
+                  {isManualTokenProvider
+                    ? "Step 2: Paste the Windsurf auth token"
+                    : t("step2PasteCallback")}
+                </p>
                 <p className="text-xs text-text-muted mb-2">
-                  {t.rich("step2Hint", {
-                    code: (c) => <code className="font-mono">{c}</code>,
-                  })}
+                  {isManualTokenProvider
+                    ? "Use the token shown by Windsurf's auth page or backup login flow. OmniRoute will exchange it for a Windsurf API key experimentally."
+                    : t.rich("step2Hint", {
+                        code: (c) => <code className="font-mono">{c}</code>,
+                      })}
                 </p>
                 <Input
                   value={callbackUrl}
                   onChange={(e) => setCallbackUrl(e.target.value)}
                   placeholder={
-                    provider === "claude" || provider === "cline"
-                      ? "code#state or /callback?code=..."
-                      : placeholderUrl
+                    isManualTokenProvider
+                      ? "Paste Windsurf auth token"
+                      : provider === "claude" || provider === "cline"
+                        ? "code#state or /callback?code=..."
+                        : placeholderUrl
                   }
                   className="font-mono text-xs"
                 />
@@ -710,7 +725,7 @@ export default function OAuthModal({
 
             <div className="flex gap-2">
               <Button onClick={handleManualSubmit} fullWidth disabled={!callbackUrl || !authData}>
-                {t("connect")}
+                {isManualTokenProvider ? "Exchange Token" : t("connect")}
               </Button>
               <Button onClick={onClose} variant="ghost" fullWidth>
                 {t("cancel")}
