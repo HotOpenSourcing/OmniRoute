@@ -28,6 +28,7 @@ ENV NODE_ENV=production
 ENV PORT=20128
 ENV HOSTNAME=0.0.0.0
 ENV NODE_OPTIONS="--max-old-space-size=256"
+ENV OMNIROUTE_MIGRATIONS_DIR=/app/migrations
 
 # Data directory inside Docker — must match the volume mount in docker-compose.yml
 ENV DATA_DIR=/app/data
@@ -46,6 +47,7 @@ COPY --from=builder /app/node_modules/@swc/helpers ./node_modules/@swc/helpers
 COPY --from=builder /app/node_modules/pino-abstract-transport ./node_modules/pino-abstract-transport
 COPY --from=builder /app/node_modules/pino-pretty ./node_modules/pino-pretty
 COPY --from=builder /app/node_modules/split2 ./node_modules/split2
+COPY --from=builder /app/src/lib/db/migrations ./migrations
 COPY --from=builder /app/scripts/run-standalone.mjs ./run-standalone.mjs
 COPY --from=builder /app/scripts/runtime-env.mjs ./runtime-env.mjs
 COPY --from=builder /app/scripts/bootstrap-env.mjs ./bootstrap-env.mjs
