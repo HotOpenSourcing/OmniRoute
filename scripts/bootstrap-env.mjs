@@ -277,7 +277,7 @@ export function bootstrapEnv({ dataDirOverride, quiet = false } = {}) {
             );
             log(`   Restore the previous key in ${serverEnvPath} or your deployment environment,`);
             log(
-              "   or run in the container: DATA_DIR=/app/data node bin/omniroute.mjs reset-encrypted-columns --force"
+              "   or run in the container: DATA_DIR=/app/data node ./bin/omniroute.mjs reset-encrypted-columns --force"
             );
             log("   Resetting wipes stored credentials only; provider metadata is preserved.");
           }
