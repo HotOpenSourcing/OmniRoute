@@ -79,3 +79,27 @@ test("decrypt returns null when the value is malformed or the key is wrong", asy
   assert.equal(secondModule.decrypt(encrypted), null);
   assert.equal(secondModule.decrypt("enc:v1:not-valid"), null);
 });
+
+test("decrypt logs only once for repeated failures of the same ciphertext", async () => {
+  process.env.STORAGE_ENCRYPTION_KEY = "task-304-secret-e";
+  const firstModule = await importFresh("src/lib/db/encryption.ts");
+  const encrypted = firstModule.encrypt("top-secret");
+
+  process.env.STORAGE_ENCRYPTION_KEY = "task-304-secret-f";
+  const secondModule = await importFresh("src/lib/db/encryption.ts");
+  const originalError = console.error;
+  const errors = [];
+  console.error = (...args) => errors.push(args.join(" "));
+
+  try {
+    assert.equal(secondModule.decrypt(encrypted), null);
+    assert.equal(secondModule.decrypt(encrypted), null);
+  } finally {
+    console.error = originalError;
+  }
+
+  assert.equal(
+    errors.filter((line) => line.includes("Decryption failed. Ciphertext prefix")).length,
+    1
+  );
+});

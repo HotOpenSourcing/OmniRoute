@@ -17,6 +17,7 @@ const PREFIX = "enc:v1:";
 
 let _derivedKey: Buffer | null = null;
 let _legacyDerivedKey: Buffer | null = null;
+const loggedDecryptFailures = new Set<string>();
 
 /** Connection object with potentially encrypted credential fields. */
 export interface ConnectionFields {
@@ -178,10 +179,14 @@ export function decrypt(ciphertext: string | null | undefined): string | null | 
       }
     }
 
-    console.error(
-      `[Encryption] Decryption failed. Ciphertext prefix: ${ciphertext.slice(0, 30)}... ` +
-        `Auth tag validation likely failed.`
-    );
+    const failureKey = ciphertext.slice(0, 30);
+    if (!loggedDecryptFailures.has(failureKey)) {
+      loggedDecryptFailures.add(failureKey);
+      console.error(
+        `[Encryption] Decryption failed. Ciphertext prefix: ${failureKey}... ` +
+          `Auth tag validation likely failed. This value will be suppressed in subsequent logs.`
+      );
+    }
     return null;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);

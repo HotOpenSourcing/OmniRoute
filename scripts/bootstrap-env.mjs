@@ -18,7 +18,7 @@
  *   4. process.env            (shell / Docker -e flags, highest priority)
  */
 
-import { randomBytes, createDecipheriv } from "node:crypto";
+import { createDecipheriv, createHash, randomBytes, scryptSync } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { homedir } from "node:os";
@@ -123,6 +123,38 @@ function writeEnvFile(filePath, env) {
     "",
   ];
   writeFileSync(filePath, lines.join("\n"), "utf8");
+}
+
+function deriveStorageEncryptionKeys(secret) {
+  const salt = createHash("sha256").update(secret).digest().slice(0, 16);
+  const currentKey = scryptSync(secret, salt, 32);
+  const legacyKey = scryptSync(secret, "omniroute-field-encryption-v1", 32);
+  return [currentKey, legacyKey];
+}
+
+function canDecryptCredential(ciphertext, secret) {
+  if (!ciphertext?.startsWith("enc:v1:")) return true;
+
+  const parts = ciphertext.split(":");
+  if (parts.length < 5) return false;
+
+  const iv = Buffer.from(parts[2], "hex");
+  const ct = Buffer.from(parts[3], "hex");
+  const tag = Buffer.from(parts[4], "hex");
+
+  for (const key of deriveStorageEncryptionKeys(secret)) {
+    try {
+      const decipher = createDecipheriv("aes-256-gcm", key, iv);
+      decipher.setAuthTag(tag);
+      decipher.update(ct);
+      decipher.final();
+      return true;
+    } catch {
+      // Try the next supported key derivation.
+    }
+  }
+
+  return false;
 }
 
 // ── Main bootstrap function ──────────────────────────────────────────────────
@@ -239,32 +271,15 @@ export function bootstrapEnv({ dataDirOverride, quiet = false } = {}) {
           .get();
         if (row) {
           const ciphertext = row.api_key || row.access_token || row.refresh_token || row.id_token;
-          if (ciphertext?.startsWith("enc:v1:")) {
-            const parts = ciphertext.split(":");
-            // enc:v1:<iv>:<ct>:<tag>
-            if (parts.length >= 5) {
-              const iv = Buffer.from(parts[2], "hex");
-              const ct = Buffer.from(parts[3], "hex");
-              const tag = Buffer.from(parts[4], "hex");
-              const key = Buffer.from(merged.STORAGE_ENCRYPTION_KEY, "hex");
-              const decipher = createDecipheriv("aes-256-gcm", key, iv);
-              decipher.setAuthTag(tag);
-              try {
-                decipher.update(ct);
-                decipher.final();
-                // Decrypt succeeded — key matches
-              } catch {
-                log(
-                  "⛔ STORAGE_ENCRYPTION_KEY does not match the key used to encrypt your stored credentials."
-                );
-                log(
-                  "   Either restore your previous key via ~/.omniroute/server.env or ~/.omniroute/.env,"
-                );
-                log(
-                  "   or run: omniroute reset-encrypted-columns --force  (wipes credentials, keeps provider config)"
-                );
-              }
-            }
+          if (!canDecryptCredential(ciphertext, merged.STORAGE_ENCRYPTION_KEY)) {
+            log(
+              "⛔ STORAGE_ENCRYPTION_KEY does not match the key used to encrypt your stored credentials."
+            );
+            log(`   Restore the previous key in ${serverEnvPath} or your deployment environment,`);
+            log(
+              "   or run in the container: DATA_DIR=/app/data node bin/omniroute.mjs reset-encrypted-columns --force"
+            );
+            log("   Resetting wipes stored credentials only; provider metadata is preserved.");
           }
         }
       } finally {
