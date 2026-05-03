@@ -29,6 +29,23 @@ class WindsurfPassiveCascadeObserverTests(unittest.TestCase):
         self.assertEqual(records[0]["surface"], "live_runtime_log")
         self.assertEqual(records[0]["metadata"]["pid"], 24516)
 
+    def test_reads_exthost_log_and_emits_submit_proximate_signal(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            file_path = pathlib.Path(tmpdir) / "exthost.log"
+            file_path.write_text(
+                "2026-05-03 14:52:47.215 [info] ExtensionService#_doActivateExtension codeium.windsurf, startup: false, activationEvent: '*'\n",
+                encoding="utf-8",
+            )
+
+            records = module.read_plaintext_runtime_records(file_path)
+
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["event"], "PlaintextRuntimeBootstrap")
+        self.assertEqual(records[0]["type"], "SUBMIT_PROXIMATE_SIGNAL")
+        self.assertEqual(records[0]["timestamp"], "2026-05-03T14:52:47.215Z")
+        self.assertEqual(records[0]["surface"], "live_runtime_log")
+        self.assertEqual(records[0]["metadata"]["reason"], "codeium.windsurf extension activation")
+
     def test_read_plaintext_log_records_extracts_start_cascade_with_adjacent_session_id(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             file_path = pathlib.Path(tmpdir) / "Windsurf.log"
@@ -702,6 +719,56 @@ class WindsurfPassiveCascadeObserverTests(unittest.TestCase):
                 },
             }
         ])
+
+    def test_plaintext_log_ignores_identity_hint_outside_three_line_window(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = pathlib.Path(tmpdir) / "Windsurf.log"
+            log_path.write_text(
+                "\n".join([
+                    "sessionId=too-early",
+                    "unrelated noise",
+                    "2026-05-02 18:52:52.108 [info] /exa.language_server_pb.LanguageServerService/SendUserCascadeMessage",
+                ]),
+                encoding="utf-8",
+            )
+
+            snapshot = module.observe_passive_cascade_from_jsonl([log_path])
+
+        self.assertEqual(snapshot["status"], "observed")
+        self.assertIsNone(snapshot["events"][0]["sessionId"])
+
+    def test_plaintext_log_conflicting_adjacent_identities_fail_closed(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = pathlib.Path(tmpdir) / "Windsurf.log"
+            log_path.write_text(
+                "\n".join([
+                    "sessionId=session-one",
+                    "2026-05-02 18:52:52.108 [info] /exa.language_server_pb.LanguageServerService/SendUserCascadeMessage",
+                    "sessionId=session-two",
+                ]),
+                encoding="utf-8",
+            )
+
+            snapshot = module.observe_passive_cascade_from_jsonl([log_path])
+
+        self.assertEqual(snapshot["status"], "observed")
+        self.assertIsNone(snapshot["events"][0]["sessionId"])
+
+    def test_plaintext_log_malformed_adjacent_jwt_stays_passive(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = pathlib.Path(tmpdir) / "Windsurf.log"
+            log_path.write_text(
+                "\n".join([
+                    "2026-05-02 18:52:52.108 [info] /exa.language_server_pb.LanguageServerService/StartCascade",
+                    "devin-session-token$not-a-jwt",
+                ]),
+                encoding="utf-8",
+            )
+
+            snapshot = module.observe_passive_cascade_from_jsonl([log_path])
+
+        self.assertEqual(snapshot["status"], "observed")
+        self.assertIsNone(snapshot["events"][0]["sessionId"])
 
 
 if __name__ == "__main__":

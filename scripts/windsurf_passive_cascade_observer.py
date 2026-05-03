@@ -80,6 +80,47 @@ def _extract_explicit_session_id(text: str) -> str | None:
     return None
 
 
+def _extract_session_id_from_plaintext_window(lines: list[str], index: int) -> str | None:
+    # Try same-line explicit first
+    same_line = lines[index]
+    session_id = _extract_explicit_session_id(same_line)
+    if session_id:
+        return session_id
+
+    # Collect adjacent explicit identities
+    adjacent_explicit: set[str] = set()
+    for offset in [-1, 1]:
+        adj_index = index + offset
+        if 0 <= adj_index < len(lines):
+            adj_session = _extract_explicit_session_id(lines[adj_index])
+            if adj_session:
+                adjacent_explicit.add(adj_session)
+
+    if len(adjacent_explicit) == 1:
+        return next(iter(adjacent_explicit))
+    if len(adjacent_explicit) > 1:
+        return None  # Conflicting adjacent identities
+
+    # Try same-line JWT
+    session_id = extract_session_id_from_har_post_data_text(same_line)
+    if session_id:
+        return session_id
+
+    # Collect adjacent JWT identities
+    adjacent_jwt: set[str] = set()
+    for offset in [-1, 1]:
+        adj_index = index + offset
+        if 0 <= adj_index < len(lines):
+            adj_session = extract_session_id_from_har_post_data_text(lines[adj_index])
+            if adj_session:
+                adjacent_jwt.add(adj_session)
+
+    if len(adjacent_jwt) == 1:
+        return next(iter(adjacent_jwt))
+
+    return None
+
+
 BOOTSTRAP_LOG_PATTERNS = {
     "LS_START": re.compile(
         r"^(?P<date>\d{4}-\d{2}-\d{2})\s+(?P<time>\d{2}:\d{2}:\d{2}\.\d{3}).*?Starting language server process with pid (?P<pid>\d+)"
@@ -92,6 +133,9 @@ BOOTSTRAP_LOG_PATTERNS = {
     ),
     "ACP_AGENT_REGISTERED": re.compile(
         r"^(?P<date>\d{4}-\d{2}-\d{2})\s+(?P<time>\d{2}:\d{2}:\d{2}\.\d{3}).*?Registering agent \"(?P<agent>[^\"]+)\""
+    ),
+    "SUBMIT_PROXIMATE_SIGNAL": re.compile(
+        r"^(?P<date>\d{4}-\d{2}-\d{2})\s+(?P<time>\d{2}:\d{2}:\d{2}\.\d{3}).*?ExtensionService#_doActivateExtension codeium\.windsurf"
     ),
 }
 
@@ -126,6 +170,8 @@ def read_plaintext_runtime_records(path: str | pathlib.Path) -> list[dict[str, A
                 record["metadata"]["port"] = int(match.group("port"))
             elif event_type == "ACP_AGENT_REGISTERED":
                 record["metadata"]["agent"] = match.group("agent")
+            elif event_type == "SUBMIT_PROXIMATE_SIGNAL":
+                record["metadata"]["reason"] = "codeium.windsurf extension activation"
 
             records.append(record)
             break
@@ -147,10 +193,7 @@ def read_plaintext_log_records(path: str | pathlib.Path) -> list[dict[str, Any]]
         match = pattern.search(line)
         if not match:
             continue
-        window = _build_fixed_line_window(lines, index)
-        session_id = _extract_explicit_session_id(window)
-        if not session_id:
-            session_id = extract_session_id_from_har_post_data_text(window)
+        session_id = _extract_session_id_from_plaintext_window(lines, index)
         record = {
             "event": "PlaintextLogRpcCall",
             "timestamp": f"{match.group('date')}T{match.group('time')}Z",
