@@ -170,14 +170,153 @@ docs/superpowers/
 # GitNexus local index
 .gitnexus
 .worktrees
+/.worktrees/
 bin/omniroute.mjs
 
 # Consistent with .dockerignore / .npmignore
 .omc/
 audit-report.json
 bun.lock
-*.json
-*.txt
-*.py
-*.log
-artifacts/windsurf-native/*
+
+# Windsurf Investigation - Temporary Files and Captures
+# Added: 2026-05-03
+
+# Windsurf binary captures (protocol messages)
+windsurf_*.bin
+model_identity_response.bin
+trajectory_for_model_analysis.bin
+
+# Windsurf JSONL captures (runtime traces)
+windsurf-auth-runtime-capture.jsonl
+windsurf-electron-lifecycle-trace.jsonl
+windsurf-live-request-capture.jsonl
+windsurf-model-runtime-capture.jsonl
+
+# Windsurf temporary investigation files (dated)
+tmp_*windsurf*.mjs
+tmp_*windsurf*.cjs
+tmp_*windsurf*.js
+tmp_*windsurf*.py
+tmp_break_on_*.mjs
+tmp_capture_*.mjs
+tmp_decode_*.cjs
+tmp_deep_scan_*.mjs
+tmp_extract_*.mjs
+tmp_inspect_*.mjs
+tmp_install_*.mjs
+tmp_list_*.mjs
+tmp_live_*.mjs
+tmp_patch_*.mjs
+tmp_read_*.mjs
+tmp_targeted_*.mjs
+tmp_test_*.mjs
+tmp_verify_*.mjs
+tmp_windsurf_constructor_snippet.js
+
+# Windsurf temporary directories
+tmp_windsurf_*/
+
+# Windsurf auth tokens (sensitive)
+AUTHTOKENWIND
+windsurf_tokens.json
+windsurf_captured_tokens.json
+windsurf_inspector_tokens.json
+windsurf_leveldb_tokens.json
+windsurf_memory_tokens.json
+
+# Windsurf investigation output files
+windsurf_capture_log.txt
+windsurf_api_analysis.json
+windsurf_endpoint_discovery.json
+windsurf_network_monitor.json
+windsurf_probe_final_run.json
+windsurf-acp-*.json
+windsurf-live-*.json
+windsurf-model-*.json
+
+# Windsurf log files
+windsurf-direct-launch.log
+windsurf-hook-launch.log
+windsurf-noop-launch.log
+
+# Windsurf response files
+reponce
+windsurf_hello_french.bin
+windsurf_model_response.bin
+windsurf_response_new.bin
+windsurf_send_message.bin
+windsurf_start_cascade.bin
+
+# Fiddler captures
+fiddler/
+
+# Python cache
+tests/unit/__pycache__/
+
+# Build/output files
+npm-run-verbose.out
+typecheck-core.out
+
+# Windsurf root-level documentation (investigation artifacts - already archived)
+WINDSURF_API_INVESTIGATION_FINAL_REPORT.md
+WINDSURF_API_TESTING_GUIDE.md
+WINDSURF_ASSIGNMODEL_INVESTIGATION.md
+WINDSURF_AUTH_FINAL_SUMMARY.md
+WINDSURF_AUTH_INVESTIGATION_SUMMARY.md
+WINDSURF_AUTH_PROTOCOL.md
+WINDSURF_DOCUMENTATION_INDEX.md
+WINDSURF_IMMEDIATE_TEST.md
+WINDSURF_INVESTIGATION_FINAL_SUMMARY.md
+WINDSURF_INVESTIGATION_INDEX.md
+WINDSURF_PROBE_COMPLETE.md
+WINDSURF_PROBE_QUICKSTART.md
+WINDSURF_QUICKSTART.md
+WINDSURF_QUICK_REFERENCE.md
+WINDSURF_TEST_FINAL_SUMMARY.md
+QUICKSTART-TOKEN-CAPTURE.md
+START_HERE.md
+STEP AUTH
+
+# Windsurf scripts documentation (investigation artifacts - already archived)
+scripts/5-MINUTE_QUICK_START.md
+scripts/ALPHABETICAL_INDEX.md
+scripts/CDP_INJECTION_GUIDE.md
+scripts/CELEBRATION.md
+scripts/CHANGELOG.md
+scripts/CHEAT_SHEET.md
+scripts/COMPLETE_FILE_INDEX.md
+scripts/CONTRIBUTING.md
+scripts/EXECUTIVE_SUMMARY.md
+scripts/FAQ.md
+scripts/FILE_NAVIGATOR.md
+scripts/FINAL_DELIVERY_REPORT.md
+scripts/FINAL_FILE_INVENTORY.md
+scripts/FINAL_OFFICIAL_CLOSURE.md
+scripts/FINAL_SUMMARY.md
+scripts/GLOSSARY.md
+scripts/HANDOFF.md
+scripts/INDEX.md
+scripts/INTEGRATION_GUIDE.md
+scripts/MAINTENANCE_GUIDE.md
+scripts/MANUAL_TEST_GUIDE.md
+scripts/OFFICIAL_PROJECT_CLOSURE.md
+scripts/PROJECT_CLOSURE.md
+scripts/PROJECT_COMPLETE.md
+scripts/PROJECT_STATUS.md
+scripts/README.md
+scripts/README_AUTH_TOOLKIT.md
+scripts/README_GITHUB.md
+scripts/README_SIMPLE.md
+scripts/SCRIPTS_MAY_2026.md
+scripts/SUMMARY.md
+scripts/TEST_REPORT.md
+scripts/ULTRA_QUICK_REF.md
+scripts/VISUAL_ARCHITECTURE.md
+scripts/WINDSURF_AUTH_FLOW.md
+
+# Windsurf native artifacts (large directory - already archived)
+artifacts/windsurf-native/
+
+# Windsurf archive scripts (keep these - they're tools)
+# scripts/copy_windsurf_archive.ps1
+# scripts/copy_windsurf_analysis_complete.ps1
