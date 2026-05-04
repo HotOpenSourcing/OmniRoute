@@ -1,0 +1,54 @@
+{
+  "timestamp": "2026-05-04T13:06:00Z",
+  "source": "SetUserSettings protobuf capture",
+  "total_models": 8,
+  "models": [
+    {
+      "base_name": "claude-opus-4-6-thinking",
+      "full_uid": "claude-opus-4-6-thinking-20260424",
+      "discovered_from": "SetUserSettings protobuf"
+    },
+    {
+      "base_name": "claude-opus-4-7-medium",
+      "full_uid": "claude-opus-4-7-medium-20260424",
+      "discovered_from": "SetUserSettings protobuf"
+    },
+    {
+      "base_name": "claude-sonnet-4-6-thinking",
+      "full_uid": "claude-sonnet-4-6-thinking-20260424",
+      "discovered_from": "SetUserSettings protobuf"
+    },
+    {
+      "base_name": "deepseek-v4",
+      "full_uid": "deepseek-v4-20260424",
+      "discovered_from": "SetUserSettings protobuf"
+    },
+    {
+      "base_name": "gpt-5-5-low",
+      "full_uid": "gpt-5-5-low-20260424",
+      "discovered_from": "SetUserSettings protobuf"
+    },
+    {
+      "base_name": "kimi-k2-6",
+      "full_uid": "kimi-k2-6-20260424",
+      "discovered_from": "SetUserSettings protobuf"
+    },
+    {
+      "base_name": "swe-1-6",
+      "full_uid": "swe-1-6-20260424",
+      "discovered_from": "SetUserSettings protobuf"
+    },
+    {
+      "base_name": "swe-1-6-fast",
+      "full_uid": "swe-1-6-fast-20260424",
+      "discovered_from": "SetUserSettings protobuf"
+    }
+  ],
+  "categories": {
+    "Claude": ["claude-opus-4-6-thinking", "claude-opus-4-7-medium", "claude-sonnet-4-6-thinking"],
+    "GPT": ["gpt-5-5-low"],
+    "DeepSeek": ["deepseek-v4"],
+    "Chinese": ["kimi-k2-6"],
+    "SWE": ["swe-1-6", "swe-1-6-fast"]
+  }
+}

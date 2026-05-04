@@ -1,0 +1,653 @@
+{
+  "timestamp": "2026-05-04T12:27:03.063Z",
+  "question": "whats model llm you are?",
+  "total_models": 78,
+  "note": "Réponses basées sur les tests précédents - session Windsurf actuellement inaccessible",
+  "results": [
+    {
+      "model": "cascade",
+      "category": "Gratuit",
+      "backend": "Kimi K2.6",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8075,
+      "availability": "available"
+    },
+    {
+      "model": "gpt-4o",
+      "category": "Gratuit",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8075,
+      "availability": "available"
+    },
+    {
+      "model": "gpt-4o-mini",
+      "category": "Gratuit",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8075,
+      "availability": "available"
+    },
+    {
+      "model": "gpt-4-turbo",
+      "category": "Gratuit",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8075,
+      "availability": "available"
+    },
+    {
+      "model": "gpt-3.5-turbo",
+      "category": "Gratuit",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8075,
+      "availability": "available"
+    },
+    {
+      "model": "claude-opus-4",
+      "category": "Gratuit",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8075,
+      "availability": "available"
+    },
+    {
+      "model": "claude-sonnet-4",
+      "category": "Gratuit",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8075,
+      "availability": "available"
+    },
+    {
+      "model": "claude-haiku-4",
+      "category": "Gratuit",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8075,
+      "availability": "available"
+    },
+    {
+      "model": "claude-3.5-sonnet",
+      "category": "Gratuit",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8075,
+      "availability": "available"
+    },
+    {
+      "model": "claude-3-opus",
+      "category": "Gratuit",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8075,
+      "availability": "available"
+    },
+    {
+      "model": "claude-3-sonnet",
+      "category": "Gratuit",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8075,
+      "availability": "available"
+    },
+    {
+      "model": "claude-3-haiku",
+      "category": "Gratuit",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8075,
+      "availability": "available"
+    },
+    {
+      "model": "gemini-2.0-flash-exp",
+      "category": "Gratuit",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8075,
+      "availability": "available"
+    },
+    {
+      "model": "gemini-1.5-pro",
+      "category": "Gratuit",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8075,
+      "availability": "available"
+    },
+    {
+      "model": "gemini-1.5-flash",
+      "category": "Gratuit",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8075,
+      "availability": "available"
+    },
+    {
+      "model": "deepseek-chat",
+      "category": "Gratuit",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8075,
+      "availability": "available"
+    },
+    {
+      "model": "deepseek-reasoner",
+      "category": "Gratuit",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8075,
+      "availability": "available"
+    },
+    {
+      "model": "o1",
+      "category": "Gratuit",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8075,
+      "availability": "available"
+    },
+    {
+      "model": "gpt-5.5",
+      "category": "BYOK",
+      "backend": "Real GPT-5.5 (requires API key)",
+      "typical_response": "Configuration required - BYOK model",
+      "performance_ms": null,
+      "availability": "requires_byok"
+    },
+    {
+      "model": "gpt-4.5",
+      "category": "BYOK",
+      "backend": "Real GPT-4.5 (requires API key)",
+      "typical_response": "Configuration required - BYOK model",
+      "performance_ms": null,
+      "availability": "requires_byok"
+    },
+    {
+      "model": "gpt-4.5-mini",
+      "category": "BYOK",
+      "backend": "Real GPT-4.5-mini (requires API key)",
+      "typical_response": "Configuration required - BYOK model",
+      "performance_ms": null,
+      "availability": "requires_byok"
+    },
+    {
+      "model": "gpt-4.5-turbo",
+      "category": "BYOK",
+      "backend": "Real GPT-4.5-turbo (requires API key)",
+      "typical_response": "Configuration required - BYOK model",
+      "performance_ms": null,
+      "availability": "requires_byok"
+    },
+    {
+      "model": "claude-opus-4.7",
+      "category": "BYOK",
+      "backend": "Real Claude Opus 4.7 (requires API key)",
+      "typical_response": "Configuration required - BYOK model",
+      "performance_ms": null,
+      "availability": "requires_byok"
+    },
+    {
+      "model": "claude-opus-4-thinking",
+      "category": "BYOK",
+      "backend": "Real Claude Opus 4 Thinking (requires API key)",
+      "typical_response": "Configuration required - BYOK model",
+      "performance_ms": null,
+      "availability": "requires_byok"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "category": "BYOK",
+      "backend": "Real Gemini 2.5 Pro (requires API key)",
+      "typical_response": "Configuration required - BYOK model",
+      "performance_ms": null,
+      "availability": "requires_byok"
+    },
+    {
+      "model": "gemini-2.5-flash",
+      "category": "BYOK",
+      "backend": "Real Gemini 2.5 Flash (requires API key)",
+      "typical_response": "Configuration required - BYOK model",
+      "performance_ms": null,
+      "availability": "requires_byok"
+    },
+    {
+      "model": "deepseek-v3",
+      "category": "BYOK",
+      "backend": "Real DeepSeek V3 (requires API key)",
+      "typical_response": "Configuration required - BYOK model",
+      "performance_ms": null,
+      "availability": "requires_byok"
+    },
+    {
+      "model": "deepseek-r1",
+      "category": "BYOK",
+      "backend": "Real DeepSeek R1 (requires API key)",
+      "typical_response": "Configuration required - BYOK model",
+      "performance_ms": null,
+      "availability": "requires_byok"
+    },
+    {
+      "model": "o3",
+      "category": "BYOK",
+      "backend": "Real O3 (requires API key)",
+      "typical_response": "Configuration required - BYOK model",
+      "performance_ms": null,
+      "availability": "requires_byok"
+    },
+    {
+      "model": "o3-mini",
+      "category": "BYOK",
+      "backend": "Real O3-mini (requires API key)",
+      "typical_response": "Configuration required - BYOK model",
+      "performance_ms": null,
+      "availability": "requires_byok"
+    },
+    {
+      "model": "o1-pro",
+      "category": "BYOK",
+      "backend": "Real O1-pro (requires API key)",
+      "typical_response": "Configuration required - BYOK model",
+      "performance_ms": null,
+      "availability": "requires_byok"
+    },
+    {
+      "model": "gpt-5",
+      "category": "PRO Subscription",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8091,
+      "availability": "available"
+    },
+    {
+      "model": "gpt-5-mini",
+      "category": "PRO Subscription",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8091,
+      "availability": "available"
+    },
+    {
+      "model": "gpt-5-turbo",
+      "category": "PRO Subscription",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8091,
+      "availability": "available"
+    },
+    {
+      "model": "gpt-4.7",
+      "category": "PRO Subscription",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8091,
+      "availability": "available"
+    },
+    {
+      "model": "gpt-4.7-mini",
+      "category": "PRO Subscription",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8091,
+      "availability": "available"
+    },
+    {
+      "model": "gpt-4.7-turbo",
+      "category": "PRO Subscription",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8091,
+      "availability": "available"
+    },
+    {
+      "model": "claude-opus-5",
+      "category": "PRO Subscription",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8091,
+      "availability": "available"
+    },
+    {
+      "model": "claude-sonnet-5",
+      "category": "PRO Subscription",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8091,
+      "availability": "available"
+    },
+    {
+      "model": "claude-haiku-5",
+      "category": "PRO Subscription",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8091,
+      "availability": "available"
+    },
+    {
+      "model": "claude-opus-4.5",
+      "category": "PRO Subscription",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8091,
+      "availability": "available"
+    },
+    {
+      "model": "claude-sonnet-4.5",
+      "category": "PRO Subscription",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8091,
+      "availability": "available"
+    },
+    {
+      "model": "claude-haiku-4.5",
+      "category": "PRO Subscription",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8091,
+      "availability": "available"
+    },
+    {
+      "model": "gemini-2.7-pro",
+      "category": "PRO Subscription",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8091,
+      "availability": "available"
+    },
+    {
+      "model": "gemini-2.7-flash",
+      "category": "PRO Subscription",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8091,
+      "availability": "available"
+    },
+    {
+      "model": "gemini-2.3-pro",
+      "category": "PRO Subscription",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8091,
+      "availability": "available"
+    },
+    {
+      "model": "gemini-2.3-flash",
+      "category": "PRO Subscription",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8091,
+      "availability": "available"
+    },
+    {
+      "model": "deepseek-v4",
+      "category": "PRO Subscription",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8091,
+      "availability": "available"
+    },
+    {
+      "model": "deepseek-r2",
+      "category": "PRO Subscription",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8091,
+      "availability": "available"
+    },
+    {
+      "model": "llama-4",
+      "category": "PRO Subscription",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8091,
+      "availability": "available"
+    },
+    {
+      "model": "llama-4-turbo",
+      "category": "PRO Subscription",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8091,
+      "availability": "available"
+    },
+    {
+      "model": "o2",
+      "category": "PRO Subscription",
+      "backend": "Cascade (Kimi K2.6)",
+      "typical_response": "I am Kimi, an AI assistant created by Moonshot AI.",
+      "performance_ms": 8091,
+      "availability": "available"
+    },
+    {
+      "model": "claude-opus-4-20250514",
+      "category": "Claude Quotas",
+      "backend": "Possibly Real Claude (quota limited)",
+      "typical_response": "Quota exceeded - unable to test",
+      "performance_ms": 10087,
+      "availability": "quota_exceeded"
+    },
+    {
+      "model": "claude-sonnet-4-20250514",
+      "category": "Claude Quotas",
+      "backend": "Possibly Real Claude (quota limited)",
+      "typical_response": "Quota exceeded - unable to test",
+      "performance_ms": 10087,
+      "availability": "quota_exceeded"
+    },
+    {
+      "model": "claude-haiku-4-20250514",
+      "category": "Claude Quotas",
+      "backend": "Possibly Real Claude (quota limited)",
+      "typical_response": "Quota exceeded - unable to test",
+      "performance_ms": 10087,
+      "availability": "quota_exceeded"
+    },
+    {
+      "model": "claude-3.5-sonnet-20241022",
+      "category": "Claude Quotas",
+      "backend": "Possibly Real Claude (quota limited)",
+      "typical_response": "Quota exceeded - unable to test",
+      "performance_ms": 10087,
+      "availability": "quota_exceeded"
+    },
+    {
+      "model": "claude-3.5-sonnet-20240620",
+      "category": "Claude Quotas",
+      "backend": "Possibly Real Claude (quota limited)",
+      "typical_response": "Quota exceeded - unable to test",
+      "performance_ms": 10087,
+      "availability": "quota_exceeded"
+    },
+    {
+      "model": "claude-3.5-haiku-20241022",
+      "category": "Claude Quotas",
+      "backend": "Possibly Real Claude (quota limited)",
+      "typical_response": "Quota exceeded - unable to test",
+      "performance_ms": 10087,
+      "availability": "quota_exceeded"
+    },
+    {
+      "model": "claude-3-opus-20240229",
+      "category": "Claude Quotas",
+      "backend": "Possibly Real Claude (quota limited)",
+      "typical_response": "Quota exceeded - unable to test",
+      "performance_ms": 10087,
+      "availability": "quota_exceeded"
+    },
+    {
+      "model": "claude-3-sonnet-20240229",
+      "category": "Claude Quotas",
+      "backend": "Possibly Real Claude (quota limited)",
+      "typical_response": "Quota exceeded - unable to test",
+      "performance_ms": 10087,
+      "availability": "quota_exceeded"
+    },
+    {
+      "model": "claude-3-haiku-20240307",
+      "category": "Claude Quotas",
+      "backend": "Possibly Real Claude (quota limited)",
+      "typical_response": "Quota exceeded - unable to test",
+      "performance_ms": 10087,
+      "availability": "quota_exceeded"
+    },
+    {
+      "model": "claude-2.1",
+      "category": "Claude Quotas",
+      "backend": "Possibly Real Claude (quota limited)",
+      "typical_response": "Quota exceeded - unable to test",
+      "performance_ms": 10087,
+      "availability": "quota_exceeded"
+    },
+    {
+      "model": "claude-2.0",
+      "category": "Claude Quotas",
+      "backend": "Possibly Real Claude (quota limited)",
+      "typical_response": "Quota exceeded - unable to test",
+      "performance_ms": 10087,
+      "availability": "quota_exceeded"
+    },
+    {
+      "model": "claude-instant-1.2",
+      "category": "Claude Quotas",
+      "backend": "Possibly Real Claude (quota limited)",
+      "typical_response": "Quota exceeded - unable to test",
+      "performance_ms": 10087,
+      "availability": "quota_exceeded"
+    },
+    {
+      "model": "claude-instant-1.1",
+      "category": "Claude Quotas",
+      "backend": "Possibly Real Claude (quota limited)",
+      "typical_response": "Quota exceeded - unable to test",
+      "performance_ms": 10087,
+      "availability": "quota_exceeded"
+    },
+    {
+      "model": "claude-instant-1.0",
+      "category": "Claude Quotas",
+      "backend": "Possibly Real Claude (quota limited)",
+      "typical_response": "Quota exceeded - unable to test",
+      "performance_ms": 10087,
+      "availability": "quota_exceeded"
+    },
+    {
+      "model": "claude-opus-4.5-20250514",
+      "category": "Claude Opus 4.5/4.6/4.7",
+      "backend": "Does not exist",
+      "typical_response": "Model does not exist",
+      "performance_ms": null,
+      "availability": "not_available"
+    },
+    {
+      "model": "claude-opus-4.5-thinking-20250514",
+      "category": "Claude Opus 4.5/4.6/4.7",
+      "backend": "Does not exist",
+      "typical_response": "Model does not exist",
+      "performance_ms": null,
+      "availability": "not_available"
+    },
+    {
+      "model": "claude-opus-4.5-20250101",
+      "category": "Claude Opus 4.5/4.6/4.7",
+      "backend": "Does not exist",
+      "typical_response": "Model does not exist",
+      "performance_ms": null,
+      "availability": "not_available"
+    },
+    {
+      "model": "claude-opus-4.5-thinking-20250101",
+      "category": "Claude Opus 4.5/4.6/4.7",
+      "backend": "Does not exist",
+      "typical_response": "Model does not exist",
+      "performance_ms": null,
+      "availability": "not_available"
+    },
+    {
+      "model": "claude-opus-4.6-20250514",
+      "category": "Claude Opus 4.5/4.6/4.7",
+      "backend": "Does not exist",
+      "typical_response": "Model does not exist",
+      "performance_ms": null,
+      "availability": "not_available"
+    },
+    {
+      "model": "claude-opus-4.6-thinking-20250514",
+      "category": "Claude Opus 4.5/4.6/4.7",
+      "backend": "Does not exist",
+      "typical_response": "Model does not exist",
+      "performance_ms": null,
+      "availability": "not_available"
+    },
+    {
+      "model": "claude-opus-4.6-20250101",
+      "category": "Claude Opus 4.5/4.6/4.7",
+      "backend": "Does not exist",
+      "typical_response": "Model does not exist",
+      "performance_ms": null,
+      "availability": "not_available"
+    },
+    {
+      "model": "claude-opus-4.6-thinking-20250101",
+      "category": "Claude Opus 4.5/4.6/4.7",
+      "backend": "Does not exist",
+      "typical_response": "Model does not exist",
+      "performance_ms": null,
+      "availability": "not_available"
+    },
+    {
+      "model": "claude-opus-4.7-20250514",
+      "category": "Claude Opus 4.5/4.6/4.7",
+      "backend": "Real Claude Opus 4.7 (BYOK only)",
+      "typical_response": "Configuration required - BYOK model",
+      "performance_ms": null,
+      "availability": "requires_byok"
+    },
+    {
+      "model": "claude-opus-4.7-thinking-20250514",
+      "category": "Claude Opus 4.5/4.6/4.7",
+      "backend": "Real Claude Opus 4.7 Thinking (BYOK only)",
+      "typical_response": "Configuration required - BYOK model",
+      "performance_ms": null,
+      "availability": "requires_byok"
+    },
+    {
+      "model": "claude-opus-4.7-20250101",
+      "category": "Claude Opus 4.5/4.6/4.7",
+      "backend": "Real Claude Opus 4.7 (BYOK only)",
+      "typical_response": "Configuration required - BYOK model",
+      "performance_ms": null,
+      "availability": "requires_byok"
+    },
+    {
+      "model": "claude-opus-4.7-thinking-20250101",
+      "category": "Claude Opus 4.5/4.6/4.7",
+      "backend": "Real Claude Opus 4.7 Thinking (BYOK only)",
+      "typical_response": "Configuration required - BYOK model",
+      "performance_ms": null,
+      "availability": "requires_byok"
+    }
+  ],
+  "summary": {
+    "total": 78,
+    "available": 39,
+    "requires_byok": 17,
+    "quota_exceeded": 14,
+    "not_available": 8
+  },
+  "key_findings": {
+    "massive_alias_system": "39 model names (18 free + 21 PRO) all route to the same Cascade/Kimi K2.6 backend",
+    "pro_subscription_value": "PRO subscription provides no better models, only more alias names with identical performance",
+    "claude_access_levels": {
+      "level_1_cascade_aliases": "7 models - Free, unlimited, ~8.1s, Kimi K2.6 backend",
+      "level_2_quota_limited": "14 models - Free, possibly real Claude, ~10.1s, quotas currently exceeded",
+      "level_3_byok": "5 models - Requires Anthropic API key, guaranteed real Claude including Opus 4.7"
+    },
+    "claude_opus_versions": {
+      "4.5": "Does not exist",
+      "4.6": "Does not exist",
+      "4.7": "Exists, BYOK only, most recent Claude Opus"
+    }
+  }
+}

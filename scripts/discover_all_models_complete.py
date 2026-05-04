@@ -14,8 +14,32 @@ import urllib.error
 import re
 
 # Configuration
-LOCAL_LS_URL = "http://127.0.0.1:53302"
-SESSION_TOKEN = "devin-session-token$eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzZXNzaW9uX2lkIjoid2luZHN1cmYtc2Vzc2lvbi1hNjliYzY5NWQyN2E0NWVjYmRmNjVmYWI5MWQxODZhNiJ9.KyaNgJ8vM6gQswVjs5YMDzSb4Q7lF5313TBlV_tybqM"
+# Auto-detect port from HAR files or use default
+import subprocess
+try:
+    port_result = subprocess.run(
+        ['python', 'detect_windsurf_port.py'],
+        capture_output=True,
+        text=True,
+        timeout=5
+    )
+    if port_result.returncode == 0:
+        port_match = re.search(r'Windsurf port: (\d+)', port_result.stdout)
+        if port_match:
+            DETECTED_PORT = int(port_match.group(1))
+        else:
+            DETECTED_PORT = 51834
+    else:
+        DETECTED_PORT = 51834
+except:
+    DETECTED_PORT = 51834
+
+LOCAL_LS_URL = f"http://127.0.0.1:{DETECTED_PORT}"
+SESSION_TOKEN = "devin-session-token$eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzZXNzaW9uX2lkIjoid2luZHN1cmYtc2Vzc2lvbi1iMzhmZjUxYmFjMzc0ZDJlOGMyMjY3ZDMzODQwYmQyMiJ9.Bh2TUtbSyCkAEKngLUdpWFmpJdMKNGV8xTfRsrXnnII"
+
+print(f"Using Windsurf port: {DETECTED_PORT}")
+print(f"URL: {LOCAL_LS_URL}")
+print()
 
 # Known model patterns to test
 MODEL_PATTERNS = [

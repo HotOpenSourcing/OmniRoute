@@ -1,0 +1,117 @@
+{
+  "timestamp": "2026-05-04T12:15:32Z",
+  "total_tested": 22,
+  "available": [],
+  "not_available": [
+    {
+      "model_uid": "kimi-k2-7",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "kimi-k3",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "kimi-k2-6-fast",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "kimi-k2-5",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "glm-4",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "glm-4-5",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "glm-4-7",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "glm-5-0",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "glm-5-2",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "glm-5-pro",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "deepseek-v3",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "deepseek-v2-5",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "deepseek-chat",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "deepseek-coder",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "qwen-max",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "qwen-plus",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "qwen-turbo",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "qwen-2-5",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "swe-1-6",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "swe-1-6-fast",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "swe-2-0",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "adaptive",
+      "available": false,
+      "error": "cascade_failed"
+    }
+  ]
+}

@@ -1,194 +1,194 @@
 {
-  "timestamp": "2026-05-04T02:04:45.717890",
+  "timestamp": "2026-05-04T13:24:48.896220",
   "auto_detected": {
-    "port": 53071,
-    "csrf_token_file": "C:\\Users\\amine\\AppData\\Local\\Programs\\Windsurf\\winsurftiwtest\\.env.windsurf.local"
+    "port": 50105,
+    "csrf_token_file": ".env.windsurf.local"
   },
   "summary": {
     "total": 18,
-    "available": 18,
-    "unavailable": 0
+    "available": 0,
+    "unavailable": 18
   },
   "results": [
     {
       "model_id": "kimi-k2-6",
-      "status": "success",
-      "error": null,
-      "cascade_id": "cfdeb70a-0dbc-442f-9892-cbccb2e48505",
-      "detected_model": "Cascade",
-      "response_time_ms": 8087,
-      "response_size_bytes": 61933,
-      "response_text": "$af7cfacd-1247-4993-8fb0-fdd1dfac1200"
+      "status": "failed",
+      "error": "Failed to create cascade",
+      "cascade_id": null,
+      "detected_model": null,
+      "response_time_ms": null,
+      "response_size_bytes": null,
+      "response_text": null
     },
     {
       "model_id": "kimi-k2-5",
-      "status": "success",
-      "error": null,
-      "cascade_id": "6ceaf683-ef31-4edc-8443-f6af2fff913f",
-      "detected_model": "Cascade",
-      "response_time_ms": 8054,
-      "response_size_bytes": 61933,
-      "response_text": "$5d5bb68a-c56a-4cfb-900d-783f27bf4bd1"
+      "status": "failed",
+      "error": "Failed to create cascade",
+      "cascade_id": null,
+      "detected_model": null,
+      "response_time_ms": null,
+      "response_size_bytes": null,
+      "response_text": null
     },
     {
       "model_id": "kimi-k2-7",
-      "status": "success",
-      "error": null,
-      "cascade_id": "686d0239-e7a7-42b1-9c5d-dc3c66ebccb8",
-      "detected_model": "Cascade",
-      "response_time_ms": 8072,
-      "response_size_bytes": 61938,
-      "response_text": "$1cb83564-fccd-4ff1-a42b-8f7cd63b7850"
+      "status": "failed",
+      "error": "Failed to create cascade",
+      "cascade_id": null,
+      "detected_model": null,
+      "response_time_ms": null,
+      "response_size_bytes": null,
+      "response_text": null
     },
     {
       "model_id": "kimi-k3",
-      "status": "success",
-      "error": null,
-      "cascade_id": "bcd85962-6e26-4090-a245-349001475270",
-      "detected_model": "Cascade",
-      "response_time_ms": 8084,
-      "response_size_bytes": 61956,
-      "response_text": "$b2a9a6de-4307-4881-8a02-ef04b67fed3f"
+      "status": "failed",
+      "error": "Failed to create cascade",
+      "cascade_id": null,
+      "detected_model": null,
+      "response_time_ms": null,
+      "response_size_bytes": null,
+      "response_text": null
     },
     {
       "model_id": "claude-opus-4",
-      "status": "success",
-      "error": null,
-      "cascade_id": "7bef6a5b-9686-411e-878f-189cb0c34fc2",
-      "detected_model": "Cascade",
-      "response_time_ms": 8098,
-      "response_size_bytes": 61938,
-      "response_text": "$9704b6ad-246a-4473-95f0-ab1d7a1e604a"
+      "status": "failed",
+      "error": "Failed to create cascade",
+      "cascade_id": null,
+      "detected_model": null,
+      "response_time_ms": null,
+      "response_size_bytes": null,
+      "response_text": null
     },
     {
       "model_id": "claude-sonnet-4",
-      "status": "success",
-      "error": null,
-      "cascade_id": "eec5f42c-3c77-4d51-84c6-d1cffc833e08",
-      "detected_model": "Cascade",
-      "response_time_ms": 8076,
-      "response_size_bytes": 61938,
-      "response_text": "$ba262c36-bad4-41af-9b2c-07497425d6a3"
+      "status": "failed",
+      "error": "Failed to create cascade",
+      "cascade_id": null,
+      "detected_model": null,
+      "response_time_ms": null,
+      "response_size_bytes": null,
+      "response_text": null
     },
     {
       "model_id": "claude-haiku-4",
-      "status": "success",
-      "error": null,
-      "cascade_id": "1e0ce21b-f1da-4da4-95e7-ba3ec4475ec4",
-      "detected_model": "Cascade",
-      "response_time_ms": 8127,
-      "response_size_bytes": 61937,
-      "response_text": "$5091b0a7-1457-48e9-be9f-810df338e457"
+      "status": "failed",
+      "error": "Failed to create cascade",
+      "cascade_id": null,
+      "detected_model": null,
+      "response_time_ms": null,
+      "response_size_bytes": null,
+      "response_text": null
     },
     {
       "model_id": "gpt-5",
-      "status": "success",
-      "error": null,
-      "cascade_id": "26c03ce6-86cd-4ed6-ae9f-2aa87c500d24",
-      "detected_model": "Cascade",
-      "response_time_ms": 8102,
-      "response_size_bytes": 61937,
-      "response_text": "$4818d4c7-0a25-49bf-a4ee-50e7d981744c"
+      "status": "failed",
+      "error": "Failed to create cascade",
+      "cascade_id": null,
+      "detected_model": null,
+      "response_time_ms": null,
+      "response_size_bytes": null,
+      "response_text": null
     },
     {
       "model_id": "gpt-4-turbo",
-      "status": "success",
-      "error": null,
-      "cascade_id": "6caf3df5-3eb2-4d00-aec9-290b76a3958f",
-      "detected_model": "Cascade",
-      "response_time_ms": 8061,
-      "response_size_bytes": 61955,
-      "response_text": "$075120b6-81ac-47a4-9ce7-d1ea403e5f59"
+      "status": "failed",
+      "error": "Failed to create cascade",
+      "cascade_id": null,
+      "detected_model": null,
+      "response_time_ms": null,
+      "response_size_bytes": null,
+      "response_text": null
     },
     {
       "model_id": "gpt-4",
-      "status": "success",
-      "error": null,
-      "cascade_id": "c255abbb-7392-4767-a203-e2bf83b21bea",
-      "detected_model": "Cascade",
-      "response_time_ms": 8092,
-      "response_size_bytes": 61936,
-      "response_text": "$f0c635df-cc62-41cf-8f80-f73e1435be00"
+      "status": "failed",
+      "error": "Failed to create cascade",
+      "cascade_id": null,
+      "detected_model": null,
+      "response_time_ms": null,
+      "response_size_bytes": null,
+      "response_text": null
     },
     {
       "model_id": "gemini-3-flash",
-      "status": "success",
-      "error": null,
-      "cascade_id": "99fd1ae5-640a-4f41-8cf8-a6a11444e55e",
-      "detected_model": "Cascade",
-      "response_time_ms": 8048,
-      "response_size_bytes": 61933,
-      "response_text": "$097eec8d-cb09-4ccd-a14a-40464bb0420c"
+      "status": "failed",
+      "error": "Failed to create cascade",
+      "cascade_id": null,
+      "detected_model": null,
+      "response_time_ms": null,
+      "response_size_bytes": null,
+      "response_text": null
     },
     {
       "model_id": "gemini-2-pro",
-      "status": "success",
-      "error": null,
-      "cascade_id": "e20ac24f-1e67-4f5b-bbb9-74789b82d011",
-      "detected_model": "Cascade",
-      "response_time_ms": 8082,
-      "response_size_bytes": 61967,
-      "response_text": "$d9cf8c54-51a8-4936-96d6-ee463fa7c3c3"
+      "status": "failed",
+      "error": "Failed to create cascade",
+      "cascade_id": null,
+      "detected_model": null,
+      "response_time_ms": null,
+      "response_size_bytes": null,
+      "response_text": null
     },
     {
       "model_id": "gemini-pro",
-      "status": "success",
-      "error": null,
-      "cascade_id": "3825deec-f06b-4e9e-999c-64022ddc415b",
-      "detected_model": "Cascade",
-      "response_time_ms": 8060,
-      "response_size_bytes": 61933,
-      "response_text": "$cb42ad6d-f654-4b5e-83ac-0865e5672e8a"
+      "status": "failed",
+      "error": "Failed to create cascade",
+      "cascade_id": null,
+      "detected_model": null,
+      "response_time_ms": null,
+      "response_size_bytes": null,
+      "response_text": null
     },
     {
       "model_id": "glm-5",
-      "status": "success",
-      "error": null,
-      "cascade_id": "9825220a-f69d-4351-9347-c098f18884e6",
-      "detected_model": "Cascade",
-      "response_time_ms": 8061,
-      "response_size_bytes": 61936,
-      "response_text": "$11931f86-74d9-46b7-9630-64e3e599d8c4"
+      "status": "failed",
+      "error": "Failed to create cascade",
+      "cascade_id": null,
+      "detected_model": null,
+      "response_time_ms": null,
+      "response_size_bytes": null,
+      "response_text": null
     },
     {
       "model_id": "glm-4",
-      "status": "success",
-      "error": null,
-      "cascade_id": "61a0973d-8cc2-4b19-af7c-89921e135eb8",
-      "detected_model": "Cascade",
-      "response_time_ms": 8078,
-      "response_size_bytes": 61938,
-      "response_text": "$aac491b2-6860-4abf-a332-3b4965948137"
+      "status": "failed",
+      "error": "Failed to create cascade",
+      "cascade_id": null,
+      "detected_model": null,
+      "response_time_ms": null,
+      "response_size_bytes": null,
+      "response_text": null
     },
     {
       "model_id": "adaptive-ss",
-      "status": "success",
-      "error": null,
-      "cascade_id": "f9287a15-c1e5-4ae2-b62b-58a32071a594",
-      "detected_model": "Cascade",
-      "response_time_ms": 8074,
-      "response_size_bytes": 61938,
-      "response_text": "$768b6900-23f8-49f9-8716-95a122a9a832"
+      "status": "failed",
+      "error": "Failed to create cascade",
+      "cascade_id": null,
+      "detected_model": null,
+      "response_time_ms": null,
+      "response_size_bytes": null,
+      "response_text": null
     },
     {
       "model_id": "swe-1-6-fast",
-      "status": "success",
-      "error": null,
-      "cascade_id": "b9976637-19e2-43ce-a951-50357cad3d71",
-      "detected_model": "Cascade",
-      "response_time_ms": 8098,
-      "response_size_bytes": 61938,
-      "response_text": "$41ee095b-d3f3-4448-9d96-924e7594a537"
+      "status": "failed",
+      "error": "Failed to create cascade",
+      "cascade_id": null,
+      "detected_model": null,
+      "response_time_ms": null,
+      "response_size_bytes": null,
+      "response_text": null
     },
     {
       "model_id": "cascade-default",
-      "status": "success",
-      "error": null,
-      "cascade_id": "1e6b20bd-0256-4265-9481-b70c54ef09c1",
-      "detected_model": "Cascade",
-      "response_time_ms": 8098,
-      "response_size_bytes": 61938,
-      "response_text": "$4622a4f4-f0e0-43fc-80a9-2e06d00bc161"
+      "status": "failed",
+      "error": "Failed to create cascade",
+      "cascade_id": null,
+      "detected_model": null,
+      "response_time_ms": null,
+      "response_size_bytes": null,
+      "response_text": null
     }
   ]
 }

@@ -1,0 +1,74 @@
+{
+  "timestamp": "2026-05-04T13:14:00Z",
+  "port": 51834,
+  "encoding": "protobuf",
+  "total_tested": 8,
+  "success_count": 8,
+  "failed_count": 0,
+  "results": [
+    {
+      "model": "claude-opus-4-6-thinking-20260424",
+      "result": {
+        "status": "success",
+        "http_status": 200,
+        "cascade_id": "0448964e-6985-41fb-9229-ae3883142f37"
+      }
+    },
+    {
+      "model": "claude-opus-4-7-medium-20260424",
+      "result": {
+        "status": "success",
+        "http_status": 200,
+        "cascade_id": "f49d064b-9fd5-4856-b76f-03ee7fcae91c"
+      }
+    },
+    {
+      "model": "claude-sonnet-4-6-thinking-20260424",
+      "result": {
+        "status": "success",
+        "http_status": 200,
+        "cascade_id": "6855acd0-defb-4a5a-b3e3-85c06a584f12"
+      }
+    },
+    {
+      "model": "deepseek-v4-20260424",
+      "result": {
+        "status": "success",
+        "http_status": 200,
+        "cascade_id": "cdc4b30f-e930-44b6-af13-c3239512db77"
+      }
+    },
+    {
+      "model": "gpt-5-5-low-20260424",
+      "result": {
+        "status": "success",
+        "http_status": 200,
+        "cascade_id": "497d87bc-8e47-4582-a0f8-aba5263f059a"
+      }
+    },
+    {
+      "model": "kimi-k2-6-20260424",
+      "result": {
+        "status": "success",
+        "http_status": 200,
+        "cascade_id": "13ba5742-e869-42c0-aff2-e782f561d08b"
+      }
+    },
+    {
+      "model": "swe-1-6-20260424",
+      "result": {
+        "status": "success",
+        "http_status": 200,
+        "cascade_id": "1e722388-01c7-4ac5-928e-96ec951ca75d"
+      }
+    },
+    {
+      "model": "swe-1-6-fast-20260424",
+      "result": {
+        "status": "success",
+        "http_status": 200,
+        "cascade_id": "932f6c66-499c-4403-a014-583b468b548c"
+      }
+    }
+  ]
+}

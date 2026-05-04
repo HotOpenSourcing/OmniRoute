@@ -49,11 +49,20 @@ while ($retryCount -lt $maxRetries -and -not $serverOk) {
     $retryCount++
     Write-Host "  [INFO] Tentative $retryCount/$maxRetries..." -ForegroundColor Yellow
 
-    $testConnection = Test-NetConnection -ComputerName localhost -Port 53302 -WarningAction SilentlyContinue -InformationLevel Quiet
+    # Detect port dynamically
+    $portDetect = python detect_windsurf_port.py 2>&1 | Select-String "Windsurf port: (\d+)"
+    if ($portDetect) {
+        $port = [int]$portDetect.Matches.Groups[1].Value
+    } else {
+        $port = 51834
+    }
+
+    Write-Host "  [INFO] Testing port $port..." -ForegroundColor Yellow
+    $testConnection = Test-NetConnection -ComputerName localhost -Port $port -WarningAction SilentlyContinue -InformationLevel Quiet
 
     if ($testConnection) {
         $serverOk = $true
-        Write-Host "  [OK] Serveur accessible sur localhost:53302" -ForegroundColor Green
+        Write-Host "  [OK] Serveur accessible sur localhost:$port" -ForegroundColor Green
     } else {
         if ($retryCount -lt $maxRetries) {
             Write-Host "  [INFO] Nouvelle tentative dans 5 secondes..." -ForegroundColor Yellow

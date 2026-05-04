@@ -1,0 +1,97 @@
+{
+  "timestamp": "2026-05-04T13:14:36Z",
+  "total_tested": 18,
+  "available": [],
+  "not_available": [
+    {
+      "model_uid": "claude-opus-4-7-medium",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "claude-opus-4-7",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "claude-opus-4-7-fast",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "claude-opus-4-7-lite",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "claude-opus-4-7-plus",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "claude-opus-4-7-thinking",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "claude-sonnet-4-6",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "claude-sonnet-4-6-medium",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "claude-sonnet-4-6-fast",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "claude-sonnet-4-6-lite",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "claude-sonnet-4-6-plus",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "claude-sonnet-4-6-thinking",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "claude-haiku-4-5",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "claude-haiku-4-5-medium",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "claude-haiku-4-5-fast",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "claude-haiku-4-5-lite",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "claude-3-7-sonnet",
+      "available": false,
+      "error": "cascade_failed"
+    },
+    {
+      "model_uid": "claude-3-5-sonnet",
+      "available": false,
+      "error": "cascade_failed"
+    }
+  ]
+}

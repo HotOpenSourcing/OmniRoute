@@ -1,0 +1,325 @@
+{
+  "investigation_metadata": {
+    "date": "2026-05-04T11:38:43Z",
+    "methodology": "static_analysis_passive_observation",
+    "constraints": ["read_only", "no_network_requests", "no_token_usage", "no_rpc_execution"],
+    "evidence_sources": [
+      "protobuf_structure_analysis",
+      "minified_bundle_reverse_engineering",
+      "runtime_capture_logs",
+      "documentation_correlation"
+    ]
+  },
+  "key_architectural_finding": {
+    "discovery": "modelRouterUid is a SESSION TOKEN, not a MODEL IDENTIFIER",
+    "explanation": "The UUID format modelRouterUid (e.g., 3ff1e703-8706-40e2-99dc-915c12f93091) is generated per-cascade by the backend and used as a session routing token. The actual model identifiers are human-readable strings like 'kimi-k2-6'.",
+    "confidence": "HIGH",
+    "evidence": [
+      "Same model produces different modelRouterUid values across cascades",
+      "Client code extracts modelRouterUid from backend response and uses it as requestedModelUid",
+      "Protobuf field 12 (GetCascadeTrajectory) returns modelRouterUid per cascade"
+    ]
+  },
+  "routing_mechanism": {
+    "flow": [
+      "1. User selects model by human-readable name (e.g., 'kimi-k2-6')",
+      "2. Client sends StartCascade RPC → receives cascadeId",
+      "3. Client sends SendUserCascadeMessage with requestedModelUid='kimi-k2-6'",
+      "4. Backend validates model availability and generates modelRouterUid (UUID)",
+      "5. Backend returns modelRouterUid in GetCascadeTrajectory response (field 12)",
+      "6. Client uses modelRouterUid as session token for subsequent requests in that cascade"
+    ],
+    "injection_points": {
+      "StartCascade": {
+        "url": "http://127.0.0.1:{port}/exa.language_server_pb.LanguageServerService/StartCascade",
+        "purpose": "Create cascade session",
+        "returns": "cascadeId (UUID)"
+      },
+      "SendUserCascadeMessage": {
+        "url": "http://127.0.0.1:{port}/exa.language_server_pb.LanguageServerService/SendUserCascadeMessage",
+        "field_1": "metadata (auth, IDE version)",
+        "field_2": "items (chat messages)",
+        "field_5": "cascadeConfig.requestedModelUid (human-readable model name)",
+        "purpose": "Send user message with model selection"
+      },
+      "AssignModel": {
+        "url": "https://eu.windsurf.com/_route/api_server/exa.api_server_pb.ApiServerService/AssignModel",
+        "field_1": "metadata",
+        "field_2": "modelRouterUid (UUID session token)",
+        "field_3": "cascadeId",
+        "field_4": "chatMessagePrompt",
+        "purpose": "Assign model to cascade (cloud-based)"
+      },
+      "GetCascadeTrajectory": {
+        "url": "http://127.0.0.1:{port}/exa.language_server_pb.LanguageServerService/GetCascadeTrajectory",
+        "response_field_12": "modelRouterUid (UUID)",
+        "response_field_11": "assignedModelUid (string)",
+        "response_field_24": "model_assignment_info",
+        "purpose": "Retrieve cascade state and model assignment"
+      }
+    }
+  },
+  "modelRouterUid_map": [
+    {
+      "model_name": "Kimi K2.6",
+      "model_uid": "kimi-k2-6",
+      "provider": "Moonshot AI",
+      "type": "subscription",
+      "tier": "free",
+      "modelRouterUid_behavior": "dynamically_generated_per_cascade",
+      "example_modelRouterUid": "3ff1e703-8706-40e2-99dc-915c12f93091",
+      "note": "Each cascade using kimi-k2-6 gets a different modelRouterUid",
+      "confidence": "HIGH",
+      "source": ["windsurf_probe_final_run.json", "WINDSURF_LLM_MODELS_REPORT.md"]
+    },
+    {
+      "model_name": "Kimi K2.6 Extended",
+      "model_uid": "kimi-k2-6-e",
+      "provider": "Moonshot AI",
+      "type": "subscription",
+      "tier": "free",
+      "modelRouterUid_behavior": "dynamically_generated_per_cascade",
+      "confidence": "HIGH",
+      "source": ["WINDSURF_LLM_MODELS_REPORT.md"]
+    },
+    {
+      "model_name": "GLM-5",
+      "model_uid": "glm-5",
+      "provider": "Zhipu AI",
+      "type": "subscription",
+      "tier": "free",
+      "modelRouterUid_behavior": "dynamically_generated_per_cascade",
+      "confidence": "HIGH",
+      "source": ["WINDSURF_MODELS_FINAL.md"]
+    },
+    {
+      "model_name": "GLM-5.1",
+      "model_uid": "glm-5-1",
+      "provider": "Zhipu AI",
+      "type": "subscription",
+      "tier": "free",
+      "modelRouterUid_behavior": "dynamically_generated_per_cascade",
+      "confidence": "HIGH",
+      "source": ["WINDSURF_MODELS_FINAL.md"]
+    },
+    {
+      "model_name": "GPT-5.5",
+      "model_uid": "gpt-5-5",
+      "provider": "OpenAI",
+      "type": "byok",
+      "tier": "requires_api_key",
+      "modelRouterUid_behavior": "dynamically_generated_per_cascade",
+      "availability": "requires_configuration",
+      "confidence": "MEDIUM",
+      "source": ["WINDSURF_BYOK_VS_SUBSCRIPTION.md"]
+    },
+    {
+      "model_name": "GPT-5.4",
+      "model_uid": "gpt-5-4",
+      "provider": "OpenAI",
+      "type": "byok",
+      "tier": "requires_api_key",
+      "modelRouterUid_behavior": "dynamically_generated_per_cascade",
+      "availability": "requires_configuration",
+      "confidence": "MEDIUM",
+      "source": ["WINDSURF_MODELS_FINAL.md"]
+    },
+    {
+      "model_name": "GPT-5.2 Low Thinking",
+      "model_uid": "gpt-5-2-low-thinking",
+      "provider": "OpenAI",
+      "type": "byok",
+      "tier": "requires_api_key",
+      "modelRouterUid_behavior": "dynamically_generated_per_cascade",
+      "availability": "requires_configuration",
+      "confidence": "MEDIUM",
+      "source": ["WINDSURF_MODELS_FINAL.md"]
+    },
+    {
+      "model_name": "Claude Opus 4.7",
+      "model_uid": "claude-opus-4-7",
+      "provider": "Anthropic",
+      "type": "byok",
+      "tier": "requires_api_key",
+      "modelRouterUid_behavior": "dynamically_generated_per_cascade",
+      "availability": "requires_configuration",
+      "confidence": "MEDIUM",
+      "source": ["WINDSURF_BYOK_VS_SUBSCRIPTION.md"]
+    },
+    {
+      "model_name": "Claude Opus 4 BYOK Beta",
+      "model_uid": "claude-opus-4-byok-beta",
+      "provider": "Anthropic",
+      "type": "byok",
+      "tier": "requires_api_key",
+      "modelRouterUid_behavior": "dynamically_generated_per_cascade",
+      "availability": "requires_configuration",
+      "confidence": "MEDIUM",
+      "source": ["WINDSURF_MODELS_FINAL.md"]
+    },
+    {
+      "model_name": "Claude Sonnet 4 BYOK",
+      "model_uid": "claude-sonnet-4-byok",
+      "provider": "Anthropic",
+      "type": "byok",
+      "tier": "requires_api_key",
+      "modelRouterUid_behavior": "dynamically_generated_per_cascade",
+      "availability": "requires_configuration",
+      "confidence": "MEDIUM",
+      "source": ["WINDSURF_MODELS_FINAL.md"]
+    },
+    {
+      "model_name": "Gemini 3 Flash Low",
+      "model_uid": "gemini-3-flash-low",
+      "provider": "Google",
+      "type": "byok",
+      "tier": "requires_api_key",
+      "modelRouterUid_behavior": "dynamically_generated_per_cascade",
+      "availability": "requires_configuration",
+      "confidence": "MEDIUM",
+      "source": ["WINDSURF_MODELS_FINAL.md"]
+    }
+  ],
+  "omniroute_internal_routing": {
+    "note": "OmniRoute uses a separate numeric upstreamId system for internal routing",
+    "models": [
+      {
+        "id": "gpt4o",
+        "name": "GPT-4o",
+        "upstreamId": 109,
+        "autoToolChoice": true
+      },
+      {
+        "id": "claude-3-5-sonnet",
+        "name": "Claude 3.5 Sonnet",
+        "upstreamId": 166
+      },
+      {
+        "id": "gemini-2.0-flash",
+        "name": "Gemini 2.0 Flash",
+        "upstreamId": 184
+      },
+      {
+        "id": "deepseek-chat",
+        "name": "DeepSeek Chat",
+        "upstreamId": 205
+      },
+      {
+        "id": "deepseek-reasoner",
+        "name": "DeepSeek Reasoner",
+        "upstreamId": 206,
+        "supportsReasoning": true
+      },
+      {
+        "id": "gpt4-o3-mini",
+        "name": "GPT-4 o3 Mini",
+        "upstreamId": 207,
+        "autoToolChoice": true
+      },
+      {
+        "id": "claude-3-7-sonnet",
+        "name": "Claude 3.7 Sonnet",
+        "upstreamId": 226
+      },
+      {
+        "id": "claude-3-7-sonnet-think",
+        "name": "Claude 3.7 Sonnet Think",
+        "upstreamId": 227,
+        "supportsReasoning": true
+      }
+    ],
+    "source": "open-sse/config/windsurfModels.ts"
+  },
+  "byok_detection_strategy": {
+    "method": "suffix_and_naming_convention",
+    "rules": [
+      "Model UID contains '-byok' suffix → BYOK model",
+      "Model UID contains '-byok-beta' suffix → BYOK model",
+      "Known BYOK models: gpt-5-*, claude-opus-4-*, gemini-3-*",
+      "Error 'unknown model UID: model not found' → BYOK not configured"
+    ],
+    "implementation": "function isBYOK(modelUid) { return modelUid.includes('-byok') || ['gpt-5-5', 'gpt-5-4', 'gpt-5-2-low-thinking', 'claude-opus-4-7', 'gemini-3-flash-low'].includes(modelUid); }"
+  },
+  "confidence_levels": {
+    "HIGH": {
+      "criteria": "Runtime verified with actual captures",
+      "models": ["kimi-k2-6", "kimi-k2-6-e", "glm-5", "glm-5-1"],
+      "findings": [
+        "modelRouterUid is session-specific",
+        "Human-readable UIDs are model identifiers"
+      ]
+    },
+    "MEDIUM": {
+      "criteria": "Documentation + code analysis + naming conventions",
+      "models": [
+        "gpt-5-5",
+        "gpt-5-4",
+        "claude-opus-4-7",
+        "claude-opus-4-byok-beta",
+        "claude-sonnet-4-byok",
+        "gemini-3-flash-low"
+      ],
+      "findings": [
+        "BYOK suffix indicates API key requirement",
+        "upstreamId used for OmniRoute routing"
+      ]
+    },
+    "LOW": {
+      "criteria": "Speculation based on documentation mentions",
+      "models": ["kimi-k3-pro", "deepseek-v3", "qwen-max"],
+      "findings": ["Pro subscription models exist but unconfirmed"]
+    }
+  },
+  "limitations": {
+    "unknown": [
+      "Complete list of Pro subscription models",
+      "Backend model assignment algorithm",
+      "Load balancing strategy for modelRouterUid generation",
+      "Exact BYOK configuration schema",
+      "Model versioning strategy"
+    ],
+    "reasons": [
+      "Read-only constraint (no active network requests)",
+      "No Pro subscription access for testing",
+      "No BYOK API keys for testing",
+      "Backend logic not observable from client"
+    ]
+  },
+  "recommendations_for_omniroute": {
+    "model_mapping": {
+      "use": "human_readable_model_uids",
+      "do_not_use": "modelRouterUid_uuids",
+      "example": {
+        "correct": "kimi-k2-6",
+        "incorrect": "3ff1e703-8706-40e2-99dc-915c12f93091"
+      }
+    },
+    "routing_strategy": [
+      "1. Accept model name from user (e.g., 'kimi-k2-6')",
+      "2. Send to Windsurf backend in SendUserCascadeMessage",
+      "3. Extract modelRouterUid from GetCascadeTrajectory response",
+      "4. Use modelRouterUid for subsequent requests in that cascade",
+      "5. Discard modelRouterUid when cascade ends"
+    ],
+    "byok_support": [
+      "1. Detect '-byok' suffix in model UID",
+      "2. Prompt user for API key configuration",
+      "3. Store API keys securely",
+      "4. Pass keys to Windsurf backend in metadata"
+    ]
+  },
+  "summary": {
+    "total_models_identified": 11,
+    "free_subscription_models": 4,
+    "byok_models": 7,
+    "pro_subscription_models": "unknown",
+    "key_insight": "modelRouterUid is a per-cascade session token generated by the backend, NOT a static model identifier. The actual model routing uses human-readable string IDs.",
+    "investigation_status": "complete",
+    "next_steps_for_complete_mapping": [
+      "Acquire Windsurf Pro subscription to test Pro-only models",
+      "Configure BYOK API keys to test BYOK model availability",
+      "Runtime monitoring to capture actual model assignment flows",
+      "Obtain official model list from Windsurf documentation"
+    ]
+  }
+}

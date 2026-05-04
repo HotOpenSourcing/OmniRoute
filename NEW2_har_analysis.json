@@ -1,0 +1,1339 @@
+{
+  "timestamp": "2026-05-04T12:21:15.703385",
+  "total_requests": 21,
+  "statistics": {
+    "methods": {
+      "POST": 21
+    },
+    "status_codes": {
+      "400": 1,
+      "200": 20
+    },
+    "endpoints": {
+      "GetUnleashData": 8,
+      "GetCascadeMemories": 1,
+      "GetUserMemories": 1,
+      "GetAllWorkflows": 2,
+      "GetAllRules": 1,
+      "GetAllSkills": 1,
+      "GetAllCascadeTrajectories": 1,
+      "GetModelStatuses": 1,
+      "GetUserStatus": 1,
+      "GetUserSettings": 1,
+      "ShouldEnableUnleash": 1,
+      "GetMcpServerStates": 2
+    }
+  },
+  "counts": {
+    "cascade_requests": 2,
+    "assign_model_requests": 0,
+    "model_requests": 0
+  },
+  "csrf_tokens": [],
+  "ports": [51834],
+  "important_requests": [
+    {
+      "method": "POST",
+      "endpoint": "GetUnleashData",
+      "status": 400,
+      "url": "http://k.localhost:51834/exa.language_server_pb.LanguageServerService/GetUnleashData",
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "*/*"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br, zstd"
+        },
+        {
+          "name": "Accept-Language",
+          "value": "en-US"
+        },
+        {
+          "name": "Connection",
+          "value": "keep-alive"
+        },
+        {
+          "name": "Content-Length",
+          "value": "230"
+        },
+        {
+          "name": "Host",
+          "value": "k.localhost:51834"
+        },
+        {
+          "name": "Origin",
+          "value": "vscode-file://vscode-app"
+        },
+        {
+          "name": "Sec-Fetch-Dest",
+          "value": "empty"
+        },
+        {
+          "name": "Sec-Fetch-Mode",
+          "value": "cors"
+        },
+        {
+          "name": "Sec-Fetch-Site",
+          "value": "cross-site"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Windsurf/1.110.1 Chrome/142.0.7444.265 Electron/39.6.0 Safari/537.36"
+        },
+        {
+          "name": "connect-protocol-version",
+          "value": "1"
+        },
+        {
+          "name": "content-type",
+          "value": "application/proto"
+        },
+        {
+          "name": "sec-ch-ua",
+          "value": "\"Not_A Brand\";v=\"99\", \"Chromium\";v=\"142\""
+        },
+        {
+          "name": "sec-ch-ua-mobile",
+          "value": "?0"
+        },
+        {
+          "name": "sec-ch-ua-platform",
+          "value": "\"Windows\""
+        },
+        {
+          "name": "x-codeium-csrf-token",
+          "value": "965fdd75-25f9-45cc-ac13-ee8dea91fa46"
+        }
+      ],
+      "postData": {
+        "mimeType": "application/proto",
+        "text": "\nã\u0001\n\bwindsurf\u0012\u00061.48.2\"\u0002en*\u0007windows:\u00062.1.32R$3bb58598-69fd-4499-ba69-76ee60dd6d0bb\bwindsurfÂ\u0001\u0001b5adc5db8df7a79fc9522e305a18bf2287b238ca91f555884f536c93d80684bcd48ebf58d894edc9fee78a5d2d5863bb722d25c72c98c7eb70208fdcdd05e96eÒ\u0001\u0005Unset"
+      },
+      "response": {
+        "status": 400,
+        "statusText": "Bad Request",
+        "httpVersion": "HTTP/1.1",
+        "headers": [
+          {
+            "name": "Accept-Encoding",
+            "value": "gzip"
+          },
+          {
+            "name": "Access-Control-Allow-Credentials",
+            "value": "true"
+          },
+          {
+            "name": "Access-Control-Allow-Origin",
+            "value": "vscode-file://vscode-app"
+          },
+          {
+            "name": "Content-Length",
+            "value": "364"
+          },
+          {
+            "name": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "name": "Date",
+            "value": "Mon, 04 May 2026 11:15:28 GMT"
+          },
+          {
+            "name": "Vary",
+            "value": "Origin"
+          }
+        ],
+        "cookies": [],
+        "content": {
+          "size": 364,
+          "mimeType": "application/json",
+          "compression": 0
+        },
+        "redirectURL": "",
+        "headersSize": 250,
+        "bodySize": 364,
+        "_transferSize": 614,
+        "_error": null,
+        "_fetchedViaServiceWorker": false
+      }
+    },
+    {
+      "method": "POST",
+      "endpoint": "GetCascadeMemories",
+      "status": 200,
+      "url": "http://w.localhost:51834/exa.language_server_pb.LanguageServerService/GetCascadeMemories",
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "*/*"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br, zstd"
+        },
+        {
+          "name": "Accept-Language",
+          "value": "en-US"
+        },
+        {
+          "name": "Connection",
+          "value": "keep-alive"
+        },
+        {
+          "name": "Content-Length",
+          "value": "0"
+        },
+        {
+          "name": "Host",
+          "value": "w.localhost:51834"
+        },
+        {
+          "name": "Origin",
+          "value": "vscode-file://vscode-app"
+        },
+        {
+          "name": "Sec-Fetch-Dest",
+          "value": "empty"
+        },
+        {
+          "name": "Sec-Fetch-Mode",
+          "value": "cors"
+        },
+        {
+          "name": "Sec-Fetch-Site",
+          "value": "cross-site"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Windsurf/1.110.1 Chrome/142.0.7444.265 Electron/39.6.0 Safari/537.36"
+        },
+        {
+          "name": "connect-protocol-version",
+          "value": "1"
+        },
+        {
+          "name": "content-type",
+          "value": "application/proto"
+        },
+        {
+          "name": "sec-ch-ua",
+          "value": "\"Not_A Brand\";v=\"99\", \"Chromium\";v=\"142\""
+        },
+        {
+          "name": "sec-ch-ua-mobile",
+          "value": "?0"
+        },
+        {
+          "name": "sec-ch-ua-platform",
+          "value": "\"Windows\""
+        },
+        {
+          "name": "x-codeium-csrf-token",
+          "value": "965fdd75-25f9-45cc-ac13-ee8dea91fa46"
+        }
+      ],
+      "postData": {},
+      "response": {
+        "status": 200,
+        "statusText": "OK",
+        "httpVersion": "HTTP/1.1",
+        "headers": [
+          {
+            "name": "Accept-Encoding",
+            "value": "gzip"
+          },
+          {
+            "name": "Access-Control-Allow-Credentials",
+            "value": "true"
+          },
+          {
+            "name": "Access-Control-Allow-Origin",
+            "value": "vscode-file://vscode-app"
+          },
+          {
+            "name": "Content-Encoding",
+            "value": "gzip"
+          },
+          {
+            "name": "Content-Length",
+            "value": "23"
+          },
+          {
+            "name": "Content-Type",
+            "value": "application/proto"
+          },
+          {
+            "name": "Date",
+            "value": "Mon, 04 May 2026 11:15:30 GMT"
+          },
+          {
+            "name": "Vary",
+            "value": "Origin"
+          }
+        ],
+        "cookies": [],
+        "content": {
+          "size": 0,
+          "mimeType": "application/proto",
+          "compression": -23
+        },
+        "redirectURL": "",
+        "headersSize": 265,
+        "bodySize": 23,
+        "_transferSize": 288,
+        "_error": null,
+        "_fetchedViaServiceWorker": false
+      }
+    },
+    {
+      "method": "POST",
+      "endpoint": "GetUserMemories",
+      "status": 200,
+      "url": "http://t.localhost:51834/exa.language_server_pb.LanguageServerService/GetUserMemories",
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "*/*"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br, zstd"
+        },
+        {
+          "name": "Accept-Language",
+          "value": "en-US"
+        },
+        {
+          "name": "Connection",
+          "value": "keep-alive"
+        },
+        {
+          "name": "Content-Length",
+          "value": "0"
+        },
+        {
+          "name": "Host",
+          "value": "t.localhost:51834"
+        },
+        {
+          "name": "Origin",
+          "value": "vscode-file://vscode-app"
+        },
+        {
+          "name": "Sec-Fetch-Dest",
+          "value": "empty"
+        },
+        {
+          "name": "Sec-Fetch-Mode",
+          "value": "cors"
+        },
+        {
+          "name": "Sec-Fetch-Site",
+          "value": "cross-site"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Windsurf/1.110.1 Chrome/142.0.7444.265 Electron/39.6.0 Safari/537.36"
+        },
+        {
+          "name": "connect-protocol-version",
+          "value": "1"
+        },
+        {
+          "name": "content-type",
+          "value": "application/proto"
+        },
+        {
+          "name": "sec-ch-ua",
+          "value": "\"Not_A Brand\";v=\"99\", \"Chromium\";v=\"142\""
+        },
+        {
+          "name": "sec-ch-ua-mobile",
+          "value": "?0"
+        },
+        {
+          "name": "sec-ch-ua-platform",
+          "value": "\"Windows\""
+        },
+        {
+          "name": "x-codeium-csrf-token",
+          "value": "965fdd75-25f9-45cc-ac13-ee8dea91fa46"
+        }
+      ],
+      "postData": {},
+      "response": {
+        "status": 200,
+        "statusText": "OK",
+        "httpVersion": "HTTP/1.1",
+        "headers": [
+          {
+            "name": "Accept-Encoding",
+            "value": "gzip"
+          },
+          {
+            "name": "Access-Control-Allow-Credentials",
+            "value": "true"
+          },
+          {
+            "name": "Access-Control-Allow-Origin",
+            "value": "vscode-file://vscode-app"
+          },
+          {
+            "name": "Content-Encoding",
+            "value": "gzip"
+          },
+          {
+            "name": "Content-Length",
+            "value": "23"
+          },
+          {
+            "name": "Content-Type",
+            "value": "application/proto"
+          },
+          {
+            "name": "Date",
+            "value": "Mon, 04 May 2026 11:15:30 GMT"
+          },
+          {
+            "name": "Vary",
+            "value": "Origin"
+          }
+        ],
+        "cookies": [],
+        "content": {
+          "size": 0,
+          "mimeType": "application/proto",
+          "compression": -23
+        },
+        "redirectURL": "",
+        "headersSize": 265,
+        "bodySize": 23,
+        "_transferSize": 288,
+        "_error": null,
+        "_fetchedViaServiceWorker": false
+      }
+    },
+    {
+      "method": "POST",
+      "endpoint": "GetAllWorkflows",
+      "status": 200,
+      "url": "http://v.localhost:51834/exa.language_server_pb.LanguageServerService/GetAllWorkflows",
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "*/*"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br, zstd"
+        },
+        {
+          "name": "Accept-Language",
+          "value": "en-US"
+        },
+        {
+          "name": "Connection",
+          "value": "keep-alive"
+        },
+        {
+          "name": "Content-Length",
+          "value": "0"
+        },
+        {
+          "name": "Host",
+          "value": "v.localhost:51834"
+        },
+        {
+          "name": "Origin",
+          "value": "vscode-file://vscode-app"
+        },
+        {
+          "name": "Sec-Fetch-Dest",
+          "value": "empty"
+        },
+        {
+          "name": "Sec-Fetch-Mode",
+          "value": "cors"
+        },
+        {
+          "name": "Sec-Fetch-Site",
+          "value": "cross-site"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Windsurf/1.110.1 Chrome/142.0.7444.265 Electron/39.6.0 Safari/537.36"
+        },
+        {
+          "name": "connect-protocol-version",
+          "value": "1"
+        },
+        {
+          "name": "connect-timeout-ms",
+          "value": "3000"
+        },
+        {
+          "name": "content-type",
+          "value": "application/proto"
+        },
+        {
+          "name": "sec-ch-ua",
+          "value": "\"Not_A Brand\";v=\"99\", \"Chromium\";v=\"142\""
+        },
+        {
+          "name": "sec-ch-ua-mobile",
+          "value": "?0"
+        },
+        {
+          "name": "sec-ch-ua-platform",
+          "value": "\"Windows\""
+        },
+        {
+          "name": "x-codeium-csrf-token",
+          "value": "965fdd75-25f9-45cc-ac13-ee8dea91fa46"
+        }
+      ],
+      "postData": {},
+      "response": {
+        "status": 200,
+        "statusText": "OK",
+        "httpVersion": "HTTP/1.1",
+        "headers": [
+          {
+            "name": "Accept-Encoding",
+            "value": "gzip"
+          },
+          {
+            "name": "Access-Control-Allow-Credentials",
+            "value": "true"
+          },
+          {
+            "name": "Access-Control-Allow-Origin",
+            "value": "vscode-file://vscode-app"
+          },
+          {
+            "name": "Content-Encoding",
+            "value": "gzip"
+          },
+          {
+            "name": "Content-Length",
+            "value": "808"
+          },
+          {
+            "name": "Content-Type",
+            "value": "application/proto"
+          },
+          {
+            "name": "Date",
+            "value": "Mon, 04 May 2026 11:15:30 GMT"
+          },
+          {
+            "name": "Vary",
+            "value": "Origin"
+          }
+        ],
+        "cookies": [],
+        "content": {
+          "size": 1539,
+          "mimeType": "application/proto",
+          "compression": 731
+        },
+        "redirectURL": "",
+        "headersSize": 266,
+        "bodySize": 808,
+        "_transferSize": 1074,
+        "_error": null,
+        "_fetchedViaServiceWorker": false
+      }
+    },
+    {
+      "method": "POST",
+      "endpoint": "GetAllRules",
+      "status": 200,
+      "url": "http://g.localhost:51834/exa.language_server_pb.LanguageServerService/GetAllRules",
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "*/*"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br, zstd"
+        },
+        {
+          "name": "Accept-Language",
+          "value": "en-US"
+        },
+        {
+          "name": "Connection",
+          "value": "keep-alive"
+        },
+        {
+          "name": "Content-Length",
+          "value": "0"
+        },
+        {
+          "name": "Host",
+          "value": "g.localhost:51834"
+        },
+        {
+          "name": "Origin",
+          "value": "vscode-file://vscode-app"
+        },
+        {
+          "name": "Sec-Fetch-Dest",
+          "value": "empty"
+        },
+        {
+          "name": "Sec-Fetch-Mode",
+          "value": "cors"
+        },
+        {
+          "name": "Sec-Fetch-Site",
+          "value": "cross-site"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Windsurf/1.110.1 Chrome/142.0.7444.265 Electron/39.6.0 Safari/537.36"
+        },
+        {
+          "name": "connect-protocol-version",
+          "value": "1"
+        },
+        {
+          "name": "connect-timeout-ms",
+          "value": "3000"
+        },
+        {
+          "name": "content-type",
+          "value": "application/proto"
+        },
+        {
+          "name": "sec-ch-ua",
+          "value": "\"Not_A Brand\";v=\"99\", \"Chromium\";v=\"142\""
+        },
+        {
+          "name": "sec-ch-ua-mobile",
+          "value": "?0"
+        },
+        {
+          "name": "sec-ch-ua-platform",
+          "value": "\"Windows\""
+        },
+        {
+          "name": "x-codeium-csrf-token",
+          "value": "965fdd75-25f9-45cc-ac13-ee8dea91fa46"
+        }
+      ],
+      "postData": {},
+      "response": {
+        "status": 200,
+        "statusText": "OK",
+        "httpVersion": "HTTP/1.1",
+        "headers": [
+          {
+            "name": "Accept-Encoding",
+            "value": "gzip"
+          },
+          {
+            "name": "Access-Control-Allow-Credentials",
+            "value": "true"
+          },
+          {
+            "name": "Access-Control-Allow-Origin",
+            "value": "vscode-file://vscode-app"
+          },
+          {
+            "name": "Content-Encoding",
+            "value": "gzip"
+          },
+          {
+            "name": "Content-Length",
+            "value": "23"
+          },
+          {
+            "name": "Content-Type",
+            "value": "application/proto"
+          },
+          {
+            "name": "Date",
+            "value": "Mon, 04 May 2026 11:15:30 GMT"
+          },
+          {
+            "name": "Vary",
+            "value": "Origin"
+          }
+        ],
+        "cookies": [],
+        "content": {
+          "size": 0,
+          "mimeType": "application/proto",
+          "compression": -23
+        },
+        "redirectURL": "",
+        "headersSize": 265,
+        "bodySize": 23,
+        "_transferSize": 288,
+        "_error": null,
+        "_fetchedViaServiceWorker": false
+      }
+    },
+    {
+      "method": "POST",
+      "endpoint": "GetAllSkills",
+      "status": 200,
+      "url": "http://y.localhost:51834/exa.language_server_pb.LanguageServerService/GetAllSkills",
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "*/*"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br, zstd"
+        },
+        {
+          "name": "Accept-Language",
+          "value": "en-US"
+        },
+        {
+          "name": "Connection",
+          "value": "keep-alive"
+        },
+        {
+          "name": "Content-Length",
+          "value": "0"
+        },
+        {
+          "name": "Host",
+          "value": "y.localhost:51834"
+        },
+        {
+          "name": "Origin",
+          "value": "vscode-file://vscode-app"
+        },
+        {
+          "name": "Sec-Fetch-Dest",
+          "value": "empty"
+        },
+        {
+          "name": "Sec-Fetch-Mode",
+          "value": "cors"
+        },
+        {
+          "name": "Sec-Fetch-Site",
+          "value": "cross-site"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Windsurf/1.110.1 Chrome/142.0.7444.265 Electron/39.6.0 Safari/537.36"
+        },
+        {
+          "name": "connect-protocol-version",
+          "value": "1"
+        },
+        {
+          "name": "connect-timeout-ms",
+          "value": "3000"
+        },
+        {
+          "name": "content-type",
+          "value": "application/proto"
+        },
+        {
+          "name": "sec-ch-ua",
+          "value": "\"Not_A Brand\";v=\"99\", \"Chromium\";v=\"142\""
+        },
+        {
+          "name": "sec-ch-ua-mobile",
+          "value": "?0"
+        },
+        {
+          "name": "sec-ch-ua-platform",
+          "value": "\"Windows\""
+        },
+        {
+          "name": "x-codeium-csrf-token",
+          "value": "965fdd75-25f9-45cc-ac13-ee8dea91fa46"
+        }
+      ],
+      "postData": {},
+      "response": {
+        "status": 200,
+        "statusText": "OK",
+        "httpVersion": "HTTP/1.1",
+        "headers": [
+          {
+            "name": "Accept-Encoding",
+            "value": "gzip"
+          },
+          {
+            "name": "Access-Control-Allow-Credentials",
+            "value": "true"
+          },
+          {
+            "name": "Access-Control-Allow-Origin",
+            "value": "vscode-file://vscode-app"
+          },
+          {
+            "name": "Content-Encoding",
+            "value": "gzip"
+          },
+          {
+            "name": "Content-Length",
+            "value": "23"
+          },
+          {
+            "name": "Content-Type",
+            "value": "application/proto"
+          },
+          {
+            "name": "Date",
+            "value": "Mon, 04 May 2026 11:15:30 GMT"
+          },
+          {
+            "name": "Vary",
+            "value": "Origin"
+          }
+        ],
+        "cookies": [],
+        "content": {
+          "size": 0,
+          "mimeType": "application/proto",
+          "compression": -23
+        },
+        "redirectURL": "",
+        "headersSize": 265,
+        "bodySize": 23,
+        "_transferSize": 288,
+        "_error": null,
+        "_fetchedViaServiceWorker": false
+      }
+    },
+    {
+      "method": "POST",
+      "endpoint": "GetAllCascadeTrajectories",
+      "status": 200,
+      "url": "http://w.localhost:51834/exa.language_server_pb.LanguageServerService/GetAllCascadeTrajectories",
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "*/*"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br, zstd"
+        },
+        {
+          "name": "Accept-Language",
+          "value": "en-US"
+        },
+        {
+          "name": "Connection",
+          "value": "keep-alive"
+        },
+        {
+          "name": "Content-Length",
+          "value": "2"
+        },
+        {
+          "name": "Host",
+          "value": "w.localhost:51834"
+        },
+        {
+          "name": "Origin",
+          "value": "vscode-file://vscode-app"
+        },
+        {
+          "name": "Sec-Fetch-Dest",
+          "value": "empty"
+        },
+        {
+          "name": "Sec-Fetch-Mode",
+          "value": "cors"
+        },
+        {
+          "name": "Sec-Fetch-Site",
+          "value": "cross-site"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Windsurf/1.110.1 Chrome/142.0.7444.265 Electron/39.6.0 Safari/537.36"
+        },
+        {
+          "name": "connect-protocol-version",
+          "value": "1"
+        },
+        {
+          "name": "content-type",
+          "value": "application/proto"
+        },
+        {
+          "name": "sec-ch-ua",
+          "value": "\"Not_A Brand\";v=\"99\", \"Chromium\";v=\"142\""
+        },
+        {
+          "name": "sec-ch-ua-mobile",
+          "value": "?0"
+        },
+        {
+          "name": "sec-ch-ua-platform",
+          "value": "\"Windows\""
+        },
+        {
+          "name": "x-codeium-csrf-token",
+          "value": "965fdd75-25f9-45cc-ac13-ee8dea91fa46"
+        }
+      ],
+      "postData": {
+        "mimeType": "application/proto",
+        "text": "\b\u0001"
+      },
+      "response": {
+        "status": 200,
+        "statusText": "OK",
+        "httpVersion": "HTTP/1.1",
+        "headers": [
+          {
+            "name": "Accept-Encoding",
+            "value": "gzip"
+          },
+          {
+            "name": "Access-Control-Allow-Credentials",
+            "value": "true"
+          },
+          {
+            "name": "Access-Control-Allow-Origin",
+            "value": "vscode-file://vscode-app"
+          },
+          {
+            "name": "Content-Encoding",
+            "value": "gzip"
+          },
+          {
+            "name": "Content-Type",
+            "value": "application/proto"
+          },
+          {
+            "name": "Date",
+            "value": "Mon, 04 May 2026 11:15:30 GMT"
+          },
+          {
+            "name": "Transfer-Encoding",
+            "value": "chunked"
+          },
+          {
+            "name": "Vary",
+            "value": "Origin"
+          }
+        ],
+        "cookies": [],
+        "content": {
+          "size": 20445,
+          "mimeType": "application/proto",
+          "compression": 15482
+        },
+        "redirectURL": "",
+        "headersSize": 273,
+        "bodySize": 4963,
+        "_transferSize": 5236,
+        "_error": null,
+        "_fetchedViaServiceWorker": false
+      }
+    },
+    {
+      "method": "POST",
+      "endpoint": "GetModelStatuses",
+      "status": 200,
+      "url": "http://k.localhost:51834/exa.language_server_pb.LanguageServerService/GetModelStatuses",
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "*/*"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br, zstd"
+        },
+        {
+          "name": "Accept-Language",
+          "value": "en-US"
+        },
+        {
+          "name": "Connection",
+          "value": "keep-alive"
+        },
+        {
+          "name": "Content-Length",
+          "value": "335"
+        },
+        {
+          "name": "Host",
+          "value": "k.localhost:51834"
+        },
+        {
+          "name": "Origin",
+          "value": "vscode-file://vscode-app"
+        },
+        {
+          "name": "Sec-Fetch-Dest",
+          "value": "empty"
+        },
+        {
+          "name": "Sec-Fetch-Mode",
+          "value": "cors"
+        },
+        {
+          "name": "Sec-Fetch-Site",
+          "value": "cross-site"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Windsurf/1.110.1 Chrome/142.0.7444.265 Electron/39.6.0 Safari/537.36"
+        },
+        {
+          "name": "connect-protocol-version",
+          "value": "1"
+        },
+        {
+          "name": "content-type",
+          "value": "application/proto"
+        },
+        {
+          "name": "sec-ch-ua",
+          "value": "\"Not_A Brand\";v=\"99\", \"Chromium\";v=\"142\""
+        },
+        {
+          "name": "sec-ch-ua-mobile",
+          "value": "?0"
+        },
+        {
+          "name": "sec-ch-ua-platform",
+          "value": "\"Windows\""
+        },
+        {
+          "name": "x-codeium-csrf-token",
+          "value": "965fdd75-25f9-45cc-ac13-ee8dea91fa46"
+        }
+      ],
+      "postData": {
+        "mimeType": "application/proto",
+        "text": "\nÌ\u0002\n\bwindsurf\u0012\u00061.48.2\u001a½\u0001devin-session-token$eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzZXNzaW9uX2lkIjoid2luZHN1cmYtc2Vzc2lvbi1iMzhmZjUxYmFjMzc0ZDJlOGMyMjY3ZDMzODQwYmQyMiJ9.Bh2TUtbSyCkAEKngLUdpWFmpJdMKNGV8xTfRsrXnnII\"\u0002en:\u00062.1.32b\bwindsurf¢\u0001%user-a0877fa492bb4eb3b0697a7c72bbb97bò\u0001\u0003\u0000\u0001\u0003\u00023devin-team$account-2a2bd7ac9a4e47ee83140eace192c9be"
+      },
+      "response": {
+        "status": 200,
+        "statusText": "OK",
+        "httpVersion": "HTTP/1.1",
+        "headers": [
+          {
+            "name": "Accept-Encoding",
+            "value": "gzip"
+          },
+          {
+            "name": "Access-Control-Allow-Credentials",
+            "value": "true"
+          },
+          {
+            "name": "Access-Control-Allow-Origin",
+            "value": "vscode-file://vscode-app"
+          },
+          {
+            "name": "Content-Encoding",
+            "value": "gzip"
+          },
+          {
+            "name": "Content-Length",
+            "value": "23"
+          },
+          {
+            "name": "Content-Type",
+            "value": "application/proto"
+          },
+          {
+            "name": "Date",
+            "value": "Mon, 04 May 2026 11:15:30 GMT"
+          },
+          {
+            "name": "Vary",
+            "value": "Origin"
+          }
+        ],
+        "cookies": [],
+        "content": {
+          "size": 0,
+          "mimeType": "application/proto",
+          "compression": -23
+        },
+        "redirectURL": "",
+        "headersSize": 265,
+        "bodySize": 23,
+        "_transferSize": 288,
+        "_error": null,
+        "_fetchedViaServiceWorker": false
+      }
+    },
+    {
+      "method": "POST",
+      "endpoint": "GetUnleashData",
+      "status": 200,
+      "url": "http://l.localhost:51834/exa.language_server_pb.LanguageServerService/GetUnleashData",
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "*/*"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br, zstd"
+        },
+        {
+          "name": "Accept-Language",
+          "value": "en-US"
+        },
+        {
+          "name": "Connection",
+          "value": "keep-alive"
+        },
+        {
+          "name": "Content-Length",
+          "value": "463"
+        },
+        {
+          "name": "Host",
+          "value": "l.localhost:51834"
+        },
+        {
+          "name": "Origin",
+          "value": "vscode-file://vscode-app"
+        },
+        {
+          "name": "Sec-Fetch-Dest",
+          "value": "empty"
+        },
+        {
+          "name": "Sec-Fetch-Mode",
+          "value": "cors"
+        },
+        {
+          "name": "Sec-Fetch-Site",
+          "value": "cross-site"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Windsurf/1.110.1 Chrome/142.0.7444.265 Electron/39.6.0 Safari/537.36"
+        },
+        {
+          "name": "connect-protocol-version",
+          "value": "1"
+        },
+        {
+          "name": "content-type",
+          "value": "application/proto"
+        },
+        {
+          "name": "sec-ch-ua",
+          "value": "\"Not_A Brand\";v=\"99\", \"Chromium\";v=\"142\""
+        },
+        {
+          "name": "sec-ch-ua-mobile",
+          "value": "?0"
+        },
+        {
+          "name": "sec-ch-ua-platform",
+          "value": "\"Windows\""
+        },
+        {
+          "name": "x-codeium-csrf-token",
+          "value": "965fdd75-25f9-45cc-ac13-ee8dea91fa46"
+        }
+      ],
+      "postData": {
+        "mimeType": "application/proto",
+        "text": "\nÌ\u0002\n\bwindsurf\u0012\u00061.48.2\u001a½\u0001devin-session-token$eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzZXNzaW9uX2lkIjoid2luZHN1cmYtc2Vzc2lvbi1iMzhmZjUxYmFjMzc0ZDJlOGMyMjY3ZDMzODQwYmQyMiJ9.Bh2TUtbSyCkAEKngLUdpWFmpJdMKNGV8xTfRsrXnnII\"\u0002en:\u00062.1.32b\bwindsurf¢\u0001%user-a0877fa492bb4eb3b0697a7c72bbb97bò\u0001\u0003\u0000\u0001\u0003\u00023devin-team$account-2a2bd7ac9a4e47ee83140eace192c9be\u0012l\n\tsentryDsn\u0012_https://564eba057587639c8a92b81cfa4b3f12@o4507463137361920.ingest.us.sentry.io/4507737596690432\u0012\u0010\n\bplanName\u0012\u0004Free"
+      },
+      "response": {
+        "status": 200,
+        "statusText": "OK",
+        "httpVersion": "HTTP/1.1",
+        "headers": [
+          {
+            "name": "Accept-Encoding",
+            "value": "gzip"
+          },
+          {
+            "name": "Access-Control-Allow-Credentials",
+            "value": "true"
+          },
+          {
+            "name": "Access-Control-Allow-Origin",
+            "value": "vscode-file://vscode-app"
+          },
+          {
+            "name": "Content-Encoding",
+            "value": "gzip"
+          },
+          {
+            "name": "Content-Length",
+            "value": "685"
+          },
+          {
+            "name": "Content-Type",
+            "value": "application/proto"
+          },
+          {
+            "name": "Date",
+            "value": "Mon, 04 May 2026 11:15:30 GMT"
+          },
+          {
+            "name": "Vary",
+            "value": "Origin"
+          }
+        ],
+        "cookies": [],
+        "content": {
+          "size": 1038,
+          "mimeType": "application/proto",
+          "compression": 353
+        },
+        "redirectURL": "",
+        "headersSize": 266,
+        "bodySize": 685,
+        "_transferSize": 951,
+        "_error": null,
+        "_fetchedViaServiceWorker": false
+      }
+    },
+    {
+      "method": "POST",
+      "endpoint": "GetUserStatus",
+      "status": 200,
+      "url": "http://y.localhost:51834/exa.language_server_pb.LanguageServerService/GetUserStatus",
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "*/*"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br, zstd"
+        },
+        {
+          "name": "Accept-Language",
+          "value": "en-US"
+        },
+        {
+          "name": "Connection",
+          "value": "keep-alive"
+        },
+        {
+          "name": "Content-Length",
+          "value": "335"
+        },
+        {
+          "name": "Host",
+          "value": "y.localhost:51834"
+        },
+        {
+          "name": "Origin",
+          "value": "vscode-file://vscode-app"
+        },
+        {
+          "name": "Sec-Fetch-Dest",
+          "value": "empty"
+        },
+        {
+          "name": "Sec-Fetch-Mode",
+          "value": "cors"
+        },
+        {
+          "name": "Sec-Fetch-Site",
+          "value": "cross-site"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Windsurf/1.110.1 Chrome/142.0.7444.265 Electron/39.6.0 Safari/537.36"
+        },
+        {
+          "name": "connect-protocol-version",
+          "value": "1"
+        },
+        {
+          "name": "content-type",
+          "value": "application/proto"
+        },
+        {
+          "name": "sec-ch-ua",
+          "value": "\"Not_A Brand\";v=\"99\", \"Chromium\";v=\"142\""
+        },
+        {
+          "name": "sec-ch-ua-mobile",
+          "value": "?0"
+        },
+        {
+          "name": "sec-ch-ua-platform",
+          "value": "\"Windows\""
+        },
+        {
+          "name": "x-codeium-csrf-token",
+          "value": "965fdd75-25f9-45cc-ac13-ee8dea91fa46"
+        }
+      ],
+      "postData": {
+        "mimeType": "application/proto",
+        "text": "\nÌ\u0002\n\bwindsurf\u0012\u00061.48.2\u001a½\u0001devin-session-token$eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzZXNzaW9uX2lkIjoid2luZHN1cmYtc2Vzc2lvbi1iMzhmZjUxYmFjMzc0ZDJlOGMyMjY3ZDMzODQwYmQyMiJ9.Bh2TUtbSyCkAEKngLUdpWFmpJdMKNGV8xTfRsrXnnII\"\u0002en:\u00062.1.32b\bwindsurf¢\u0001%user-a0877fa492bb4eb3b0697a7c72bbb97bò\u0001\u0003\u0000\u0001\u0003\u00023devin-team$account-2a2bd7ac9a4e47ee83140eace192c9be"
+      },
+      "response": {
+        "status": 200,
+        "statusText": "OK",
+        "httpVersion": "HTTP/1.1",
+        "headers": [
+          {
+            "name": "Accept-Encoding",
+            "value": "gzip"
+          },
+          {
+            "name": "Access-Control-Allow-Credentials",
+            "value": "true"
+          },
+          {
+            "name": "Access-Control-Allow-Origin",
+            "value": "vscode-file://vscode-app"
+          },
+          {
+            "name": "Content-Encoding",
+            "value": "gzip"
+          },
+          {
+            "name": "Content-Type",
+            "value": "application/proto"
+          },
+          {
+            "name": "Date",
+            "value": "Mon, 04 May 2026 11:15:30 GMT"
+          },
+          {
+            "name": "Transfer-Encoding",
+            "value": "chunked"
+          },
+          {
+            "name": "Vary",
+            "value": "Origin"
+          }
+        ],
+        "cookies": [],
+        "content": {
+          "size": 39638,
+          "mimeType": "application/proto",
+          "compression": 33559
+        },
+        "redirectURL": "",
+        "headersSize": 273,
+        "bodySize": 6079,
+        "_transferSize": 6352,
+        "_error": null,
+        "_fetchedViaServiceWorker": false
+      }
+    }
+  ]
+}
