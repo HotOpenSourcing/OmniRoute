@@ -1,4 +1,4 @@
-FROM node:24.14.1-trixie-slim AS builder
+FROM node:24.15.0-trixie-slim AS builder
 WORKDIR /app
 
 RUN apt-get update \
@@ -9,13 +9,13 @@ COPY package*.json ./
 COPY scripts/postinstall.mjs ./scripts/postinstall.mjs
 COPY scripts/postinstallSupport.mjs ./scripts/postinstallSupport.mjs
 COPY scripts/native-binary-compat.mjs ./scripts/native-binary-compat.mjs
-COPY scripts/postinstallSupport.mjs ./scripts/postinstallSupport.mjs
-RUN if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
+ENV NPM_CONFIG_LEGACY_PEER_DEPS=true
+RUN npm install --no-audit --no-fund
 
 COPY . ./
 RUN mkdir -p /app/data && npm run build -- --webpack
 
-FROM node:24.14.1-trixie-slim AS runner-base
+FROM node:24.15.0-trixie-slim AS runner-base
 WORKDIR /app
 
 LABEL org.opencontainers.image.title="omniroute" \
@@ -28,6 +28,7 @@ ENV NODE_ENV=production
 ENV PORT=20128
 ENV HOSTNAME=0.0.0.0
 ENV NODE_OPTIONS="--max-old-space-size=256"
+ENV OMNIROUTE_MIGRATIONS_DIR=/app/migrations
 
 # Data directory inside Docker — must match the volume mount in docker-compose.yml
 ENV DATA_DIR=/app/data
@@ -46,10 +47,18 @@ COPY --from=builder /app/node_modules/@swc/helpers ./node_modules/@swc/helpers
 COPY --from=builder /app/node_modules/pino-abstract-transport ./node_modules/pino-abstract-transport
 COPY --from=builder /app/node_modules/pino-pretty ./node_modules/pino-pretty
 COPY --from=builder /app/node_modules/split2 ./node_modules/split2
+# Migration SQL files are read via fs.readFileSync at runtime and are NOT
+# traced by Next.js standalone output — copy them explicitly.
+COPY --from=builder /app/src/lib/db/migrations ./migrations
+ENV OMNIROUTE_MIGRATIONS_DIR=/app/migrations
+
 COPY --from=builder /app/scripts/run-standalone.mjs ./run-standalone.mjs
 COPY --from=builder /app/scripts/runtime-env.mjs ./runtime-env.mjs
 COPY --from=builder /app/scripts/bootstrap-env.mjs ./bootstrap-env.mjs
 COPY --from=builder /app/scripts/healthcheck.mjs ./healthcheck.mjs
+COPY --from=builder /app/bin/omniroute.mjs ./bin/omniroute.mjs
+COPY --from=builder /app/bin/nodeRuntimeSupport.mjs ./bin/nodeRuntimeSupport.mjs
+COPY --from=builder /app/scripts/native-binary-compat.mjs ./scripts/native-binary-compat.mjs
 
 EXPOSE 20128
 

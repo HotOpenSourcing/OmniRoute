@@ -12,6 +12,7 @@ import {
 } from "@/lib/localDb";
 import { syncToCloud } from "@/lib/cloudSync";
 import { setQuotaCache } from "@/domain/quotaCache";
+import { buildClaudeExtraUsageConnectionUpdate } from "@/lib/providers/claudeExtraUsage";
 import { getMachineId } from "@/shared/utils/machine";
 import { USAGE_SUPPORTED_PROVIDERS } from "@/shared/constants/providers";
 import { getCloudExecutor } from "@omniroute/open-sse/executors/index.ts";
@@ -33,9 +34,23 @@ interface ProviderConnectionLike {
   providerSpecificData?: JsonRecord;
   testStatus?: string;
   isActive?: boolean;
+  lastError?: string | null;
+  lastErrorAt?: string | null;
+  lastErrorType?: string | null;
+  lastErrorSource?: string | null;
+  errorCode?: string | number | null;
+  rateLimitedUntil?: string | null;
+  backoffLevel?: number;
 }
 
-const PROVIDER_LIMITS_APIKEY_PROVIDERS = new Set(["glm", "glmt"]);
+const PROVIDER_LIMITS_APIKEY_PROVIDERS = new Set([
+  "glm",
+  "glmt",
+  "minimax",
+  "minimax-cn",
+  "crof",
+  "nanogpt",
+]);
 const DEFAULT_PROVIDER_LIMITS_SYNC_INTERVAL_MINUTES = 70;
 const PROVIDER_LIMITS_AUTO_SYNC_SETTING_KEY = "provider_limits_auto_sync_last_run";
 
@@ -187,6 +202,20 @@ async function syncExpiredStatusIfNeeded(connection: ProviderConnectionLike, usa
   }
 }
 
+async function syncClaudeExtraUsageStateIfNeeded(
+  connection: ProviderConnectionLike,
+  usage: JsonRecord
+): Promise<ProviderConnectionLike> {
+  const update = buildClaudeExtraUsageConnectionUpdate(connection, usage);
+  if (!update) return connection;
+
+  await updateProviderConnection(connection.id, update);
+  return {
+    ...connection,
+    ...update,
+  };
+}
+
 export function getProviderLimitsSyncIntervalMinutes(): number {
   const raw = Number.parseInt(process.env.PROVIDER_LIMITS_SYNC_INTERVAL_MINUTES ?? "", 10);
   return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_PROVIDER_LIMITS_SYNC_INTERVAL_MINUTES;
@@ -218,6 +247,16 @@ export async function fetchLiveProviderLimits(connectionId: string): Promise<{
   connection: ProviderConnectionLike;
   usage: JsonRecord;
 }> {
+  return fetchLiveProviderLimitsWithOptions(connectionId, { forceRefresh: false });
+}
+
+async function fetchLiveProviderLimitsWithOptions(
+  connectionId: string,
+  options: { forceRefresh?: boolean } = {}
+): Promise<{
+  connection: ProviderConnectionLike;
+  usage: JsonRecord;
+}> {
   let connection = (await getProviderConnectionById(connectionId)) as ProviderConnectionLike | null;
   if (!connection) {
     throw withStatus(new Error("Connection not found"), 404);
@@ -228,11 +267,12 @@ export async function fetchLiveProviderLimits(connectionId: string): Promise<{
   }
 
   if (connection.authType !== "oauth") {
-    const usage = (await getUsageForProvider(connection)) as JsonRecord;
+    const usage = (await getUsageForProvider(connection, options)) as JsonRecord;
     if (isRecord(usage.quotas)) {
       setQuotaCache(connectionId, connection.provider, usage.quotas);
     }
     await syncExpiredStatusIfNeeded(connection, usage);
+    connection = await syncClaudeExtraUsageStateIfNeeded(connection, usage);
     return { connection, usage };
   }
 
@@ -251,7 +291,7 @@ export async function fetchLiveProviderLimits(connectionId: string): Promise<{
         await syncToCloudIfEnabled();
       }
 
-      const usageData = (await getUsageForProvider(conn)) as JsonRecord;
+      const usageData = (await getUsageForProvider(conn, options)) as JsonRecord;
       connection = conn;
       return { usage: usageData };
     });
@@ -291,6 +331,7 @@ export async function fetchLiveProviderLimits(connectionId: string): Promise<{
     setQuotaCache(connectionId, connection.provider, result.usage.quotas);
   }
   await syncExpiredStatusIfNeeded(connection, result.usage);
+  connection = await syncClaudeExtraUsageStateIfNeeded(connection, result.usage);
 
   return {
     connection,
@@ -306,7 +347,9 @@ export async function fetchAndPersistProviderLimits(
   usage: JsonRecord;
   cache: ProviderLimitsCacheEntry;
 }> {
-  const { connection, usage } = await fetchLiveProviderLimits(connectionId);
+  const { connection, usage } = await fetchLiveProviderLimitsWithOptions(connectionId, {
+    forceRefresh: source === "manual",
+  });
   const cache = toProviderLimitsCacheEntry(usage, source);
   setProviderLimitsCache(connectionId, cache);
   return { connection, usage, cache };
@@ -336,7 +379,9 @@ export async function syncAllProviderLimits(
     const chunk = connections.slice(i, i + concurrency);
     const results = await Promise.allSettled(
       chunk.map(async (connection) => {
-        const { usage } = await fetchLiveProviderLimits(connection.id);
+        const { usage } = await fetchLiveProviderLimitsWithOptions(connection.id, {
+          forceRefresh: source === "manual",
+        });
         const cache = toProviderLimitsCacheEntry(usage, source);
         return { connectionId: connection.id, cache };
       })

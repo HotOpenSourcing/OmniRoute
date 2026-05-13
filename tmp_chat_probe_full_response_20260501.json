@@ -1,6 +1,0 @@
-{
-  "error": "WINDSURF_DIRECT_KEY is empty",
-  "hint": "Set WINDSURF_DIRECT_KEY in your shell before running this script. SQLite only contains a devin-session-token session value, which this probe rejects because it is not a direct cloud API key.",
-  "mode": "chat",
-  "authType": "direct"
-}

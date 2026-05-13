@@ -1,10 +1,12 @@
+// @ts-nocheck
 import test from "node:test";
 import assert from "node:assert/strict";
 
 // ─── Import the executor and its dependencies ──────────────────────────────
 
 const { PerplexityWebExecutor } = await import("../../open-sse/executors/perplexity-web.ts");
-const { getCloudExecutor, hasSpecializedExecutor } = await import("../../open-sse/executors/index.ts");
+const { getCloudExecutor, hasSpecializedExecutor } =
+  await import("../../open-sse/executors/index.ts");
 
 // ─── Helper: Build a mock SSE stream from Perplexity events ─────────────────
 
@@ -104,7 +106,7 @@ test("Non-streaming: simple text response", async () => {
     });
 
     assert.equal(result.response.status, 200);
-    const json = await result.response.json();
+    const json = (await result.response.json()) as any;
     assert.equal(json.object, "chat.completion");
     assert.equal(json.choices[0].message.role, "assistant");
     assert.equal(json.choices[0].message.content, "Hello, world!");
@@ -144,7 +146,7 @@ test("Non-streaming: strips citations from response", async () => {
       log: null,
     });
 
-    const json = await result.response.json();
+    const json = (await result.response.json()) as any;
     assert.ok(!json.choices[0].message.content.includes("[1]"));
     assert.ok(!json.choices[0].message.content.includes("[2]"));
     assert.ok(!json.choices[0].message.content.includes("[3]"));
@@ -292,7 +294,7 @@ test("Error: 401 returns auth error message", async () => {
     });
 
     assert.equal(result.response.status, 401);
-    const json = await result.response.json();
+    const json = (await result.response.json()) as any;
     assert.ok(json.error.message.includes("auth failed"));
     assert.ok(json.error.message.includes("session-token"));
   } finally {
@@ -314,7 +316,7 @@ test("Error: 429 returns rate limit message", async () => {
     });
 
     assert.equal(result.response.status, 429);
-    const json = await result.response.json();
+    const json = (await result.response.json()) as any;
     assert.ok(json.error.message.includes("rate limited"));
   } finally {
     restore();
@@ -335,7 +337,7 @@ test("Error: fetch failure returns 502", async () => {
     });
 
     assert.equal(result.response.status, 502);
-    const json = await result.response.json();
+    const json = (await result.response.json()) as any;
     assert.ok(json.error.message.includes("ECONNREFUSED"));
   } finally {
     restore();
@@ -354,7 +356,7 @@ test("Error: empty messages returns 400", async () => {
   });
 
   assert.equal(result.response.status, 400);
-  const json = await result.response.json();
+  const json = (await result.response.json()) as any;
   assert.ok(json.error.message.includes("Missing or empty messages"));
 });
 
@@ -390,7 +392,7 @@ test("Non-streaming: Perplexity stream error returns 502", async () => {
     });
 
     assert.equal(result.response.status, 502);
-    const json = await result.response.json();
+    const json = (await result.response.json()) as any;
     assert.ok(json.error.message.includes("Too many requests"));
   } finally {
     restore();
@@ -671,7 +673,7 @@ test("Provider registry: perplexity-web is registered with correct models", asyn
 
   const models = PROVIDER_MODELS["pplx-web"];
   assert.ok(models, "pplx-web should be in PROVIDER_MODELS");
-  assert.ok(models.length === 7, `Expected 7 models, got ${models.length}`);
+  assert.ok(models.length === 8, `Expected 8 models, got ${models.length}`);
 
   const modelIds = models.map((m) => m.id);
   assert.ok(modelIds.includes("pplx-auto"));
@@ -681,6 +683,7 @@ test("Provider registry: perplexity-web is registered with correct models", asyn
   assert.ok(modelIds.includes("pplx-gemini"));
   assert.ok(modelIds.includes("pplx-nemotron"));
   assert.ok(modelIds.includes("pplx-sonar"));
+  assert.ok(modelIds.includes("pplx-kimi"));
 });
 
 // ─── Test: Fallback text field ──────────────────────────────────────────────
@@ -700,7 +703,7 @@ test("Non-streaming: falls back to text field when no blocks", async () => {
       log: null,
     });
 
-    const json = await result.response.json();
+    const json = (await result.response.json()) as any;
     assert.ok(json.choices[0].message.content.includes("Fallback answer text"));
   } finally {
     restore();
@@ -742,7 +745,7 @@ test("Request: posts to correct Perplexity SSE endpoint", async () => {
 
     assert.equal(capturedUrl, "https://www.perplexity.ai/rest/sse/perplexity_ask");
     assert.equal(capturedHeaders["Origin"], "https://www.perplexity.ai");
-    assert.equal(capturedHeaders["X-App-ApiVersion"], "2.18");
+    assert.equal(capturedHeaders["X-App-ApiVersion"], "client-1.11.0");
     assert.equal(capturedHeaders["Accept"], "text/event-stream");
   } finally {
     globalThis.fetch = original;

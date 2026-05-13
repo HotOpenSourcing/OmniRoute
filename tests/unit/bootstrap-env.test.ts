@@ -6,6 +6,7 @@ import path from "node:path";
 import Database from "better-sqlite3";
 
 import { bootstrapEnv } from "../../scripts/bootstrap-env.mjs";
+import { encrypt } from "../../src/lib/db/encryption.ts";
 
 function withTempEnv(fn) {
   const originalCwd = process.cwd();
@@ -100,6 +101,38 @@ test("bootstrapEnv fails closed when existing database cannot be inspected", () 
     fs.mkdirSync(path.join(dataDir, "storage.sqlite"), { recursive: true });
 
     assert.throws(() => bootstrapEnv({ quiet: true }), /Unable to inspect existing database/);
+  });
+});
+
+test("bootstrapEnv decrypt probe accepts credentials encrypted by runtime helper", () => {
+  withTempEnv(({ dataDir }) => {
+    process.env.DATA_DIR = dataDir;
+    process.env.STORAGE_ENCRYPTION_KEY = "bootstrap-probe-secret";
+    process.env.JWT_SECRET = "jwt-from-env";
+    process.env.API_KEY_SECRET = "api-key-secret";
+    fs.mkdirSync(dataDir, { recursive: true });
+
+    const encrypted = encrypt("stored-token");
+    const db = new Database(path.join(dataDir, "storage.sqlite"));
+    try {
+      db.exec(`
+        CREATE TABLE provider_connections (
+          id TEXT PRIMARY KEY,
+          access_token TEXT,
+          refresh_token TEXT,
+          api_key TEXT,
+          id_token TEXT
+        );
+      `);
+      db.prepare("INSERT INTO provider_connections (id, access_token) VALUES (?, ?)").run(
+        "conn-1",
+        encrypted
+      );
+    } finally {
+      db.close();
+    }
+
+    assert.doesNotThrow(() => bootstrapEnv({ quiet: true }));
   });
 });
 

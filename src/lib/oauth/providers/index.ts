@@ -19,6 +19,7 @@ import { qwen } from "./qwen";
 import { windsurf } from "./windsurf.ts";
 import { kimiCoding } from "./kimi-coding";
 import { github } from "./github";
+import { gitlabDuo } from "./gitlab-duo";
 import { kiro } from "./kiro";
 import { cursor } from "./cursor";
 import { kilocode } from "./kilocode";
@@ -34,7 +35,9 @@ export const PROVIDERS = {
   windsurf,
   "kimi-coding": kimiCoding,
   github,
+  "gitlab-duo": gitlabDuo,
   kiro,
+  "amazon-q": kiro,
   cursor,
   kilocode,
   cline,

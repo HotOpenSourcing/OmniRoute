@@ -17,6 +17,13 @@ import { GrokWebExecutor } from "./grok-web.ts";
 import { WindsurfExecutor } from "./windsurf.ts";
 import { WindsurfLocalExecutor } from "./windsurfLocal.ts";
 import { WindsurfHybridExecutor } from "./windsurfHybrid.ts";
+import { ChatGptWebExecutor } from "./chatgpt-web.ts";
+import { BlackboxWebExecutor } from "./blackbox-web.ts";
+import { MuseSparkWebExecutor } from "./muse-spark-web.ts";
+import { AzureOpenAIExecutor } from "./azure-openai.ts";
+import { GitlabExecutor } from "./gitlab.ts";
+import { NlpCloudExecutor } from "./nlpcloud.ts";
+import { PetalsExecutor } from "./petals.ts";
 
 const cloudExecutors = {
   antigravity: new AntigravityExecutor(),
@@ -24,11 +31,17 @@ const cloudExecutors = {
   github: new GithubExecutor(),
   qoder: new QoderExecutor(),
   kiro: new KiroExecutor(),
+  "amazon-q": new KiroExecutor("amazon-q"),
   codex: new CodexExecutor(),
   cursor: new CursorExecutor(),
-  cu: new CursorExecutor(),
+  cu: new CursorExecutor(), // Alias for cursor
   windsurf: new WindsurfExecutor(),
   ws: new WindsurfExecutor(),
+  "azure-openai": new AzureOpenAIExecutor(),
+  gitlab: new GitlabExecutor(),
+  "gitlab-duo": new GitlabExecutor("gitlab-duo"),
+  nlpcloud: new NlpCloudExecutor(),
+  petals: new PetalsExecutor(),
   pollinations: new PollinationsExecutor(),
   pol: new PollinationsExecutor(),
   "cloudflare-ai": new CloudflareAIExecutor(),
@@ -38,11 +51,18 @@ const cloudExecutors = {
   puter: new PuterExecutor(),
   pu: new PuterExecutor(),
   vertex: new VertexExecutor(),
+  "vertex-partner": new VertexExecutor(),
   cliproxyapi: new CliproxyapiExecutor(),
   cpa: new CliproxyapiExecutor(),
   "perplexity-web": new PerplexityWebExecutor(),
   "pplx-web": new PerplexityWebExecutor(),
   "grok-web": new GrokWebExecutor(),
+  "chatgpt-web": new ChatGptWebExecutor(),
+  "cgpt-web": new ChatGptWebExecutor(), // Alias
+  "blackbox-web": new BlackboxWebExecutor(),
+  "bb-web": new BlackboxWebExecutor(), // Alias
+  "muse-spark-web": new MuseSparkWebExecutor(),
+  "ms-web": new MuseSparkWebExecutor(), // Alias
 };
 
 const localExecutors = {
@@ -60,14 +80,22 @@ function getDefaultExecutor(provider: string) {
   return defaultCache.get(provider)!;
 }
 
-function getExecutorOrThrow<T extends Record<string, unknown>>(pool: T, provider: string, backend: string) {
+function getExecutorOrThrow<T extends Record<string, unknown>>(
+  pool: T,
+  provider: string,
+  backend: string
+) {
   const executor = pool[provider as keyof T];
   if (executor) return executor;
   throw new Error(`No ${backend} executor registered for provider '${provider}'`);
 }
 
+export function getExecutor(provider: string) {
+  return cloudExecutors[provider as keyof typeof cloudExecutors] || getDefaultExecutor(provider);
+}
+
 export function getCloudExecutor(provider: string) {
-  return getExecutorOrThrow(cloudExecutors, provider, "cloud");
+  return getExecutor(provider);
 }
 
 export function getLocalExecutor(provider: string) {
@@ -81,8 +109,8 @@ export function getHybridExecutor(provider: string) {
 export function hasSpecializedExecutor(provider: string) {
   return Boolean(
     cloudExecutors[provider as keyof typeof cloudExecutors] ||
-      localExecutors[provider as keyof typeof localExecutors] ||
-      hybridExecutors[provider as keyof typeof hybridExecutors]
+    localExecutors[provider as keyof typeof localExecutors] ||
+    hybridExecutors[provider as keyof typeof hybridExecutors]
   );
 }
 
@@ -106,3 +134,10 @@ export { GrokWebExecutor } from "./grok-web.ts";
 export { WindsurfExecutor } from "./windsurf.ts";
 export { WindsurfLocalExecutor } from "./windsurfLocal.ts";
 export { WindsurfHybridExecutor } from "./windsurfHybrid.ts";
+export { ChatGptWebExecutor } from "./chatgpt-web.ts";
+export { BlackboxWebExecutor } from "./blackbox-web.ts";
+export { MuseSparkWebExecutor } from "./muse-spark-web.ts";
+export { AzureOpenAIExecutor } from "./azure-openai.ts";
+export { GitlabExecutor } from "./gitlab.ts";
+export { NlpCloudExecutor } from "./nlpcloud.ts";
+export { PetalsExecutor } from "./petals.ts";

@@ -24,6 +24,7 @@ import {
   oauthPollSchema,
 } from "@/shared/validation/schemas";
 import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
+import { isAuthRequired, isAuthenticated } from "@/shared/utils/apiAuth";
 
 // Use globalThis to persist callback server state across Next.js HMR reloads
 if (!globalThis.__codexCallbackState) {
@@ -112,6 +113,12 @@ function parseWindsurfCallbackUrl(callbackUrl: string, expectedState?: string) {
   return { ok: true as const, code, state };
 }
 
+async function requireOAuthRouteAuth(request: Request) {
+  if (!(await isAuthRequired(request))) return null;
+  if (await isAuthenticated(request)) return null;
+  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+}
+
 /**
  * Dynamic OAuth API Route
  * Handles: authorize, exchange, device-code, poll, start-callback-server, poll-callback
@@ -123,6 +130,9 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ provider: string; action: string }> }
 ) {
+  const authResponse = await requireOAuthRouteAuth(request);
+  if (authResponse) return authResponse;
+
   try {
     const { provider, action } = await params;
     const { searchParams } = new URL(request.url);
@@ -150,15 +160,40 @@ export async function GET(
       }
 
       const authData = generateAuthData(provider, null);
+      const startUrl = searchParams.get("startUrl");
+      const region = searchParams.get("region") || "us-east-1";
 
       // Resolve proxy for this provider (provider-level → global → direct)
       const proxy = await resolveProxyForProvider(provider);
 
       // Request device code (through proxy if configured)
       let deviceData;
-      if (provider === "github" || provider === "kiro" || provider === "kilocode") {
-        // GitHub, Kiro, and KiloCode don't use PKCE for device code
-        deviceData = await runWithProxyContext(proxy, () => (requestDeviceCode as any)(provider));
+      if (
+        provider === "github" ||
+        provider === "kiro" ||
+        provider === "amazon-q" ||
+        provider === "kimi-coding" ||
+        provider === "kilocode"
+      ) {
+        // GitHub, Kiro/Amazon Q, Kimi Coding, and KiloCode don't use PKCE for device code
+        if ((provider === "kiro" || provider === "amazon-q") && startUrl) {
+          const providerOverrideConfig = {
+            ...providerData.config,
+            startUrl,
+            region,
+            skipIssuerUrlForRegistration: true,
+            registerClientUrl: `https://oidc.${region}.amazonaws.com/client/register`,
+            deviceAuthUrl: `https://oidc.${region}.amazonaws.com/device_authorization`,
+            tokenUrl: `https://oidc.${region}.amazonaws.com/token`,
+            ssoOidcEndpoint: `https://oidc.${region}.amazonaws.com`,
+          };
+
+          deviceData = await runWithProxyContext(proxy, () =>
+            (requestDeviceCode as any)(provider, null, providerOverrideConfig)
+          );
+        } else {
+          deviceData = await runWithProxyContext(proxy, () => (requestDeviceCode as any)(provider));
+        }
       } else {
         // Qwen and other providers use PKCE
         deviceData = await runWithProxyContext(proxy, () =>
@@ -256,6 +291,9 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ provider: string; action: string }> }
 ) {
+  const authResponse = await requireOAuthRouteAuth(request);
+  if (authResponse) return authResponse;
+
   try {
     const { provider, action } = await params;
     let rawBody: any = {};
@@ -297,7 +335,7 @@ export async function POST(
     }
 
     if (action === "exchange") {
-      let { code, callbackUrl, redirectUri, codeVerifier, state } = body;
+      let { code, callbackUrl, redirectUri, connectionId, codeVerifier, state } = body;
       const providerData = getProvider(provider);
 
       let windsurfUsedCallbackUrl = false;
@@ -376,6 +414,7 @@ export async function POST(
       if (tokenData.email) {
         const existing = await getProviderConnections({ provider });
         const match = existing.find((c: any) => {
+          if (c.id && safeEqual(connectionId, c.id)) return true;
           // safeEqual: constant-time comparison to prevent timing attacks (CWE-208, finding #258-6/7)
           if (!safeEqual(c.email, tokenData.email) || c.authType !== "oauth") return false;
           // For Codex, also check workspaceId to avoid overwriting different workspace connections
@@ -420,7 +459,7 @@ export async function POST(
     }
 
     if (action === "poll") {
-      const { deviceCode, codeVerifier, extraData } = body;
+      const { deviceCode, connectionId, codeVerifier, extraData } = body;
       const providerData = getProvider(provider);
 
       if (providerData.config?.enabled === false) {
@@ -441,11 +480,11 @@ export async function POST(
       // Poll for token (through proxy if configured)
       let result;
       if (provider === "github" || provider === "kimi-coding" || provider === "kilocode") {
-        // For providers that don't use PKCE (like GitHub, Kiro, Kimi Coding), don't pass codeVerifier
+        // For providers that don't use PKCE (GitHub, Kimi Coding, KiloCode), don't pass codeVerifier
         result = await runWithProxyContext(proxy, () =>
           (pollForToken as any)(provider, deviceCode)
         );
-      } else if (provider === "kiro") {
+      } else if (provider === "kiro" || provider === "amazon-q") {
         // Kiro needs extraData (clientId, clientSecret) from device code response
         result = await runWithProxyContext(proxy, () =>
           (pollForToken as any)(provider, deviceCode, null, extraData)
@@ -475,6 +514,7 @@ export async function POST(
         if (result.tokens.email) {
           const existing = await getProviderConnections({ provider });
           const match = existing.find((c: any) => {
+            if (c.id && safeEqual(connectionId, c.id)) return true;
             // safeEqual: constant-time comparison to prevent timing attacks (CWE-208, finding #258-8/9)
             if (!safeEqual(c.email, result.tokens.email) || c.authType !== "oauth") return false;
             // For Codex, also check workspaceId to avoid overwriting different workspace connections
@@ -529,6 +569,8 @@ export async function POST(
     }
 
     if (action === "poll-callback") {
+      const { connectionId } = body;
+
       // Poll for Codex callback server result
       if (provider !== "codex") {
         return NextResponse.json(
@@ -600,6 +642,7 @@ export async function POST(
         if (tokenData.email) {
           const existing = await getProviderConnections({ provider });
           const match = existing.find((c: any) => {
+            if (c.id && safeEqual(connectionId, c.id)) return true;
             // safeEqual: constant-time comparison to prevent timing attacks (CWE-208, finding #258-6/7)
             if (!safeEqual(c.email, tokenData.email) || c.authType !== "oauth") return false;
             // For Codex, also check workspaceId to avoid overwriting different workspace connections
