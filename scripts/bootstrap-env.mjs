@@ -18,7 +18,7 @@
  *   4. process.env            (shell / Docker -e flags, highest priority)
  */
 
-import { createDecipheriv, createHash, randomBytes, scryptSync } from "node:crypto";
+import { randomBytes, createDecipheriv, scryptSync, createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { homedir } from "node:os";
@@ -271,15 +271,59 @@ export function bootstrapEnv({ dataDirOverride, quiet = false } = {}) {
           .get();
         if (row) {
           const ciphertext = row.api_key || row.access_token || row.refresh_token || row.id_token;
-          if (!canDecryptCredential(ciphertext, merged.STORAGE_ENCRYPTION_KEY)) {
-            log(
-              "⛔ STORAGE_ENCRYPTION_KEY does not match the key used to encrypt your stored credentials."
-            );
-            log(`   Restore the previous key in ${serverEnvPath} or your deployment environment,`);
-            log(
-              "   or run in the container: DATA_DIR=/app/data node ./bin/omniroute.mjs reset-encrypted-columns --force"
-            );
-            log("   Resetting wipes stored credentials only; provider metadata is preserved.");
+          if (ciphertext?.startsWith("enc:v1:")) {
+            const parts = ciphertext.split(":");
+            // enc:v1:<iv>:<ct>:<tag>
+            if (parts.length >= 5) {
+              const iv = Buffer.from(parts[2], "hex");
+              const ct = Buffer.from(parts[3], "hex");
+              const tag = Buffer.from(parts[4], "hex");
+
+              // Try decrypting with both key derivation methods matching encryption.ts
+              const tryDecrypt = (derivedKey) => {
+                const decipher = createDecipheriv("aes-256-gcm", derivedKey, iv);
+                decipher.setAuthTag(tag);
+                decipher.update(ct);
+                decipher.final();
+              };
+
+              // Dynamic salt (current): scryptSync(secret, sha256(secret).slice(0,16), 32)
+              const dynamicSalt = createHash("sha256")
+                .update(merged.STORAGE_ENCRYPTION_KEY)
+                .digest()
+                .slice(0, 16);
+              const dynamicKey = scryptSync(merged.STORAGE_ENCRYPTION_KEY, dynamicSalt, 32);
+
+              // Legacy salt (fallback): scryptSync(secret, "omniroute-field-encryption-v1", 32)
+              const legacySalt = "omniroute-field-encryption-v1";
+              const legacyKey = scryptSync(merged.STORAGE_ENCRYPTION_KEY, legacySalt, 32);
+
+              let keyMatched = false;
+              try {
+                tryDecrypt(dynamicKey);
+                keyMatched = true;
+              } catch {
+                // Try legacy key as fallback
+                try {
+                  tryDecrypt(legacyKey);
+                  keyMatched = true;
+                } catch {
+                  // Both failed — key truly doesn't match
+                }
+              }
+
+              if (!keyMatched) {
+                log(
+                  "⛔ STORAGE_ENCRYPTION_KEY does not match the key used to encrypt your stored credentials."
+                );
+                log(
+                  "   Either restore your previous key via ~/.omniroute/server.env or ~/.omniroute/.env,"
+                );
+                log(
+                  "   or run: omniroute reset-encrypted-columns --force  (wipes credentials, keeps provider config)"
+                );
+              }
+            }
           }
         }
       } finally {
