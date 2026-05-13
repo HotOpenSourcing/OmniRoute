@@ -15,12 +15,29 @@ const revealRoute = await import("../../src/app/api/keys/[id]/reveal/route.ts");
 
 const MACHINE_ID = "1234567890abcdef";
 
+async function removeDirWithRetry(targetDir, attempts = 10) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      if (fs.existsSync(targetDir)) {
+        fs.rmSync(targetDir, { recursive: true, force: true });
+      }
+      return;
+    } catch (error) {
+      if ((error?.code === "EBUSY" || error?.code === "EPERM") && attempt < attempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
 async function resetStorage() {
   delete process.env.ALLOW_API_KEY_REVEAL;
   delete process.env.INITIAL_PASSWORD;
   core.resetDbInstance();
   apiKeysDb.resetApiKeyState();
-  fs.rmSync(TEST_DATA_DIR, { recursive: true, force: true });
+  await removeDirWithRetry(TEST_DATA_DIR);
   fs.mkdirSync(TEST_DATA_DIR, { recursive: true });
 }
 
@@ -36,7 +53,7 @@ test.after(async () => {
   delete process.env.ALLOW_API_KEY_REVEAL;
   core.resetDbInstance();
   apiKeysDb.resetApiKeyState();
-  fs.rmSync(TEST_DATA_DIR, { recursive: true, force: true });
+  await removeDirWithRetry(TEST_DATA_DIR);
 });
 
 test("GET /api/keys stays masked even when reveal is enabled", async () => {

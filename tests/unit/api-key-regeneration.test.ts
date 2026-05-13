@@ -11,21 +11,38 @@ process.env.API_KEY_SECRET = "test-secret-regen";
 const core = await import("../../src/lib/db/core.ts");
 const apiKeysDb = await import("../../src/lib/db/apiKeys.ts");
 
-function reset() {
+async function removeDirWithRetry(targetDir, attempts = 10) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      if (fs.existsSync(targetDir)) {
+        fs.rmSync(targetDir, { recursive: true, force: true });
+      }
+      return;
+    } catch (error) {
+      if ((error?.code === "EBUSY" || error?.code === "EPERM") && attempt < attempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
+async function reset() {
   core.resetDbInstance();
   apiKeysDb.resetApiKeyState();
-  if (fs.existsSync(TEST_DATA_DIR)) {
-    fs.rmSync(TEST_DATA_DIR, { recursive: true, force: true });
-  }
+  await removeDirWithRetry(TEST_DATA_DIR);
   fs.mkdirSync(TEST_DATA_DIR, { recursive: true });
 }
 
-test.beforeEach(() => {
-  reset();
+test.beforeEach(async () => {
+  await reset();
 });
 
-test.after(() => {
-  fs.rmSync(TEST_DATA_DIR, { recursive: true, force: true });
+test.after(async () => {
+  core.resetDbInstance();
+  apiKeysDb.resetApiKeyState();
+  await removeDirWithRetry(TEST_DATA_DIR);
 });
 
 test("regenerateApiKey creates a new key and invalidates the old one", async () => {

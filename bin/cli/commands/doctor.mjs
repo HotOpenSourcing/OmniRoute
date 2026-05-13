@@ -325,7 +325,7 @@ async function checkNodeRuntime(rootDir) {
   );
   const support = getNodeRuntimeSupport();
   if (!support.nodeCompatible) {
-    return fail("Node runtime", `${support.nodeVersion} is outside supported policy`, support);
+    return warn("Node runtime", `${support.nodeVersion} is outside supported policy`, support);
   }
   return ok("Node runtime", `${support.nodeVersion} is supported`, support);
 }
