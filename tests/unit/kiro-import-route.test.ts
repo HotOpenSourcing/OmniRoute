@@ -80,7 +80,12 @@ test("POST /api/oauth/kiro/import creates a new connection when no matching acco
   };
 
   try {
-    const response = await callImportRoute({ refreshToken: "aorAAAAAG-new-token" });
+    const response = await callImportRoute({
+      refreshToken: "aorAAAAAG-new-token",
+      name: "Kiro Imported Name",
+      accountName: "Kiro Imported Account",
+      tagGroupLabel: "aws-kiro-import",
+    });
     assert.equal(response.status, 200);
 
     const payload = await response.json();
@@ -93,9 +98,14 @@ test("POST /api/oauth/kiro/import creates a new connection when no matching acco
     const created = connections[0] as any;
     assert.equal(created.email, "kiro-user@example.com");
     assert.equal(created.provider, "kiro");
+    assert.equal(created.name, "Kiro Imported Name");
+    assert.equal(created.displayName, "Kiro Imported Account");
+    assert.equal(created.group, "aws-kiro-import");
     assert.equal(created.testStatus, "active");
     assert.equal(created.providerSpecificData?.profileArn, "arn:aws:sso:::profile/test-user");
     assert.equal(created.providerSpecificData?.authMethod, "imported");
+    assert.equal(created.providerSpecificData?.accountName, "Kiro Imported Account");
+    assert.equal(created.providerSpecificData?.tagGroupLabel, "aws-kiro-import");
   } finally {
     kiroServiceModule.KiroService.prototype.validateImportToken = originalValidateImportToken;
     kiroServiceModule.KiroService.prototype.extractEmailFromJWT = originalExtractEmailFromJWT;
@@ -134,7 +144,12 @@ test("POST /api/oauth/kiro/import updates an existing connection when the email 
       },
     });
 
-    const response = await callImportRoute({ refreshToken: "aorAAAAAG-updated-token" });
+    const response = await callImportRoute({
+      refreshToken: "aorAAAAAG-updated-token",
+      name: "Updated Imported Name",
+      accountName: "Updated Imported Account",
+      tagGroupLabel: "aws-kiro-import",
+    });
     assert.equal(response.status, 200);
 
     const payload = await response.json();
@@ -150,9 +165,14 @@ test("POST /api/oauth/kiro/import updates an existing connection when the email 
     assert.equal(updated.accessToken, "access-updated");
     assert.equal(updated.refreshToken, "refresh-updated");
     assert.equal(updated.email, "existing@example.com");
+    assert.equal(updated.name, "Updated Imported Name");
+    assert.equal(updated.displayName, "Updated Imported Account");
+    assert.equal(updated.group, "aws-kiro-import");
     assert.equal(updated.testStatus, "active");
     assert.equal(updated.isActive, true);
     assert.equal(updated.providerSpecificData?.profileArn, "arn:aws:sso:::profile/updated-user");
+    assert.equal(updated.providerSpecificData?.accountName, "Updated Imported Account");
+    assert.equal(updated.providerSpecificData?.tagGroupLabel, "aws-kiro-import");
   } finally {
     kiroServiceModule.KiroService.prototype.validateImportToken = originalValidateImportToken;
     kiroServiceModule.KiroService.prototype.extractEmailFromJWT = originalExtractEmailFromJWT;
@@ -209,7 +229,10 @@ test("POST /api/oauth/kiro/import updates an existing connection when profileArn
     assert.equal(updated.email, undefined);
     assert.equal(updated.testStatus, "active");
     assert.equal(updated.isActive, true);
-    assert.equal(updated.providerSpecificData?.profileArn, "arn:aws:sso:::profile/profile-match-user");
+    assert.equal(
+      updated.providerSpecificData?.profileArn,
+      "arn:aws:sso:::profile/profile-match-user"
+    );
   } finally {
     kiroServiceModule.KiroService.prototype.validateImportToken = originalValidateImportToken;
     kiroServiceModule.KiroService.prototype.extractEmailFromJWT = originalExtractEmailFromJWT;

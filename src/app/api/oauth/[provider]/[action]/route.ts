@@ -113,6 +113,26 @@ function parseWindsurfCallbackUrl(callbackUrl: string, expectedState?: string) {
   return { ok: true as const, code, state };
 }
 
+function resolveImportedConnectionMetadata(input: {
+  name?: string;
+  accountName?: string;
+  tagGroupLabel?: string;
+}) {
+  const normalizedName = input.name?.trim() || input.accountName?.trim() || undefined;
+  const normalizedAccountName = input.accountName?.trim() || normalizedName || undefined;
+  const normalizedGroup = input.tagGroupLabel?.trim() || undefined;
+
+  return {
+    name: normalizedName,
+    displayName: normalizedAccountName,
+    group: normalizedGroup,
+    providerSpecificData: {
+      ...(normalizedAccountName ? { accountName: normalizedAccountName } : {}),
+      ...(normalizedGroup ? { tagGroupLabel: normalizedGroup } : {}),
+    },
+  };
+}
+
 async function requireOAuthRouteAuth(request: Request) {
   if (!(await isAuthRequired(request))) return null;
   if (await isAuthenticated(request)) return null;
@@ -459,8 +479,21 @@ export async function POST(
     }
 
     if (action === "poll") {
-      const { deviceCode, connectionId, codeVerifier, extraData } = body;
+      const {
+        deviceCode,
+        connectionId,
+        codeVerifier,
+        extraData,
+        name,
+        accountName,
+        tagGroupLabel,
+      } = body;
       const providerData = getProvider(provider);
+      const importedMetadata = resolveImportedConnectionMetadata({
+        name,
+        accountName,
+        tagGroupLabel,
+      });
 
       if (providerData.config?.enabled === false) {
         return NextResponse.json(
@@ -528,6 +561,15 @@ export async function POST(
           if (matchId) {
             connection = await updateProviderConnection(matchId, {
               ...result.tokens,
+              ...(importedMetadata.name ? { name: importedMetadata.name } : {}),
+              ...(importedMetadata.displayName
+                ? { displayName: importedMetadata.displayName }
+                : {}),
+              ...(importedMetadata.group ? { group: importedMetadata.group } : {}),
+              providerSpecificData: {
+                ...(result.tokens.providerSpecificData || {}),
+                ...importedMetadata.providerSpecificData,
+              },
               expiresAt,
               testStatus: "active",
               isActive: true,
@@ -539,6 +581,13 @@ export async function POST(
             provider,
             authType: "oauth",
             ...result.tokens,
+            ...(importedMetadata.name ? { name: importedMetadata.name } : {}),
+            ...(importedMetadata.displayName ? { displayName: importedMetadata.displayName } : {}),
+            ...(importedMetadata.group ? { group: importedMetadata.group } : {}),
+            providerSpecificData: {
+              ...(result.tokens.providerSpecificData || {}),
+              ...importedMetadata.providerSpecificData,
+            },
             expiresAt,
             testStatus: "active",
           });
@@ -552,6 +601,9 @@ export async function POST(
           connection: {
             id: connection.id,
             provider: connection.provider,
+            name: connection.name,
+            displayName: connection.displayName,
+            group: connection.group,
           },
         });
       }

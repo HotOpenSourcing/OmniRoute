@@ -1273,6 +1273,9 @@ export const oauthPollSchema = z.object({
   deviceCode: z.string().trim().min(1),
   codeVerifier: z.string().optional(),
   extraData: z.unknown().optional(),
+  name: z.string().trim().min(1).max(200).optional(),
+  accountName: z.string().trim().min(1).max(200).optional(),
+  tagGroupLabel: z.string().trim().min(1).max(100).optional(),
 });
 
 export const cursorImportSchema = z.object({
@@ -1282,6 +1285,9 @@ export const cursorImportSchema = z.object({
 
 export const kiroImportSchema = z.object({
   refreshToken: z.string().trim().min(1, "Refresh token is required"),
+  name: z.string().trim().min(1).max(200).optional(),
+  accountName: z.string().trim().min(1).max(200).optional(),
+  tagGroupLabel: z.string().trim().min(1).max(100).optional(),
 });
 
 export const kiroSocialExchangeSchema = z.object({
