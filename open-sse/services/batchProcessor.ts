@@ -19,6 +19,12 @@ let isProcessing: boolean = false;
 let pollInterval: NodeJS.Timeout | null = null;
 const activeProcesses = new Set<Promise<void>>();
 const DEFAULT_BATCH_WINDOW_SECONDS: number = 24 * 60 * 60;
+const BATCH_RETRY_DURATION_MS: number =
+  parseInt(process.env.BATCH_RETRY_DURATION_MS ?? "", 10) || 24 * 60 * 60 * 1_000;
+const BATCH_BACKOFF_BASE_MS: number =
+  parseInt(process.env.BATCH_BACKOFF_BASE_MS ?? "", 10) || 5_000;
+const BATCH_BACKOFF_MAX_MS: number =
+  parseInt(process.env.BATCH_BACKOFF_MAX_MS ?? "", 10) || 3_600_000;
 
 interface BatchRequestItem {
   body: Record<string, unknown>;
@@ -293,17 +299,22 @@ async function startBatch(batch: any): Promise<void> {
   }
 }
 
+let prevHeaders: Headers | null = null;
+let prevHeadersTimestamp: number = 0;
+const HEADERS_CACHE_TTL_MS = 60_000;
+
 async function processBatchItems(batch: BatchRecord, items: BatchRequestItem[]): Promise<void> {
   const state = createBatchState(batch);
 
   const apiKey = await resolveApiKey(batch);
-  let prevHeaders: Headers | null = null;
 
   for (const item of items) {
     if (isBatchCancelled(batch.id)) break;
 
-    if (prevHeaders) {
-      const delay = maybeThrottle(prevHeaders);
+    const cachedHeaders =
+      prevHeaders && Date.now() - prevHeadersTimestamp < HEADERS_CACHE_TTL_MS ? prevHeaders : null;
+    if (cachedHeaders) {
+      const delay = maybeThrottle(cachedHeaders);
       if (delay) {
         await sleep(delay);
       }
@@ -333,10 +344,12 @@ async function processBatchItems(batch: BatchRecord, items: BatchRequestItem[]):
       state.results.push(wrapped);
       applyItemResult(state, response.status, responseBody);
       prevHeaders = response.headers;
+      prevHeadersTimestamp = Date.now();
     } catch (exception) {
       // Track processing-level errors separately (items that failed to be processed)
       state.errors.push({ custom_id: item.customId ?? null, error: String(exception) });
       prevHeaders = null;
+      prevHeadersTimestamp = 0;
     }
 
     maybePersistProgress(batch.id, state);
@@ -357,8 +370,11 @@ async function resolveApiKey(batch: BatchRecord): Promise<any> {
 }
 
 async function processSingleItemWithRetry(item: BatchRequestItem, apiKey: string) {
-  // TODO: expose as configurable parameter
-  const maxRetries = 10;
+  // Time-based retry limit: individual batch items can retry for up to 24 hours.
+  // This accommodates large batches against heavily rate-limited providers.
+  const MAX_RETRY_DURATION_MS = BATCH_RETRY_DURATION_MS;
+  const maxRetries = 200; // safety ceiling — time limit should kick in first
+  const retryStartedAt = Date.now();
 
   let response: Response = null;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -376,6 +392,13 @@ async function processSingleItemWithRetry(item: BatchRequestItem, apiKey: string
       (response.status === 429 || response.status === 502 || response.status === 504) &&
       attempt < maxRetries
     ) {
+      // Bail if we've been retrying for longer than the allowed window
+      if (Date.now() - retryStartedAt >= MAX_RETRY_DURATION_MS) {
+        console.warn(
+          `[BATCH] Item ${item.customId ?? "(no id)"} exceeded 24h retry window after ${attempt} attempts — giving up`
+        );
+        return response;
+      }
       const delay = getRetryDelayMs(response.headers) ?? getBackoffDelayMs(attempt);
       await sleep(delay);
       continue;
@@ -412,9 +435,8 @@ export function buildRequestBody(item: BatchRequestItem) {
 }
 
 function getBackoffDelayMs(attempt: number) {
-  // TODO: expose in config
-  let baseMs = 500;
-  let maxMs = 30_000;
+  const baseMs = BATCH_BACKOFF_BASE_MS;
+  const maxMs = BATCH_BACKOFF_MAX_MS;
 
   // exponential: 2^attempt * base
   const exp = Math.min(maxMs, baseMs * 2 ** attempt);
@@ -774,4 +796,13 @@ function failBatch(batchId: string, reason: string): void {
 
 export async function waitForAllBatches(): Promise<void> {
   await Promise.all(Array.from(activeProcesses));
+}
+
+// Test helpers
+export function getCachedHeaders(): { headers: Headers | null; timestamp: number } {
+  return { headers: prevHeaders, timestamp: prevHeadersTimestamp };
+}
+export function resetCachedHeaders(): void {
+  prevHeaders = null;
+  prevHeadersTimestamp = 0;
 }

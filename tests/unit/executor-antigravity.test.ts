@@ -8,6 +8,33 @@ import {
   clearAntigravityVersionCache,
   seedAntigravityVersionCache,
 } from "../../open-sse/services/antigravityVersion.ts";
+import { clearAntigravityProjectCache } from "../../open-sse/services/antigravityProjectBootstrap.ts";
+
+type AntigravityTransformResult = Exclude<
+  Awaited<ReturnType<AntigravityExecutor["transformRequest"]>>,
+  Response
+>;
+
+type ErrorPayload = {
+  error: {
+    code?: string;
+    message: string;
+  };
+  retryAfterMs?: number;
+};
+
+type ChatCompletionPayload = {
+  object?: string;
+  choices: Array<{
+    message: { content: string };
+    finish_reason: string;
+  }>;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+};
 
 async function withEnv<T>(
   name: string,
@@ -54,7 +81,7 @@ test("AntigravityExecutor.buildHeaders includes native headers without OmniRoute
 
   assert.equal(headers.Authorization, "Bearer ag-token");
   assert.equal(headers.Accept, "text/event-stream");
-  assert.match(headers["User-Agent"], /^Antigravity\/4\.1\.33 /);
+  assert.match(headers["User-Agent"], /^Antigravity\/4\.2\.0 /);
   assert.equal(headers["X-OmniRoute-Source"], undefined);
 });
 
@@ -115,8 +142,10 @@ test("AntigravityExecutor.transformRequest normalizes model, project and content
   assert.match(result.requestId, /^agent\/\d+\/[0-9a-f]{8}$/);
   assert.deepEqual(result.enabledCreditTypes, ["GOOGLE_ONE_AI"]);
   assert.ok(result.request.sessionId);
-  assert.equal(result.request.generationConfig.topK, 40);
-  assert.equal(result.request.generationConfig.topP, 1.0);
+  const request = result.request as { generationConfig?: { topK?: number; topP?: number } };
+  const generationConfig = request.generationConfig || {};
+  assert.equal(generationConfig.topK, 40);
+  assert.equal(generationConfig.topP, 1.0);
   assert.deepEqual(result.request.toolConfig, {
     functionCallingConfig: { mode: "VALIDATED" },
   });
@@ -198,11 +227,168 @@ test("AntigravityExecutor.transformRequest returns a structured error response w
     true,
     {}
   );
-  const payload = (await result.json()) as any;
+  if (!(result instanceof Response)) throw new Error("Expected Response from transformRequest");
+  const payload = (await result.json()) as ErrorPayload;
 
   assert.equal(result.status, 422);
   assert.equal(payload.error.code, "missing_project_id");
   assert.match(payload.error.message, /Missing Google projectId/);
+});
+
+// #2334/#2541: a freshly re-added Antigravity account can have an empty stored projectId
+// even when its Google account already owns a Cloud Code project. transformRequest must
+// auto-discover it via loadCodeAssist (mirroring gemini-cli.ts) instead of hard-failing.
+test("AntigravityExecutor.transformRequest auto-discovers a missing projectId via loadCodeAssist (#2334)", async () => {
+  clearAntigravityProjectCache();
+  seedAntigravityVersionCache("2026.04.17-test");
+  const executor = new AntigravityExecutor();
+  const originalFetch = globalThis.fetch;
+  let loadCodeAssistCalled = false;
+
+  globalThis.fetch = (async (url: string | URL | Request) => {
+    if (String(url).includes("loadCodeAssist")) {
+      loadCodeAssistCalled = true;
+      return new Response(JSON.stringify({ cloudaicompanionProject: "discovered-project-123" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return new Response("{}", { status: 404 });
+  }) as typeof fetch;
+
+  try {
+    const result = await executor.transformRequest(
+      "antigravity/gemini-3.1-pro",
+      { request: { contents: [] } },
+      true,
+      { accessToken: "fresh-account-token-2334" }
+    );
+    if (result instanceof Response) {
+      throw new Error(`Expected an envelope but got a ${result.status} Response`);
+    }
+    assert.equal(
+      loadCodeAssistCalled,
+      true,
+      "loadCodeAssist should be called to recover the project"
+    );
+    assert.equal(result.project, "discovered-project-123");
+  } finally {
+    globalThis.fetch = originalFetch;
+    clearAntigravityProjectCache();
+  }
+});
+
+// #2334: when loadCodeAssist also finds no project (truly un-onboarded account), the
+// structured 422 must still be returned so the dashboard can prompt a reconnect.
+test("AntigravityExecutor.transformRequest still 422s when loadCodeAssist finds no project (#2334)", async () => {
+  clearAntigravityProjectCache();
+  seedAntigravityVersionCache("2026.04.17-test");
+  const executor = new AntigravityExecutor();
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({}), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })) as typeof fetch;
+
+  try {
+    const result = await executor.transformRequest(
+      "antigravity/gemini-3.1-pro",
+      { request: { contents: [] } },
+      true,
+      { accessToken: "no-project-token-2334" }
+    );
+    if (!(result instanceof Response)) throw new Error("Expected a 422 Response");
+    assert.equal(result.status, 422);
+    const payload = (await result.json()) as ErrorPayload;
+    assert.equal(payload.error.code, "missing_project_id");
+  } finally {
+    globalThis.fetch = originalFetch;
+    clearAntigravityProjectCache();
+  }
+});
+
+test("AntigravityExecutor.transformRequest prefers top-level credentials projectId over nested providerSpecificData", async () => {
+  const executor = new AntigravityExecutor();
+  const result = await executor.transformRequest(
+    "antigravity/gemini-2.5-pro",
+    {
+      project: "body-project",
+      request: {
+        contents: [{ role: "user", parts: [{ text: "Hello" }] }],
+      },
+    },
+    true,
+    {
+      projectId: "credential-project",
+      providerSpecificData: { projectId: "nested-project" },
+    }
+  );
+
+  if (result instanceof Response) throw new Error("Unexpected Response from transformRequest");
+  assert.equal(result.project, "credential-project");
+});
+
+test("AntigravityExecutor.transformRequest uses nested providerSpecificData projectId when top-level is absent", async () => {
+  const executor = new AntigravityExecutor();
+  const result = await executor.transformRequest(
+    "antigravity/gemini-2.5-pro",
+    {
+      request: {
+        contents: [{ role: "user", parts: [{ text: "Hello" }] }],
+      },
+    },
+    true,
+    {
+      providerSpecificData: { projectId: "nested-project" },
+    }
+  );
+
+  if (result instanceof Response) throw new Error("Unexpected Response from transformRequest");
+  assert.equal(result.project, "nested-project");
+});
+
+test("AntigravityExecutor.transformRequest treats whitespace-only project values as missing", async () => {
+  const executor = new AntigravityExecutor();
+
+  const nestedFallback = await executor.transformRequest(
+    "antigravity/gemini-2.5-pro",
+    {
+      project: "   ",
+      request: {
+        contents: [{ role: "user", parts: [{ text: "Hello" }] }],
+      },
+    },
+    true,
+    {
+      projectId: "   ",
+      providerSpecificData: { projectId: " nested-project " },
+    }
+  );
+
+  if (nestedFallback instanceof Response)
+    throw new Error("Unexpected Response from transformRequest");
+  assert.equal(nestedFallback.project, "nested-project");
+
+  const bodyFallback = await executor.transformRequest(
+    "antigravity/gemini-2.5-pro",
+    {
+      project: " body-project ",
+      request: {
+        contents: [{ role: "user", parts: [{ text: "Hello" }] }],
+      },
+    },
+    true,
+    {
+      projectId: "   ",
+      providerSpecificData: { projectId: "   " },
+    }
+  );
+
+  if (bodyFallback instanceof Response)
+    throw new Error("Unexpected Response from transformRequest");
+  assert.equal(bodyFallback.project, "body-project");
 });
 
 test("AntigravityExecutor.transformRequest allows body project overrides when the env flag is enabled", async () => {
@@ -277,7 +463,7 @@ test("AntigravityExecutor.collectStreamToResponse turns SSE Gemini chunks into a
     { Authorization: "Bearer ag-token" },
     { request: {} }
   );
-  const payload = (await result.response.json()) as any;
+  const payload = (await result.response.json()) as ChatCompletionPayload;
 
   assert.equal(result.response.status, 200);
   assert.equal(payload.object, "chat.completion");
@@ -343,7 +529,7 @@ test("AntigravityExecutor.collectStreamToResponse parses fragmented SSE lines in
     { Authorization: "Bearer ag-token" },
     { request: {} }
   );
-  const payload = (await result.response.json()) as any;
+  const payload = (await result.response.json()) as ChatCompletionPayload;
 
   assert.equal(payload.choices[0].message.content, "Fragmented");
   assert.equal(payload.choices[0].finish_reason, "stop");
@@ -379,6 +565,10 @@ test("AntigravityExecutor.refreshCredentials refreshes Google OAuth tokens", asy
       refreshToken: "new-refresh",
       expiresIn: 3600,
       projectId: "project-1",
+      // refreshCredentials preserves providerSpecificData across refresh (#2480); when the
+      // input has none it surfaces as `undefined`. (Test updated to match that behavior —
+      // it had been stale since the #2480 change added this field.)
+      providerSpecificData: undefined,
     });
   } finally {
     globalThis.fetch = originalFetch;
@@ -423,10 +613,10 @@ test("AntigravityExecutor.execute auto-retries short 429 responses and collects 
       model: "antigravity/gemini-2.5-flash",
       body: { request: { contents: [] } },
       stream: false,
-      credentials: { accessToken: "token", projectId: "project-1" } as any,
+      credentials: { accessToken: "token", projectId: "project-1" },
       log: { debug() {}, warn() {} },
     });
-    const payload = (await result.response.json()) as any;
+    const payload = (await result.response.json()) as ChatCompletionPayload;
 
     assert.equal(calls.length, 2);
     assert.equal(result.response.status, 200);
@@ -465,15 +655,60 @@ test("AntigravityExecutor.execute embeds retryAfterMs when the upstream asks for
       model: "antigravity/gemini-2.5-flash",
       body: { request: { contents: [] } },
       stream: true,
-      credentials: { accessToken: "token", projectId: "project-1" } as any,
+      credentials: { accessToken: "token", projectId: "project-1" },
       log: { debug() {}, warn() {} },
     });
-    const payload = (await result.response.json()) as any;
+    const payload = (await result.response.json()) as ErrorPayload;
 
     assert.equal(result.response.status, 429);
     assert.equal(payload.retryAfterMs, 7_200_000);
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+test("AntigravityExecutor.execute tags pre-response stalls with a fallbackable timeout code", async () => {
+  const executor = new AntigravityExecutor();
+  const originalFetch = globalThis.fetch;
+  const originalSetTimeout = globalThis.setTimeout;
+  seedAntigravityVersionCache("2026.04.17-test");
+
+  globalThis.fetch = async (_url, init) => {
+    await new Promise((_resolve, reject) => {
+      const signal = init?.signal as AbortSignal | undefined;
+      if (signal?.aborted) {
+        reject(signal.reason);
+        return;
+      }
+      signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
+    });
+    throw new Error("unreachable");
+  };
+  globalThis.setTimeout = ((callback) => {
+    (callback as () => void)();
+    return 0;
+  }) as typeof setTimeout;
+
+  try {
+    await assert.rejects(
+      () =>
+        executor.execute({
+          model: "antigravity/gemini-2.5-flash",
+          body: { request: { contents: [] } },
+          stream: true,
+          credentials: { accessToken: "token", projectId: "project-1" },
+          log: { debug() {}, warn() {}, error() {} },
+        }),
+      (error: unknown) => {
+        assert.equal((error as { code?: string }).code, "ANTIGRAVITY_PRE_RESPONSE_TIMEOUT");
+        assert.equal((error as { name?: string }).name, "TimeoutError");
+        assert.match((error as Error).message, /did not return response headers/);
+        return true;
+      }
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    globalThis.setTimeout = originalSetTimeout;
   }
 });
 
@@ -487,9 +722,9 @@ test("AntigravityExecutor.execute applies CLI fingerprint when enabled", async (
     const headers = init?.headers as Record<string, string>;
     const parsedBody = JSON.parse(String(init?.body));
 
-    assert.equal(
+    assert.match(
       headers["User-Agent"],
-      "Antigravity/2026.04.17-test (Macintosh; Intel Mac OS X 10_15_7) Chrome/132.0.6834.160 Electron/39.2.3"
+      /^Antigravity\/2026\.04\.17-test \(.+\) Chrome\/132\.0\.6834\.160 Electron\/39\.2\.3$/
     );
     assert.equal(headers["x-client-name"], "antigravity");
     assert.equal(headers["x-client-version"], "2026.04.17-test");
@@ -519,7 +754,7 @@ test("AntigravityExecutor.execute applies CLI fingerprint when enabled", async (
         model: "antigravity/gemini-2.5-flash",
         body: { request: { contents: [] } },
         stream: false,
-        credentials: { accessToken: "token", projectId: "project-1" } as any,
+        credentials: { accessToken: "token", projectId: "project-1" },
         log: { debug() {}, warn() {}, info() {} },
       })
     );
@@ -556,7 +791,7 @@ test("AntigravityExecutor.transformRequest maps Claude models through Gemini con
 
   const result = (await executor.transformRequest("antigravity/claude-sonnet-4-6", body, true, {
     projectId: "project-1",
-  })) as any;
+  })) as AntigravityTransformResult;
 
   assert.equal(result.project, "project-1");
   assert.equal(result.model, "claude-sonnet-4-6");

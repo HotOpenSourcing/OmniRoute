@@ -35,7 +35,7 @@ function makeRequest(headers?: HeadersInit) {
       "content-type": "application/json",
       ...headers,
     },
-    body: JSON.stringify({ providerId: "openai", modelId: "gpt-4o-mini" }),
+    body: JSON.stringify({ providerId: "openai", modelId: "gpt-4o-2024-11-20" }),
   });
 }
 
@@ -94,8 +94,8 @@ test("model test route requires management auth when login protection is enabled
 
   assert.equal(unauthenticated.status, 401);
   assert.equal(unauthenticatedBody.error.message, "Authentication required");
-  assert.equal(invalidToken.status, 401);
-  assert.equal(invalidTokenBody.error.message, "Invalid API key");
+  assert.equal(invalidToken.status, 403);
+  assert.equal(invalidTokenBody.error.message, "Invalid management token");
 });
 
 test("model test route ignores forwarded hosts and works in strict API-key mode", async () => {
@@ -135,7 +135,7 @@ test("model test route ignores forwarded hosts and works in strict API-key mode"
         "x-forwarded-host": "evil.example",
         "x-forwarded-proto": "https",
       },
-      body: { providerId: "openai", modelId: "gpt-4o-mini" },
+      body: { providerId: "openai", modelId: "gpt-4o-2024-11-20" },
     })
   );
   const body = (await response.json()) as any;

@@ -141,6 +141,9 @@ export async function updateProviderCredentials(connectionId: string, newCredent
     if (newCredentials.testStatus) {
       updates.testStatus = newCredentials.testStatus;
     }
+    if (newCredentials.isActive !== undefined) {
+      updates.isActive = newCredentials.isActive;
+    }
 
     const result = await updateProviderConnection(connectionId, updates);
     log.info("TOKEN_REFRESH", "Credentials updated in localDb", {
@@ -174,12 +177,22 @@ export async function checkAndRefreshToken(provider: string, credentials: any) {
 
       const connectionId: string | undefined = updatedCredentials.connectionId;
       const newCredentials = connectionId
-        ? await withConnectionRefreshMutex(connectionId, () =>
-            getAccessToken(provider, updatedCredentials)
-          )
+        ? await withConnectionRefreshMutex(connectionId, async () => {
+            const result = await getAccessToken(provider, updatedCredentials);
+            if (result?.accessToken) {
+              // Persist BEFORE the mutex releases so a concurrent request
+              // cannot read stale DB credentials and re-use a rotated refresh token.
+              await updateProviderCredentials(connectionId, result);
+            }
+            return result;
+          })
         : await getAccessToken(provider, updatedCredentials);
       if (newCredentials && newCredentials.accessToken) {
-        await updateProviderCredentials(updatedCredentials.connectionId, newCredentials);
+        // DB already updated inside the mutex when connectionId is present.
+        // For the no-connectionId path, persist here as before.
+        if (!connectionId) {
+          await updateProviderCredentials(updatedCredentials.connectionId, newCredentials);
+        }
 
         updatedCredentials = {
           ...updatedCredentials,
