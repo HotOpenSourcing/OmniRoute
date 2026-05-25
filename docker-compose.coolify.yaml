@@ -67,6 +67,10 @@ services:
       - "${PORT:-20128}"
       - "${API_PORT:-20129}"
 
+    ports:
+      - "${PORT:-20128}:${PORT:-20128}"
+      - "${API_PORT:-20129}:${API_PORT:-20129}"
+
     volumes:
       - omniroute-coolify-data:/app/data
 
@@ -91,6 +95,8 @@ services:
       PORT: ${CLIPROXYAPI_PORT:-8317}
     expose:
       - "${CLIPROXYAPI_PORT:-8317}"
+    ports:
+      - "${CLIPROXYAPI_PORT:-8317}:${CLIPROXYAPI_PORT:-8317}"
     volumes:
       - cliproxyapi-coolify-logs:/CLIProxyAPI/logs
       - cliproxyapi-coolify-data:/root/.cli-proxy-api
