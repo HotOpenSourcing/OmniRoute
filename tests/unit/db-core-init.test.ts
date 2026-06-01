@@ -40,7 +40,31 @@ function makeTempDir(prefix) {
 }
 
 function removePath(targetPath) {
-  fs.rmSync(targetPath, { recursive: true, force: true });
+  // On Windows occasional EBUSY (file locked) errors can occur briefly after
+  // closing SQLite handles. Retry several times with a short busy-wait and
+  // then fall back to renaming the directory to avoid test failure.
+  const attempts = 20;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      fs.rmSync(targetPath, { recursive: true, force: true });
+      return;
+    } catch (err) {
+      // busy-wait ~200ms, then retry
+      const waitUntil = Date.now() + 200;
+      while (Date.now() < waitUntil) {}
+    }
+  }
+
+  // If deletion still fails, attempt to rename the path to preserve artifacts
+  // and avoid failing the CI run due to transient file locks.
+  try {
+    const fallback = `${targetPath}.stale-${Date.now()}`;
+    fs.renameSync(targetPath, fallback);
+    return;
+  } catch {
+    // give up silently — leaving temp artifacts is acceptable for flaky OS-level locks
+    return;
+  }
 }
 
 async function importFresh(modulePath) {

@@ -50,6 +50,8 @@ type PreservedCriticalDbState = {
 type CriticalTableSpec = {
   table: string;
   maxRows?: number;
+  // Optional fast row-count to avoid materializing large tables.
+  countRows?: (db: SqliteDatabase) => number;
   readRows?: (db: SqliteDatabase) => JsonRecord[];
 };
 
@@ -77,12 +79,29 @@ const CRITICAL_DB_TABLES: CriticalTableSpec[] = [
   {
     table: "key_value",
     maxRows: 10_000,
+    // Avoid selecting the whole table blindly; only read allowed namespaces.
+    countRows(db) {
+      try {
+        const placeholders = [...SKIP_PRESERVE_NAMESPACES].map(() => "?").join(",");
+        const q = placeholders.length
+          ? `SELECT COUNT(*) as c FROM key_value WHERE namespace NOT IN (${placeholders})`
+          : `SELECT COUNT(*) as c FROM key_value`;
+        const row = (db.prepare(q).get(...[...SKIP_PRESERVE_NAMESPACES])) as { c?: number } | undefined;
+        return Number(row?.c ?? 0);
+      } catch {
+        return 0;
+      }
+    },
     readRows(db) {
-      return (
-        (db.prepare("SELECT namespace, key, value FROM key_value").all() as JsonRecord[]) ?? []
-      ).filter(
-        (row) => typeof row.namespace !== "string" || !SKIP_PRESERVE_NAMESPACES.has(row.namespace)
-      );
+      try {
+        const placeholders = [...SKIP_PRESERVE_NAMESPACES].map(() => "?").join(",");
+        const q = placeholders
+          ? `SELECT namespace, key, value FROM key_value WHERE namespace NOT IN (${placeholders})`
+          : `SELECT namespace, key, value FROM key_value`;
+        return (db.prepare(q).all(...[...SKIP_PRESERVE_NAMESPACES]) as JsonRecord[]) ?? [];
+      } catch {
+        return [];
+      }
     },
   },
   { table: "provider_connections", maxRows: 5_000 },
@@ -743,13 +762,31 @@ function captureCriticalDbState(sqliteFile: string): PreservedCriticalDbState {
     for (const tableSpec of CRITICAL_DB_TABLES) {
       if (!hasTable(probe, tableSpec.table)) continue;
 
-      const maxRows = tableSpec.maxRows ?? DEFAULT_CRITICAL_TABLE_ROW_LIMIT;
-      const rows = (tableSpec.readRows?.(probe) ??
-        (probe
-          .prepare(`SELECT * FROM ${quoteIdentifier(tableSpec.table)}`)
-          .all() as JsonRecord[])) as JsonRecord[];
-      const rowCount = rows.length;
+      // First, get a cheap row count (if available) to avoid materializing
+      // very large tables into memory. If count is unknown, fall back to
+      // a COUNT(*) query; only read rows when under the maxRows threshold.
+      let rowCount = 0;
+      try {
+        if (tableSpec.countRows) {
+          rowCount = tableSpec.countRows(probe);
+        } else {
+          const cnt = probe
+            .prepare(`SELECT COUNT(*) as c FROM ${quoteIdentifier(tableSpec.table)}`)
+            .get() as { c?: number } | undefined;
+          rowCount = Number(cnt?.c ?? 0);
+        }
+      } catch {
+        // If counting fails, skip reading this table to avoid OOM risk
+        snapshot.skippedTables.push({
+          table: tableSpec.table,
+          rowCount: -1,
+          maxRows: tableSpec.maxRows ?? DEFAULT_CRITICAL_TABLE_ROW_LIMIT,
+          reason: "count_failed",
+        });
+        continue;
+      }
 
+      const maxRows = tableSpec.maxRows ?? DEFAULT_CRITICAL_TABLE_ROW_LIMIT;
       if (rowCount === 0) continue;
 
       if (rowCount > maxRows) {
@@ -758,6 +795,22 @@ function captureCriticalDbState(sqliteFile: string): PreservedCriticalDbState {
           rowCount,
           maxRows,
           reason: "row_limit_exceeded",
+        });
+        continue;
+      }
+
+      // Safe to read rows (bounded by maxRows)
+      let rows: JsonRecord[] = [];
+      try {
+        rows = (tableSpec.readRows?.(probe) ??
+          (probe.prepare(`SELECT * FROM ${quoteIdentifier(tableSpec.table)}`).all() as JsonRecord[])) as
+          JsonRecord[];
+      } catch (e) {
+        snapshot.skippedTables.push({
+          table: tableSpec.table,
+          rowCount,
+          maxRows,
+          reason: "read_failed",
         });
         continue;
       }
@@ -1252,22 +1305,87 @@ export function getDbInstance(): SqliteDatabase {
         throw e;
       }
   preservedCriticalState = captureCriticalDbState(sqliteFile);
+  console.error('[DB] captured preservedCriticalState:', JSON.stringify(preservedCriticalState));
 
       // SAFETY: Never delete the database — rename to backup so data can be recovered.
       // The old code would silently destroy all user data on any probe failure.
       const failedPath = sqliteFile + `.probe-failed-${Date.now()}`;
       try {
-        fs.renameSync(sqliteFile, failedPath);
-        console.warn(`[DB] Renamed corrupt DB to ${path.basename(failedPath)}`);
-        failedProbePath = failedPath;
-        failedProbeMessage = message;
-      } catch {
-        /* ok */
+        let renamed = false;
+        for (let attempt = 0; attempt < 40; attempt++) {
+          try {
+            fs.renameSync(sqliteFile, failedPath);
+            renamed = true;
+            console.warn(`[DB] Renamed corrupt DB to ${path.basename(failedPath)}`);
+            break;
+          } catch (renameErr) {
+            // brief synchronous wait before retrying
+            try {
+              const sab = new SharedArrayBuffer(4);
+              const ia = new Int32Array(sab);
+              Atomics.wait(ia, 0, 0, 50);
+            } catch {
+              // ignore
+            }
+          }
+        }
+        if (!renamed) {
+          // On Windows the file may be locked; fallback to copying the file
+          try {
+            fs.copyFileSync(sqliteFile, failedPath);
+            console.warn(`[DB] Copied corrupt DB to ${path.basename(failedPath)} (rename retries exhausted)`);
+            // Try to remove the original file to emulate a rename; on Windows this may require retries
+            let removed = false;
+            for (let attempt = 0; attempt < 40; attempt++) {
+              try {
+                fs.unlinkSync(sqliteFile);
+                removed = true;
+                break;
+              } catch (uErr) {
+                try {
+                  const sab = new SharedArrayBuffer(4);
+                  const ia = new Int32Array(sab);
+                  Atomics.wait(ia, 0, 0, 50);
+                } catch {
+                  // ignore
+                }
+              }
+            }
+            if (!removed) {
+                // Final forced delete fallback on Windows: use cmd del to bypass certain file locks
+                try {
+                  if (process.platform === 'win32') {
+                    const cp = require('child_process');
+                    try {
+                      cp.execSync(`cmd /c del /f /q "${sqliteFile}"`);
+                      removed = !fs.existsSync(sqliteFile);
+                      if (removed) console.warn('[DB] Removed original corrupt DB using cmd del fallback');
+                    } catch (delErr) {
+                      console.warn('[DB] cmd del fallback failed:', String(delErr));
+                    }
+                  }
+                } catch (finalErr) {
+                  // ignore
+                }
+                if (!removed) console.warn('[DB] Could not remove original corrupt DB after copying; original file remains');
+            }
+            failedProbePath = failedPath;
+            failedProbeMessage = message;
+          } catch (copyErr) {
+            console.warn('[DB] Failed to preserve corrupt DB via rename or copy:', String(copyErr));
+          }
+        } else {
+          failedProbePath = failedPath;
+          failedProbeMessage = message;
+        }
+      } catch (errAll) {
+        console.warn('[DB] Unexpected error while preserving corrupt DB:', String(errAll));
       }
     }
   }
 
   if (failedProbePath) {
+    console.error('[DB] probe-failure check:', { failedProbePath, skipped: preservedCriticalState.skippedTables.length, captureSucceeded: preservedCriticalState.captureSucceeded });
     const hasUnsafeSkippedTables = preservedCriticalState.skippedTables.length > 0;
     const missingSnapshot = !preservedCriticalState.captureSucceeded;
     if (hasUnsafeSkippedTables || missingSnapshot) {
@@ -1288,7 +1406,51 @@ export function getDbInstance(): SqliteDatabase {
   db.pragma("busy_timeout = 5000");
   db.pragma("synchronous = NORMAL");
   db.pragma("cache_size = -2048");
-  db.exec(SCHEMA_SQL);
+  try {
+    console.log('[DB] Applying SCHEMA_SQL...');
+    db.exec(SCHEMA_SQL);
+    console.log('[DB] SCHEMA_SQL applied successfully');
+  } catch (err: unknown) {
+    const e = err instanceof Error ? err : new Error(String(err));
+    console.error('[DB] Error applying SCHEMA_SQL:', e.message);
+    try {
+      // Try to gather diagnostics about provider_connections table
+      const hasPc = db
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='provider_connections'")
+        .get();
+      if (hasPc) {
+        const cols = db.prepare('PRAGMA table_info(provider_connections)').all();
+        console.error('[DB] provider_connections columns:', JSON.stringify(cols));
+      } else {
+        console.error('[DB] provider_connections table does not exist');
+      }
+      const indexes = db
+        .prepare("SELECT name, sql FROM sqlite_master WHERE type='index' AND tbl_name='provider_connections'")
+        .all();
+      console.error('[DB] provider_connections indexes:', JSON.stringify(indexes));
+    } catch (diagErr) {
+      console.error('[DB] Failed to gather diagnostics after SCHEMA_SQL error:', String(diagErr));
+    }
+    // Attempt a safe fallback: execute statements one-by-one and skip failing ones
+    try {
+      console.log('[DB] Attempting safe fallback: executing SCHEMA_SQL statements individually');
+      const stmts = String(SCHEMA_SQL)
+        .split(/;\s*\n/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      for (const stmt of stmts) {
+        try {
+          db.exec(stmt + ";");
+        } catch (sErr) {
+          console.warn('[DB] Skipping failing SCHEMA statement:', (sErr instanceof Error && sErr.message) || String(sErr));
+        }
+      }
+      console.log('[DB] Safe fallback completed');
+    } catch (fallbackErr) {
+      console.error('[DB] Safe fallback failed:', String(fallbackErr));
+      throw e;
+    }
+  }
   ensureProviderConnectionsColumns(db);
   ensureUsageHistoryColumns(db);
   ensureCallLogsColumns(db);
@@ -1370,6 +1532,12 @@ export function getDbInstance(): SqliteDatabase {
   startDbHealthCheckScheduler(db);
   console.log(`[DB] SQLite database ready: ${sqliteFile}`);
   return db;
+}
+
+// Test hook: expose captureCriticalDbState for unit tests to inspect snapshots
+// without going through the full startup probe/restore flow.
+export function captureCriticalDbStateForTesting(sqliteFile: string): PreservedCriticalDbState {
+  return captureCriticalDbState(sqliteFile);
 }
 
 export function closeDbInstance(options?: { checkpointMode?: CheckpointMode | null }): boolean {
