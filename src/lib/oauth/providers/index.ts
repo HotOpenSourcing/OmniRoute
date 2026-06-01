@@ -14,6 +14,7 @@ import { claude } from "./claude";
 import { codex } from "./codex";
 import { gemini } from "./gemini";
 import { antigravity } from "./antigravity";
+import { agy } from "./agy";
 import { qoder } from "./qoder";
 import { qwen } from "./qwen";
 import { windsurf } from "./windsurf";
@@ -31,6 +32,7 @@ export const PROVIDERS = {
   codex,
   "gemini-cli": gemini,
   antigravity,
+  agy,
   qoder,
   qwen,
   windsurf,

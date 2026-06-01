@@ -14,14 +14,13 @@
 # - Coolify usually handles ingress/proxy automatically, so this file uses expose
 #   instead of host port bindings.
 # - Data is persisted in /app/data via the named volume below.
-# - Includes a CLIProxyAPI sidecar for providers/executors that route through CPA.
 
 services:
   omniroute:
     container_name: omniroute-coolify
     build:
       context: .
-      target: runner-base
+      target: runner-cli
     image: omniroute:coolify
     restart: unless-stopped
     stop_grace_period: 40s
@@ -59,10 +58,6 @@ services:
       PROVIDER_LIMITS_SYNC_INTERVAL_MINUTES: ${PROVIDER_LIMITS_SYNC_INTERVAL_MINUTES:-70}
       OMNIROUTE_DISABLE_BACKGROUND_SERVICES: ${OMNIROUTE_DISABLE_BACKGROUND_SERVICES:-false}
 
-      # CLIProxyAPI sidecar bridge
-      CLIPROXYAPI_HOST: ${CLIPROXYAPI_HOST:-cliproxyapi}
-      CLIPROXYAPI_PORT: ${CLIPROXYAPI_PORT:-8317}
-
       # Redis cache / queue backend
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       REDIS_HOST: ${REDIS_HOST:-redis}
@@ -70,8 +65,8 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
 
     depends_on:
-      - redis
-      - cliproxyapi
+      redis:
+        condition: service_healthy
 
     expose:
       - "${PORT:-20128}"
@@ -91,36 +86,9 @@ services:
       retries: 3
       start_period: 15s
 
-  cliproxyapi:
-    container_name: cliproxyapi-coolify
-    build:
-      context: .
-      dockerfile: bin/Dockerfile.cliproxyapi
-    image: cliproxyapi:coolify
-    pull_policy: never
-    restart: unless-stopped
-    environment:
-      DEPLOY: production
-      HOST: 0.0.0.0
-      PORT: ${CLIPROXYAPI_PORT:-8317}
-    expose:
-      - "${CLIPROXYAPI_PORT:-8317}"
-    ports:
-      - "${CLIPROXYAPI_PORT:-8317}:${CLIPROXYAPI_PORT:-8317}"
-    volumes:
-      - cliproxyapi-coolify-logs:/CLIProxyAPI/logs
-      - cliproxyapi-coolify-data:/root/.cli-proxy-api
-    healthcheck:
-      test:
-        ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:${CLIPROXYAPI_PORT:-8317}/v1/models"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-
   redis:
     container_name: redis-coolify
-    image: redis:7-alpine
+    image: redis:8.6.2-alpine
     restart: unless-stopped
     stop_grace_period: 10s
     command: >
@@ -142,9 +110,5 @@ services:
 volumes:
   omniroute-coolify-data:
     name: omniroute-coolify-data
-  cliproxyapi-coolify-logs:
-    name: cliproxyapi-coolify-logs
-  cliproxyapi-coolify-data:
-    name: cliproxyapi-coolify-data
   redis-coolify-data:
     name: redis-coolify-data
