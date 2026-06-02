@@ -13,6 +13,7 @@ import {
 } from "./adapters/driverFactory";
 import path from "path";
 import fs from "fs";
+import cp from "child_process";
 import { resolveDataDir, getLegacyDotDataDir } from "../dataPaths";
 import { runMigrations } from "./migrationRunner";
 import { runDbHealthCheck } from "./healthCheck";
@@ -1366,6 +1367,22 @@ export function getDbInstance(): SqliteDatabase {
                   }
                 } catch (finalErr) {
                   // ignore
+                }
+                // Additional PowerShell removal fallback (synchronous) for stubborn locks
+                if (!removed && process.platform === 'win32') {
+                  try {
+                    const cp = require('child_process');
+                    const psCmd = `powershell -NoProfile -Command "for ($i=0; $i -lt 40; $i++) { try { Remove-Item -LiteralPath '${sqliteFile.replace(/'/g, "''")}' -Force -ErrorAction Stop; exit 0 } catch { Start-Sleep -Milliseconds 100 } } exit 1"`;
+                    try {
+                      cp.execSync(psCmd, { stdio: 'ignore' });
+                      removed = !fs.existsSync(sqliteFile);
+                      if (removed) console.warn('[DB] Removed original corrupt DB using PowerShell fallback');
+                    } catch (psErr) {
+                      console.warn('[DB] PowerShell fallback failed:', String(psErr));
+                    }
+                  } catch {
+                    /* ignore */
+                  }
                 }
                 if (!removed) console.warn('[DB] Could not remove original corrupt DB after copying; original file remains');
             }

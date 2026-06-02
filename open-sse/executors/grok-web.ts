@@ -1495,7 +1495,6 @@ function buildStreamingResponse(
                     index: 0,
                     delta: {
                       content: `[Stream error: ${err instanceof Error ? err.message : String(err)}]`,
->>>>>>> upstream/main
                     },
                     finish_reason: "stop",
                     logprobs: null,
