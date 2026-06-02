@@ -38,8 +38,10 @@ RUN --mount=type=cache,target=/root/.npm \
   && npm rebuild better-sqlite3 \
   && node -e "require('better-sqlite3')(':memory:').close()"
 
-# Use Turbopack for significant build speedup
-ENV OMNIROUTE_USE_TURBOPACK=1
+# Respect the build arg so deploy platforms can force webpack when Turbopack
+# is unstable for production builds. Default to webpack for safer CI/CD builds.
+ARG OMNIROUTE_USE_TURBOPACK=0
+ENV OMNIROUTE_USE_TURBOPACK=${OMNIROUTE_USE_TURBOPACK}
 
 COPY . ./
 RUN --mount=type=cache,target=/app/.next/cache \
