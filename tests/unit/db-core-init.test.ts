@@ -382,9 +382,8 @@ test("getDbInstance creates sqlite schema, metadata and applies migrations", ser
           .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
           .get("provider_connections")
       );
-      assert.deepEqual(db.prepare("SELECT value FROM db_meta WHERE key = 'schema_version'").get(), {
-        value: "1",
-      });
+      const meta = db.prepare("SELECT value FROM db_meta WHERE key = 'schema_version'").get();
+      assert.equal(meta.value, "1");
 
       const versions = db
         .prepare("SELECT version FROM _omniroute_migrations ORDER BY version")

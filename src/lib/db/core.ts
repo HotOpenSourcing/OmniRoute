@@ -1356,7 +1356,6 @@ export function getDbInstance(): SqliteDatabase {
                 // Final forced delete fallback on Windows: use cmd del to bypass certain file locks
                 try {
                   if (process.platform === 'win32') {
-                    const cp = require('child_process');
                     try {
                       cp.execSync(`cmd /c del /f /q "${sqliteFile}"`);
                       removed = !fs.existsSync(sqliteFile);
@@ -1371,7 +1370,6 @@ export function getDbInstance(): SqliteDatabase {
                 // Additional PowerShell removal fallback (synchronous) for stubborn locks
                 if (!removed && process.platform === 'win32') {
                   try {
-                    const cp = require('child_process');
                     const psCmd = `powershell -NoProfile -Command "for ($i=0; $i -lt 40; $i++) { try { Remove-Item -LiteralPath '${sqliteFile.replace(/'/g, "''")}' -Force -ErrorAction Stop; exit 0 } catch { Start-Sleep -Milliseconds 100 } } exit 1"`;
                     try {
                       cp.execSync(psCmd, { stdio: 'ignore' });
