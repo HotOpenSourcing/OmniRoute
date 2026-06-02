@@ -48,6 +48,10 @@ ENV OMNIROUTE_USE_TURBOPACK=${OMNIROUTE_USE_TURBOPACK}
 ARG OMNIROUTE_BUILD_MAX_OLD_SPACE_SIZE=4096
 ENV NODE_OPTIONS="--max-old-space-size=${OMNIROUTE_BUILD_MAX_OLD_SPACE_SIZE}"
 
+COPY . ./
+RUN --mount=type=cache,target=/app/.next/cache \
+  mkdir -p /app/data && npm run build
+
 FROM base AS runner-base
 
 LABEL org.opencontainers.image.title="omniroute" \
