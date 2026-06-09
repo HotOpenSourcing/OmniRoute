@@ -1509,7 +1509,7 @@ export default function ProviderDetailPage() {
   const [batchDeleting, setBatchDeleting] = useState(false);
   const [batchUpdating, setBatchUpdating] = useState<"activate" | "deactivate" | null>(null);
   const [batchRetesting, setBatchRetesting] = useState(false);
-  const [showOnlyActive, setShowOnlyActive] = useState(providerId === "kiro");
+  const [showOnlyActive, setShowOnlyActive] = useState(true);
   const [healthFilter, setHealthFilter] = useState<string>("all");
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 50;
@@ -1767,8 +1767,8 @@ export default function ProviderDetailPage() {
         const filtered = (connectionsData.connections || [])
           .filter((c) => c.provider === providerId)
           .filter((c) => {
-            // For Kiro provider, mask/hide disabled connections based on toggle
-            if (providerId === "kiro" && showOnlyActive && c.isActive === false) return false;
+            // Hide disabled connections based on toggle (applies to all providers)
+            if (showOnlyActive && c.isActive === false) return false;
             return true;
           });
         setConnections(filtered);
