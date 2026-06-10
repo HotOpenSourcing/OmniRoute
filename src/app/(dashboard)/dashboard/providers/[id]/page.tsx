@@ -1509,7 +1509,7 @@ export default function ProviderDetailPage() {
   const [batchDeleting, setBatchDeleting] = useState(false);
   const [batchUpdating, setBatchUpdating] = useState<"activate" | "deactivate" | null>(null);
   const [batchRetesting, setBatchRetesting] = useState(false);
-  const [showOnlyActive, setShowOnlyActive] = useState(true);
+  const [batchRefreshingTokens, setBatchRefreshingTokens] = useState(false);
   const [healthFilter, setHealthFilter] = useState<string>("all");
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 50;
@@ -1765,12 +1765,7 @@ export default function ProviderDetailPage() {
       const nodesData = await nodesRes.json();
       if (connectionsRes.ok) {
         const filtered = (connectionsData.connections || [])
-          .filter((c) => c.provider === providerId)
-          .filter((c) => {
-            // Hide disabled connections based on toggle (applies to all providers)
-            if (showOnlyActive && c.isActive === false) return false;
-            return true;
-          });
+          .filter((c) => c.provider === providerId);
         setConnections(filtered);
       }
       if (nodesRes.ok) {
@@ -1796,7 +1791,7 @@ export default function ProviderDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [providerId, isCompatible, showOnlyActive]);
+  }, [providerId, isCompatible]);
 
   const handleUpdateNode = async (formData) => {
     try {
@@ -3091,6 +3086,56 @@ export default function ProviderDetailPage() {
     } finally {
       setBatchRetesting(false);
     }
+  };
+
+  // Batch token refresh for selected OAuth connections
+  const handleBatchRefreshTokens = async () => {
+    if (batchRefreshingTokens || selectedIds.size === 0) return;
+    setBatchRefreshingTokens(true);
+    
+    const selectedConnections = connections.filter((c) => selectedIds.has(c.id));
+    const oauthConnections = selectedConnections.filter((c) => c.authType === "oauth");
+    
+    if (oauthConnections.length === 0) {
+      notify.warning(t("noOAuthConnectionsSelected") || "No OAuth connections selected");
+      setBatchRefreshingTokens(false);
+      return;
+    }
+    
+    let successCount = 0;
+    let failCount = 0;
+    
+    for (const conn of oauthConnections) {
+      try {
+        const res = await fetch(`/api/providers/${conn.id}/refresh`, { method: "POST" });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.success) {
+          successCount++;
+        } else {
+          failCount++;
+        }
+      } catch (error) {
+        console.error(`Error refreshing token for ${conn.id}:`, error);
+        failCount++;
+      }
+    }
+    
+    if (successCount > 0) {
+      notify.success(
+        t("batchTokenRefreshSuccess", { count: successCount }) ||
+        `${successCount} token(s) refreshed successfully`
+      );
+      await fetchConnections();
+    }
+    
+    if (failCount > 0) {
+      notify.error(
+        t("batchTokenRefreshFailed", { count: failCount }) ||
+        `${failCount} token(s) failed to refresh`
+      );
+    }
+    
+    setBatchRefreshingTokens(false);
   };
 
   // T12: Manual token refresh
@@ -4527,18 +4572,7 @@ export default function ProviderDetailPage() {
                   {distributingProxies ? t("distributing") : t("distributeProxies")}
                 </button>
               )}
-              {providerId === "kiro" && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-bg-subtle">
-                  <span className="text-xs font-medium text-text-muted">
-                    {t("showOnlyActive") || "Show Only Active"}
-                  </span>
-                  <Toggle
-                    checked={showOnlyActive}
-                    onChange={(checked) => setShowOnlyActive(checked)}
-                    size="sm"
-                  />
-                </div>
-              )}
+
               {connections.length > 1 && (
                 <button
                   onClick={handleBatchTestAll}
@@ -4764,7 +4798,7 @@ export default function ProviderDetailPage() {
               );
               const allSelected = selectedIds.size === connections.length && connections.length > 0;
               const someSelected = selectedIds.size > 0 && selectedIds.size < connections.length;
-              const bulkBusy = batchUpdating !== null || batchRetesting || batchDeleting;
+              const bulkBusy = batchUpdating !== null || batchRetesting || batchDeleting || batchRefreshingTokens;
               const bulkActions = selectedIds.size > 0 && (
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   <Button
@@ -4796,6 +4830,16 @@ export default function ProviderDetailPage() {
                     onClick={handleBatchRetest}
                   >
                     {t("batchRetestSelected")}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon="refresh"
+                    loading={batchRefreshingTokens}
+                    disabled={bulkBusy && !batchRefreshingTokens}
+                    onClick={handleBatchRefreshTokens}
+                  >
+                    {t("batchRefreshTokensSelected") || "Token Shortcut"}
                   </Button>
                   <Button
                     variant="danger"
