@@ -61,9 +61,10 @@ services:
       REDIS_PORT: ${REDIS_PORT:-6379}
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
 
-      # Qdrant vector database for memory/RAG
-      QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
-      QDRANT_HOST: ${QDRANT_HOST:-qdrant}
+      # External Qdrant vector database for memory/RAG
+      # Set these in Coolify to point at your isolated Qdrant deployment.
+      QDRANT_URL: ${QDRANT_URL:-}
+      QDRANT_HOST: ${QDRANT_HOST:-}
       QDRANT_PORT: ${QDRANT_PORT:-6333}
       QDRANT_API_KEY: ${QDRANT_API_KEY:-}
       QDRANT_GRPC_PORT: ${QDRANT_GRPC_PORT:-6334}
@@ -75,7 +76,7 @@ services:
       CACHE_MAX_SIZE: ${CACHE_MAX_SIZE:-100}
       CACHE_MAX_BYTES: ${CACHE_MAX_BYTES:-10485760}
 
-      # Memory system backend (use Qdrant for better performance)
+      # Memory system backend (use external Qdrant when configured)
       MEMORY_VECTOR_STORE: ${MEMORY_VECTOR_STORE:-qdrant}
       MEMORY_EMBEDDING_MODEL: ${MEMORY_EMBEDDING_MODEL:-openai/text-embedding-3-small}
 
@@ -94,8 +95,6 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-      qdrant:
-        condition: service_started
 
     expose:
       - "${PORT:-20128}"
@@ -147,38 +146,8 @@ services:
       retries: 3
       start_period: 5s
 
-  qdrant:
-    container_name: qdrant-omniroute
-    image: qdrant/qdrant:latest
-    restart: unless-stopped
-    stop_grace_period: 30s
-    environment:
-      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:-}
-      QDRANT__SERVICE__GRPC_PORT: ${QDRANT_GRPC_PORT:-6334}
-      QDRANT__LOG_LEVEL: ${QDRANT_LOG_LEVEL:-INFO}
-      # Performance tuning
-      QDRANT__STORAGE__PERFORMANCE__MAX_SEARCH_THREADS: ${QDRANT_MAX_SEARCH_THREADS:-4}
-      QDRANT__STORAGE__OPTIMIZERS__DEFAULT_SEGMENT_NUMBER: ${QDRANT_DEFAULT_SEGMENT_NUMBER:-2}
-      QDRANT__STORAGE__OPTIMIZERS__INDEXING_THRESHOLD_KB: ${QDRANT_INDEXING_THRESHOLD_KB:-20000}
-      QDRANT__STORAGE__WAL__WAL_CAPACITY_MB: ${QDRANT_WAL_CAPACITY_MB:-32}
-      # Memory optimization
-      QDRANT__STORAGE__PERFORMANCE__MAX_OPTIMIZATION_THREADS: ${QDRANT_MAX_OPTIMIZATION_THREADS:-2}
-    expose:
-      - "6333"  # HTTP API
-      - "6334"  # gRPC API
-    volumes:
-      - qdrant-omniroute-data:/qdrant/storage
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:6333/healthz || exit 1"]
-      interval: 15s
-      timeout: 15s
-      retries: 20
-      start_period: 120s
-
 volumes:
   omniroute-coolify-data:
     name: omniroute-coolify-data
   redis-omniroute-data:
     name: redis-omniroute-data
-  qdrant-omniroute-data:
-    name: qdrant-omniroute-data
