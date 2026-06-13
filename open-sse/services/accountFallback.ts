@@ -27,7 +27,9 @@ import {
   looksLikeQuotaExhausted,
   type FailureKind,
 } from "../../src/shared/utils/classify429";
+import { resolveProviderId } from "../../src/shared/constants/providers";
 import { resolveUseUpstream429BreakerHints } from "../../src/shared/utils/providerHints";
+import { isRpdExhausted, isRpmExhausted } from "./geminiRateLimitTracker.ts";
 
 export type ProviderProfile = {
   baseCooldownMs: number;
@@ -42,11 +44,12 @@ export type ProviderProfile = {
   maxBackoffLevel: number;
   circuitBreakerThreshold: number;
   circuitBreakerReset: number;
-  // Provider-level circuit breaker fields
+  // Adaptive circuit breaker fields
+  degradationThreshold?: number;
+  // Provider-level cooldown fields
   providerFailureThreshold: number;
   providerFailureWindowMs: number;
   providerCooldownMs: number;
-  degradationThreshold?: number;
   maxBackoffMultiplier?: number;
   backoffEscalationCount?: number;
 };
@@ -64,6 +67,9 @@ type ModelFailureState = {
   failureCount: number;
   lastFailureAt: number;
   resetAfterMs: number;
+  /** Cooldown applied on the last failure — extends the escalation window so a
+   *  model that fails again right after its lockout expires keeps escalating. */
+  lastCooldownMs?: number;
 };
 type AccountState = JsonRecord & {
   id?: string | null;
@@ -151,9 +157,6 @@ export const CREDITS_EXHAUSTED_SIGNALS = [
   "out of credits",
   "no credits",
   "payment required",
-  "resource has been exhausted",
-  "resource_exhausted",
-  "check quota",
   "free tier of the model has been exhausted",
   "reached the limit",
   "you have reached",
@@ -320,10 +323,10 @@ function buildProviderProfile(
     maxBackoffLevel: connectionCooldown.maxBackoffSteps,
     circuitBreakerThreshold: providerBreaker.failureThreshold,
     circuitBreakerReset: providerBreaker.resetTimeoutMs,
-    // Provider-level circuit breaker fields (not configurable via settings, use PROVIDER_PROFILES defaults)
+    degradationThreshold: providerBreaker.degradationThreshold,
+    // Provider-level cooldown fields are not exposed in resilience settings yet.
     providerFailureThreshold: PROVIDER_PROFILES[category].providerFailureThreshold,
     providerFailureWindowMs: PROVIDER_PROFILES[category].providerFailureWindowMs,
-    degradationThreshold: PROVIDER_PROFILES[category].degradationThreshold,
     maxBackoffMultiplier: PROVIDER_PROFILES[category].maxBackoffMultiplier,
     backoffEscalationCount: PROVIDER_PROFILES[category].backoffEscalationCount,
     providerCooldownMs: PROVIDER_PROFILES[category].providerCooldownMs,
@@ -360,8 +363,20 @@ export async function getRuntimeProviderProfile(provider: string | null | undefi
 const modelLockouts = new Map<string, ModelLockoutEntry>();
 const modelFailureState = new Map<string, ModelFailureState>();
 
+// Aliases (e.g. "cx" → "codex") must share lockout state with their canonical
+// provider, otherwise a model locked via one spelling stays routable via the other.
+const canonicalProviderCache = new Map<string, string>();
+function getCanonicalLockProvider(provider: string): string {
+  let canonical = canonicalProviderCache.get(provider);
+  if (!canonical) {
+    canonical = resolveProviderId(provider);
+    canonicalProviderCache.set(provider, canonical);
+  }
+  return canonical;
+}
+
 function getModelLockKey(provider: string, connectionId: string, model: string) {
-  return `${provider}:${connectionId}:${model}`;
+  return `${getCanonicalLockProvider(provider)}:${connectionId}:${model}`;
 }
 
 function getFailureWindowMs(profile: ProviderProfile | null = null, fallbackMs = 30 * 60 * 1000) {
@@ -377,7 +392,9 @@ function cleanupModelLockKey(key: string, now = Date.now()) {
 
   const failure = modelFailureState.get(key);
   if (!failure) return;
-  if (now - failure.lastFailureAt <= failure.resetAfterMs) return;
+  // The escalation window extends past the applied cooldown: a model that fails
+  // again right after its lockout expires must keep escalating, not reset to 1.
+  if (now - failure.lastFailureAt <= failure.resetAfterMs + (failure.lastCooldownMs ?? 0)) return;
   if (modelLockouts.has(key)) return;
   modelFailureState.delete(key);
 }
@@ -478,7 +495,7 @@ export function recordModelLockoutFailure(
   status: number,
   fallbackCooldownMs: number,
   profile: ProviderProfile | null = null,
-  options: { exactCooldownMs?: number | null } = {}
+  options: { exactCooldownMs?: number | null; maxCooldownMs?: number } = {}
 ) {
   ensureCleanupTimer();
   const key = getModelLockKey(provider, connectionId, model);
@@ -493,23 +510,38 @@ export function recordModelLockoutFailure(
 
   const resetAfterMs = getFailureWindowMs(profile);
   const previous = modelFailureState.get(key);
-  const withinWindow = previous && now - previous.lastFailureAt <= previous.resetAfterMs;
+  // Escalation window extends past the previously applied cooldown so a model
+  // that fails again right after its lockout expires keeps escalating.
+  const withinWindow =
+    previous &&
+    now - previous.lastFailureAt <= previous.resetAfterMs + (previous.lastCooldownMs ?? 0);
   const failureCount = withinWindow ? previous.failureCount + 1 : 1;
+
+  const baseCooldownMs = getModelLockBaseCooldown(status, fallbackCooldownMs, profile);
+  // Cap exponential backoff so repeated failures cannot produce absurdly long
+  // lockouts; exact cooldowns (e.g. daily-quota until-midnight) are not capped.
+  const maxCooldownMs =
+    typeof options.maxCooldownMs === "number" && options.maxCooldownMs > 0
+      ? options.maxCooldownMs
+      : BACKOFF_CONFIG.max;
+  const cooldownMs =
+    typeof options.exactCooldownMs === "number" && options.exactCooldownMs > 0
+      ? options.exactCooldownMs
+      : Math.min(
+          getScaledCooldown(
+            baseCooldownMs,
+            failureCount,
+            profile?.maxBackoffSteps ?? BACKOFF_CONFIG.maxLevel
+          ),
+          maxCooldownMs
+        );
+
   modelFailureState.set(key, {
     failureCount,
     lastFailureAt: now,
     resetAfterMs,
+    lastCooldownMs: cooldownMs,
   });
-
-  const baseCooldownMs = getModelLockBaseCooldown(status, fallbackCooldownMs, profile);
-  const cooldownMs =
-    typeof options.exactCooldownMs === "number" && options.exactCooldownMs > 0
-      ? options.exactCooldownMs
-      : getScaledCooldown(
-          baseCooldownMs,
-          failureCount,
-          profile?.maxBackoffSteps ?? BACKOFF_CONFIG.maxLevel
-        );
 
   lockModel(provider, connectionId, model, reason, cooldownMs, {
     failureCount,
@@ -600,6 +632,36 @@ export function shouldMarkAccountExhaustedFrom429(
   );
 }
 
+export function classifyLockoutReason(status: number): string {
+  if (status === 429) return "rate_limit";
+  if (status === 403) return "quota_exhausted";
+  return "unknown";
+}
+
+export type DecayResult = { cleared: boolean; newFailureCount: number };
+
+export function decayModelFailureCount(
+  provider: string,
+  connectionId: string,
+  model: string
+): DecayResult {
+  const key = getModelLockKey(provider, connectionId, model);
+  const failure = modelFailureState.get(key);
+  if (!failure) return { cleared: false, newFailureCount: 0 };
+
+  const newFailureCount = Math.floor(failure.failureCount / 2);
+  if (newFailureCount === 0) {
+    modelFailureState.delete(key);
+    return { cleared: true, newFailureCount: 0 };
+  } else {
+    modelFailureState.set(key, {
+      ...failure,
+      failureCount: newFailureCount,
+    });
+    return { cleared: false, newFailureCount };
+  }
+}
+
 /**
  * Clear all in-memory model lockouts and failure state (for tests / full reset).
  */
@@ -685,12 +747,13 @@ export function getAllModelLockouts(): ModelLockoutInfo[] {
 // ─── Provider Breaker Compatibility Wrappers ────────────────────────────────
 // Legacy helpers now delegate to the shared provider circuit breaker.
 
-type ProviderBreakerProfile = Partial<
-  Pick<
-    ProviderProfile,
-    "failureThreshold" | "resetTimeoutMs" | "circuitBreakerThreshold" | "circuitBreakerReset"
-  >
->;
+type ProviderBreakerProfile = {
+  failureThreshold?: number;
+  degradationThreshold?: number;
+  resetTimeoutMs?: number;
+  circuitBreakerThreshold?: number;
+  circuitBreakerReset?: number;
+};
 
 function getProviderBreaker(provider: string | null | undefined) {
   return provider ? getCircuitBreaker(provider) : null;
@@ -887,7 +950,7 @@ export function parseRetryAfterFromBody(responseBody: unknown): {
 
   // OpenAI: "Please retry after 20s" in message
   const msg = String(error.message || body.message || "");
-  const retryMatch = RegExp(/retry\s+after\s+(\d+)\s*s/i).exec(msg);
+  const retryMatch = /retry\s+after\s+(\d+)\s*s/i.exec(msg);
   if (retryMatch) {
     return {
       retryAfterMs: Number.parseInt(retryMatch[1], 10) * 1000,
@@ -912,13 +975,13 @@ export function parseRetryAfterFromBody(responseBody: unknown): {
 function parseDelayString(value: unknown): number | null {
   if (!value) return null;
   const str = String(value).trim();
-  const msMatch = RegExp(/^(\d+)\s*ms$/i).exec(str);
+  const msMatch = /^(\d+)\s*ms$/i.exec(str);
   if (msMatch) return Number.parseInt(msMatch[1], 10);
-  const secMatch = RegExp(/^(\d+)\s*s$/i).exec(str);
+  const secMatch = /^(\d+)\s*s$/i.exec(str);
   if (secMatch) return Number.parseInt(secMatch[1], 10) * 1000;
-  const minMatch = RegExp(/^(\d+)\s*m$/i).exec(str);
+  const minMatch = /^(\d+)\s*m$/i.exec(str);
   if (minMatch) return Number.parseInt(minMatch[1], 10) * 60 * 1000;
-  const hrMatch = RegExp(/^(\d+)\s*h$/i).exec(str);
+  const hrMatch = /^(\d+)\s*h$/i.exec(str);
   if (hrMatch) return Number.parseInt(hrMatch[1], 10) * 3600 * 1000;
   // Bare number → seconds
   const num = Number.parseInt(str, 10);
@@ -941,9 +1004,10 @@ export function parseRetryFromErrorText(errorText: unknown): number | null {
   // timestamp instead of a relative duration (e.g. "Try again at
   // 2026-05-17T10:00:00Z" or "Please wait until 2026-05-17T10:00:00.000Z").
   // Convert to a future-duration in milliseconds if it parses.
-  const isoMatch = RegExp(
-    /\b(?:try again at|wait until|reset(?:s)? at|available at|retry after)\s+(\d{4}-\d{2}-\d{2}[Tt ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)/i
-  ).exec(msg);
+  const isoMatch =
+    /\b(?:try again at|wait until|reset(?:s)? at|available at|retry after)\s+(\d{4}-\d{2}-\d{2}[Tt ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)/i.exec(
+      msg
+    );
   if (isoMatch) {
     const parsedTs = Date.parse(isoMatch[1]);
     if (Number.isFinite(parsedTs)) {
@@ -952,15 +1016,15 @@ export function parseRetryFromErrorText(errorText: unknown): number | null {
     }
   }
 
-  const match = RegExp(/reset after (\d+h)?(\d+m)?(\d+s)?/i).exec(msg);
+  const match = /reset after (\d+h)?(\d+m)?(\d+s)?/i.exec(msg);
   if (match?.[1] || match?.[2] || match?.[3]) return computeDurationMs(match);
 
   // Variant without "reset after": "will reset after XhYmZs"
-  const altMatch = RegExp(/will reset after (\d+h)?(\d+m)?(\d+s)?/i).exec(msg);
+  const altMatch = /will reset after (\d+h)?(\d+m)?(\d+s)?/i.exec(msg);
   if (altMatch?.[1] || altMatch?.[2] || altMatch?.[3]) return computeDurationMs(altMatch);
 
   // Antigravity / Cloud Code phrasing: "Resets in 164h27m24s".
-  const resetsInMatch = RegExp(/resets? in (\d+h)?(\d+m)?(\d+s)?/i).exec(msg);
+  const resetsInMatch = /resets? in (\d+h)?(\d+m)?(\d+s)?/i.exec(msg);
   if (resetsInMatch?.[1] || resetsInMatch?.[2] || resetsInMatch?.[3]) {
     return computeDurationMs(resetsInMatch);
   }
@@ -1030,10 +1094,8 @@ export function classifyErrorText(errorText: unknown): RateLimitReasonValue {
   const configuredRule = matchErrorRuleByText(errorText);
   if (configuredRule?.reason) return configuredRule.reason;
   if (lower.includes("rate_limit")) return RateLimitReason.RATE_LIMIT_EXCEEDED;
-  if (
-    lower.includes("resource exhausted") ||
-    lower.includes("high demand")
-  ) return RateLimitReason.MODEL_CAPACITY;
+  if (lower.includes("resource exhausted") || lower.includes("high demand"))
+    return RateLimitReason.MODEL_CAPACITY;
   if (
     lower.includes("unauthorized") ||
     lower.includes("invalid api key") ||
@@ -1420,6 +1482,19 @@ export function checkFallbackError(
       !errorStr.toLowerCase().includes("quota has been exceeded")
     ) {
       return buildRetryableFallback(RateLimitReason.AUTH_ERROR);
+    }
+  }
+
+  // Gemini-specific: use known published RPM/RPD limits to distinguish 429 types.
+  // Gemini returns the same error body for both, so we use per-model request
+  // counters to decide: if daily count >= RPD → quota_exhausted (midnight lockout);
+  // if minute count >= RPM → rate_limit_exceeded (exponential backoff).
+  if (provider === "gemini" && status === HTTP_STATUS.RATE_LIMITED && _model) {
+    if (isRpdExhausted(_model)) {
+      return buildRetryableFallback(RateLimitReason.QUOTA_EXHAUSTED);
+    }
+    if (isRpmExhausted(_model)) {
+      return buildRetryableFallback(RateLimitReason.RATE_LIMIT_EXCEEDED);
     }
   }
 
