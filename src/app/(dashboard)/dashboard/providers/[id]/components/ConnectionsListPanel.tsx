@@ -17,6 +17,7 @@ type ConnectionsListPanelProps = {
   selectedIds: Set<string>;
   batchUpdating: string | null;
   batchRetesting: boolean;
+  batchRefreshingTokens: boolean;
   batchDeleting: boolean;
   batchTesting: boolean;
   retestingId: string | null;
@@ -53,6 +54,7 @@ type ConnectionsListPanelProps = {
   handleBatchSetActive: (active: boolean) => void;
   handleBatchDeleteOpenModal: () => void;
   handleBatchRetest: () => void;
+  handleBatchRefreshToken: () => void;
   handleToggleSelectOne: (id: string) => void;
   handleToggleSelectAll: () => void;
   handleDistributeProxies: (tag?: string) => void;
@@ -80,6 +82,7 @@ export default function ConnectionsListPanel({
   selectedIds,
   batchUpdating,
   batchRetesting,
+  batchRefreshingTokens,
   batchDeleting,
   batchTesting,
   retestingId,
@@ -114,6 +117,7 @@ export default function ConnectionsListPanel({
   handleBatchSetActive,
   handleBatchDeleteOpenModal,
   handleBatchRetest,
+  handleBatchRefreshToken,
   handleToggleSelectOne,
   handleToggleSelectAll,
   handleDistributeProxies,
@@ -132,7 +136,7 @@ export default function ConnectionsListPanel({
 }: ConnectionsListPanelProps) {
   const sorted = [...connections].sort((a, b) => (a.priority || 0) - (b.priority || 0));
   const hasAnyTag = sorted.some((c) => c.providerSpecificData?.tag as string | undefined);
-  const bulkBusy = batchUpdating !== null || batchRetesting || batchDeleting || batchTesting;
+  const bulkBusy = batchUpdating !== null || batchRetesting || batchRefreshingTokens || batchDeleting || batchTesting;
   const bulkActions = selectedIds.size > 0 && (
     <div className="flex flex-wrap items-center justify-end gap-2">
       <Button
@@ -164,6 +168,16 @@ export default function ConnectionsListPanel({
         onClick={handleBatchRetest}
       >
         {t("batchRetestSelected")}
+      </Button>
+      <Button
+        variant="secondary"
+        size="sm"
+        icon="refresh"
+        loading={batchRefreshingTokens}
+        disabled={(bulkBusy && !batchRefreshingTokens) || !!refreshingId}
+        onClick={handleBatchRefreshToken}
+      >
+        {t("batchRefreshTokensSelected")}
       </Button>
       <Button
         variant="danger"

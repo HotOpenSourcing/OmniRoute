@@ -88,6 +88,7 @@ export default function ProviderDetailPageClient() {
     batchDeleting,
     batchUpdating,
     batchRetesting,
+    batchRefreshingTokens,
     batchDeleteConfirmOpen,
     healthFilter,
     page,
@@ -119,6 +120,7 @@ export default function ProviderDetailPageClient() {
     handleBatchDeleteOpenModal,
     handleBatchDeleteConfirm,
     handleBatchRetest,
+    handleBatchRefreshToken,
     handleBatchTestAll,
     handleToggleSelectOne,
     handleToggleSelectAll,
@@ -557,6 +559,7 @@ export default function ProviderDetailPageClient() {
               selectedIds={selectedIds}
               batchUpdating={batchUpdating}
               batchRetesting={batchRetesting}
+              batchRefreshingTokens={batchRefreshingTokens}
               batchDeleting={batchDeleting}
               batchTesting={batchTesting}
               retestingId={retestingId}
@@ -591,6 +594,7 @@ export default function ProviderDetailPageClient() {
               handleBatchSetActive={handleBatchSetActive}
               handleBatchDeleteOpenModal={handleBatchDeleteOpenModal}
               handleBatchRetest={handleBatchRetest}
+              handleBatchRefreshToken={handleBatchRefreshToken}
               handleToggleSelectOne={handleToggleSelectOne}
               handleToggleSelectAll={handleToggleSelectAll}
               handleDistributeProxies={handleDistributeProxies}
