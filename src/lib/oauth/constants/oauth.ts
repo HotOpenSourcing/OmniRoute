@@ -458,7 +458,6 @@ export const PROVIDERS = {
   CURSOR: "cursor",
   KILOCODE: "kilocode",
   CLINE: "cline",
-  WINDSURF: "windsurf",
   DEVIN_CLI: "devin-cli",
   TRAE: "trae",
 };

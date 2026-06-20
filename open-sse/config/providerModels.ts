@@ -17,7 +17,6 @@ export function getProviderModels(aliasOrId: string): RegistryModel[] {
   const alias = PROVIDER_ID_TO_ALIAS[aliasOrId] || aliasOrId;
   return PROVIDER_MODELS[alias] || PROVIDER_MODELS[aliasOrId] || [];
 }
-}
 
 export function getDefaultModel(aliasOrId: string): string | null {
   const models = PROVIDER_MODELS[aliasOrId];

@@ -333,18 +333,6 @@ export const OAUTH_PROVIDERS = {
       "Requires the Devin CLI binary. Run `devin auth login` to authenticate, or provide your WINDSURF_API_KEY. Install: https://cli.devin.ai",
     website: "https://cli.devin.ai",
   },
-  windsurf: {
-    id: "windsurf",
-    alias: "ws",
-    name: "Windsurf",
-    icon: "air",
-    color: "#00A3FF",
-    textIcon: "WS",
-    enabled: false,
-    website: "https://windsurf.com",
-    authHint:
-      "Internal Windsurf auth has been observed in the desktop client, but third-party Windsurf OAuth is unsupported by default. This provider remains an OAuth-ready placeholder until a stable, authorized public contract exists.",
-  },
 };
 
 // Web / Cookie Providers
