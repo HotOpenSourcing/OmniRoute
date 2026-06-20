@@ -81,21 +81,25 @@ describe("Kiro rate limit protection defaults", () => {
     );
   });
 
-  test("Non-Kiro provider without default gets rate_limit_protection=false or undefined", async () => {
+  test("LOCAL provider (lm-studio) does not get rate_limit_protection by default", async () => {
+    // lm-studio is in LOCAL_PROVIDERS — by design it has no `rateLimitProtected`
+    // flag in `src/shared/constants/providers.ts` because local instances don't
+    // hit a remote upstream with rate limits. The default block in
+    // `createProviderConnection` must therefore leave the field falsy/null.
     const connection = await createProviderConnection({
-      provider: "openai",
+      provider: "lm-studio",
       authType: "apikey",
-      apiKey: "sk-test123",
-      name: "Test OpenAI",
+      apiKey: "local-key",
+      name: "Test LM Studio",
     });
 
     createdIds.push(connection.id);
 
     assert.ok(connection, "Connection should be created");
-    assert.strictEqual(connection.provider, "openai");
+    assert.strictEqual(connection.provider, "lm-studio");
     assert.ok(
       connection.rateLimitProtection === false || connection.rateLimitProtection === undefined,
-      "OpenAI connection should not have rate limit protection enabled by default"
+      "LOCAL provider should not have rate limit protection enabled by default"
     );
 
     // Verify in database
@@ -106,7 +110,7 @@ describe("Kiro rate limit protection defaults", () => {
 
     assert.ok(
       row.rate_limit_protection === 0 || row.rate_limit_protection === null,
-      "Database should store rate_limit_protection as 0 or NULL for OpenAI"
+      "Database should store rate_limit_protection as 0 or NULL for LOCAL provider"
     );
   });
 });

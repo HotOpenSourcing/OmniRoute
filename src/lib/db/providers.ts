@@ -321,7 +321,13 @@ export async function createProviderConnection(data: JsonRecord) {
     createdAt: now,
     updatedAt: now,
     proxyEnabled: normalizeBooleanColumn(data.proxyEnabled, true),
-    perKeyProxyEnabled: normalizeBooleanColumn(data.perKeyProxyEnabled, false),
+    // NOTE: perKeyProxyEnabled is intentionally NOT initialized here.
+    // Mirrors the rateLimitProtection pattern below — when the caller
+    // omits the field, the optionalFields loop leaves it undefined and
+    // the provider-default block then applies `perKeyProxyByDefault`
+    // from AI_PROVIDERS. Initializing eagerly with `false` here would
+    // shadow that block and silently turn off per-key proxy for
+    // providers that opt in (e.g. Kiro).
   };
 
   // Optional fields
@@ -370,6 +376,23 @@ export async function createProviderConnection(data: JsonRecord) {
       const providerConfig = AI_PROVIDERS[providerId];
       if (providerConfig.rateLimitProtected === true) {
         connection.rateLimitProtection = true;
+      }
+    }
+  }
+
+  // Apply provider defaults for perKeyProxyEnabled if not explicitly provided.
+  // Mirrors the rateLimitProtection pattern above: optional-fields loop sets the
+  // value when the caller passed one in, then this block fills in the provider-
+  // declared default when they did not. Required for Kiro (which declares
+  // `perKeyProxyByDefault: true`) so freshly inserted Kiro connections land
+  // with per-key proxy enabled instead of being silently left at the global
+  // default (false). Idempotent — only runs when the field is undefined.
+  if (connection.perKeyProxyEnabled === undefined) {
+    const providerId = toStringOrNull(data.provider);
+    if (providerId && AI_PROVIDERS[providerId]) {
+      const providerConfig = AI_PROVIDERS[providerId];
+      if (providerConfig.perKeyProxyByDefault === true) {
+        connection.perKeyProxyEnabled = true;
       }
     }
   }

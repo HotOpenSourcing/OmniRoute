@@ -45,6 +45,7 @@ export const NOAUTH_PROVIDERS = {
     notice: {
       text: "OpenCode Free uses the public OpenCode endpoint (https://opencode.ai/zen/v1). No signup or API key needed. Rate limits apply.",
     },
+    rateLimitProtected: true,
   },
   "duckduckgo-web": {
     id: "duckduckgo-web",
@@ -59,6 +60,7 @@ export const NOAUTH_PROVIDERS = {
     serviceKinds: ["llm"],
     freeNote: "Free — anonymous access to multiple AI models via DuckDuckGo.",
     authHint: "No credentials required — DuckDuckGo AI Chat is anonymous and free.",
+    rateLimitProtected: true,
   },
   theoldllm: {
     id: "theoldllm",
@@ -75,6 +77,7 @@ export const NOAUTH_PROVIDERS = {
       "Free — GPT-5.4, Claude 4.6 Opus/Sonnet/Haiku, + more. No API key — tokens auto-generated via browser.",
     authHint:
       "No credentials required. The executor auto-generates access tokens via an embedded Playwright browser instance.",
+    rateLimitProtected: true,
   },
   chipotle: {
     id: "chipotle",
@@ -91,6 +94,7 @@ export const NOAUTH_PROVIDERS = {
       "Free — Chipotle's Pepper AI (IPsoft Amelia). Anonymous sessions, no API key. Rate-limited.",
     authHint:
       "No credentials required. Uses Chipotle's public support chatbot via reverse-engineered SockJS/STOMP protocol.",
+    rateLimitProtected: true,
   },
   "veoaifree-web": {
     id: "veoaifree-web",
@@ -105,6 +109,7 @@ export const NOAUTH_PROVIDERS = {
     serviceKinds: ["video"],
     freeNote: "Free video generation — VEO 3.1, Seedance. 6 requests/hour.",
     authHint: "No auth required. Rate limited to 6 requests/hour per IP.",
+    rateLimitProtected: true,
   },
   mimocode: {
     id: "mimocode",
@@ -124,6 +129,7 @@ export const NOAUTH_PROVIDERS = {
     notice: {
       text: "MiMoCode uses Xiaomi's public free AI endpoint with bootstrap-based JWT authentication. No signup needed. Rate limits apply.",
     },
+    rateLimitProtected: true,
   },
 };
 
@@ -144,6 +150,7 @@ export const OAUTH_PROVIDERS = {
     subscriptionRisk: true,
     riskNoticeVariant: "oauth",
     hasFree: true,
+    rateLimitProtected: true,
   },
   qwen: {
     id: "qwen",
@@ -156,6 +163,7 @@ export const OAUTH_PROVIDERS = {
     deprecated: true,
     deprecationReason:
       "Qwen OAuth free tier was discontinued on 2026-04-15. Use 'bailian-coding-plan', 'alibaba', 'alibaba-cn', or 'openrouter' provider with API key instead.",
+    rateLimitProtected: true,
   },
   "gemini-cli": {
     id: "gemini-cli",
@@ -168,6 +176,7 @@ export const OAUTH_PROVIDERS = {
     hasFree: true,
     authHint:
       "Uses Gemini CLI OAuth / Cloud Code credentials. Pro models require an eligible Google account or paid plan.",
+    rateLimitProtected: true,
   },
   agy: {
     id: "agy",
@@ -182,6 +191,7 @@ export const OAUTH_PROVIDERS = {
     hasFree: true,
     authHint:
       "Import your Antigravity CLI (`agy`) login (paste/upload its token file), auto-detect a local CLI login, or sign in with Google. Shares the Antigravity backend (incl. Claude models).",
+    rateLimitProtected: true,
   },
   kiro: {
     id: "kiro",
@@ -195,6 +205,7 @@ export const OAUTH_PROVIDERS = {
     freeNote:
       "Free tier: 50 credits/month (~25K–100K tokens). ⚠️ Kiro ToS prohibits third-party proxy/harness use.",
     rateLimitProtected: true,
+    perKeyProxyByDefault: true,
   },
   "amazon-q": {
     id: "amazon-q",
@@ -207,6 +218,7 @@ export const OAUTH_PROVIDERS = {
     hasFree: true,
     authHint:
       "Uses the same AWS Builder ID or imported refresh-token flow as Kiro, but keeps Amazon Q connections separate.",
+    rateLimitProtected: true,
   },
   claude: {
     id: "claude",
@@ -216,6 +228,7 @@ export const OAUTH_PROVIDERS = {
     color: "#D97757",
     subscriptionRisk: true,
     riskNoticeVariant: "oauth",
+    rateLimitProtected: true,
   },
   antigravity: {
     id: "antigravity",
@@ -225,6 +238,7 @@ export const OAUTH_PROVIDERS = {
     color: "#F59E0B",
     subscriptionRisk: true,
     riskNoticeVariant: "oauth",
+    rateLimitProtected: true,
   },
   codex: {
     id: "codex",
@@ -234,8 +248,9 @@ export const OAUTH_PROVIDERS = {
     color: "#3B82F6",
     subscriptionRisk: true,
     riskNoticeVariant: "oauth",
+    rateLimitProtected: true,
   },
-  github: { id: "github", alias: "gh", name: "GitHub Copilot", icon: "code", color: "#333333" },
+  github: { id: "github", alias: "gh", name: "GitHub Copilot", icon: "code", color: "#333333", rateLimitProtected: true },
   "gitlab-duo": {
     id: "gitlab-duo",
     alias: "gitlab-duo",
@@ -246,6 +261,7 @@ export const OAUTH_PROVIDERS = {
     website: "https://docs.gitlab.com/user/duo_agent_platform/code_suggestions/",
     authHint:
       "OAuth application with ai_features + read_user scopes. Configure GITLAB_DUO_OAUTH_CLIENT_ID and optionally GITLAB_DUO_OAUTH_CLIENT_SECRET on this OmniRoute instance.",
+    rateLimitProtected: true,
   },
   cursor: {
     id: "cursor",
@@ -255,6 +271,7 @@ export const OAUTH_PROVIDERS = {
     color: "#00D4AA",
     subscriptionRisk: true,
     riskNoticeVariant: "oauth",
+    rateLimitProtected: true,
   },
   zed: {
     id: "zed",
@@ -266,6 +283,7 @@ export const OAUTH_PROVIDERS = {
     website: "https://zed.dev",
     authHint:
       "Zed stores LLM provider credentials (OpenAI, Anthropic, Google, Mistral, xAI) in the OS keychain. Use the Import button below to discover and import them automatically.",
+    rateLimitProtected: true,
   },
   trae: {
     id: "trae",
@@ -277,6 +295,7 @@ export const OAUTH_PROVIDERS = {
     website: "https://trae.ai",
     authHint:
       "Trae is an AI-native IDE by ByteDance (SOLO remote agent). Authorize via trae.ai in the popup, or sign in at solo.trae.ai and paste the Cloud-IDE-JWT (sent as 'Authorization: Cloud-IDE-JWT <token>', ~14-day lifetime) as the access token; web_id/biz_user_id/user_unique_id/scope/tenant/region propagate via providerSpecificData. No headless refresh for pasted tokens — re-paste on expiry.",
+    rateLimitProtected: true,
   },
   "kimi-coding": {
     id: "kimi-coding",
@@ -287,6 +306,7 @@ export const OAUTH_PROVIDERS = {
     textIcon: "KC",
     subscriptionRisk: true,
     riskNoticeVariant: "oauth",
+    rateLimitProtected: true,
   },
   kilocode: {
     id: "kilocode",
@@ -297,6 +317,7 @@ export const OAUTH_PROVIDERS = {
     textIcon: "KC",
     subscriptionRisk: true,
     riskNoticeVariant: "oauth",
+    rateLimitProtected: true,
   },
   cline: {
     id: "cline",
@@ -307,6 +328,7 @@ export const OAUTH_PROVIDERS = {
     textIcon: "CL",
     subscriptionRisk: true,
     riskNoticeVariant: "oauth",
+    rateLimitProtected: true,
   },
   windsurf: {
     id: "windsurf",
@@ -321,6 +343,7 @@ export const OAUTH_PROVIDERS = {
     authHint:
       'In the Windsurf / VS Code IDE, open the command palette and run `Windsurf: Provide Auth Token` (or click the Jupyter "Get Windsurf Authentication Token" button), then copy the shown token and paste it here. Note: opening windsurf.com/show-auth-token directly only renders a "Redirecting" page — the IDE must initiate the flow (it adds a `?state=...` param) for the token to appear.',
     website: "https://windsurf.com",
+    rateLimitProtected: true,
   },
   "devin-cli": {
     id: "devin-cli",
@@ -332,6 +355,7 @@ export const OAUTH_PROVIDERS = {
     authHint:
       "Requires the Devin CLI binary. Run `devin auth login` to authenticate, or provide your WINDSURF_API_KEY. Install: https://cli.devin.ai",
     website: "https://cli.devin.ai",
+    rateLimitProtected: true,
   },
 };
 
@@ -348,6 +372,7 @@ export const WEB_COOKIE_PROVIDERS = {
     authHint: "Paste your __Secure-next-auth.session-token cookie value from chatgpt.com",
     subscriptionRisk: true,
     riskNoticeVariant: "webCookie",
+    rateLimitProtected: true,
   },
   "grok-web": {
     id: "grok-web",
@@ -361,6 +386,7 @@ export const WEB_COOKIE_PROVIDERS = {
       "Paste the full grok.com cookie line from DevTools → Application → Cookies. Include both `sso` and `sso-rw` (e.g. `sso=...; sso-rw=...`) — Grok's anti-bot rejects `sso` on its own.",
     subscriptionRisk: true,
     riskNoticeVariant: "webCookie",
+    rateLimitProtected: true,
   },
   "gemini-web": {
     id: "gemini-web",
@@ -374,6 +400,7 @@ export const WEB_COOKIE_PROVIDERS = {
       "Paste your __Secure-1PSID cookie value from gemini.google.com. Optionally add __Secure-1PSIDTS separated by semicolon.",
     subscriptionRisk: true,
     riskNoticeVariant: "webCookie",
+    rateLimitProtected: true,
   },
   "perplexity-web": {
     id: "perplexity-web",
@@ -386,6 +413,7 @@ export const WEB_COOKIE_PROVIDERS = {
     authHint: "Paste your __Secure-next-auth.session-token cookie value from perplexity.ai",
     subscriptionRisk: true,
     riskNoticeVariant: "webCookie",
+    rateLimitProtected: true,
   },
   "blackbox-web": {
     id: "blackbox-web",
@@ -399,6 +427,7 @@ export const WEB_COOKIE_PROVIDERS = {
       "Paste your __Secure-authjs.session-token value or full cookie header from app.blackbox.ai",
     subscriptionRisk: true,
     riskNoticeVariant: "webCookie",
+    rateLimitProtected: true,
   },
   "muse-spark-web": {
     id: "muse-spark-web",
@@ -411,6 +440,7 @@ export const WEB_COOKIE_PROVIDERS = {
     hasFree: true,
     freeNote: "Free with login — Meta AI platform with Llama models.",
     authHint: "Paste your abra_sess value or full cookie header from meta.ai",
+    rateLimitProtected: true,
   },
   "claude-web": {
     id: "claude-web",
@@ -423,6 +453,7 @@ export const WEB_COOKIE_PROVIDERS = {
     authHint: "Paste your session cookie from claude.ai",
     subscriptionRisk: true,
     riskNoticeVariant: "webCookie",
+    rateLimitProtected: true,
   },
   "deepseek-web": {
     id: "deepseek-web",
@@ -436,6 +467,7 @@ export const WEB_COOKIE_PROVIDERS = {
       "Paste your userToken from chat.deepseek.com — DevTools → Application → Local Storage → userToken",
     subscriptionRisk: true,
     riskNoticeVariant: "webCookie",
+    rateLimitProtected: true,
   },
   "copilot-web": {
     id: "copilot-web",
@@ -449,6 +481,7 @@ export const WEB_COOKIE_PROVIDERS = {
       "Paste your access_token from copilot.microsoft.com (or export a .har file from DevTools while logged in)",
     subscriptionRisk: true,
     riskNoticeVariant: "webCookie",
+    rateLimitProtected: true,
   },
   "t3-web": {
     id: "t3-web",
@@ -464,6 +497,7 @@ export const WEB_COOKIE_PROVIDERS = {
       "Open t3.chat in your browser, log in, then open DevTools → Application → Local Storage → https://t3.chat. " +
       "Copy the value of 'convex-session-id'. Also open DevTools → Network, copy the Cookie header from any request. " +
       "Paste both values here. See provider setup docs for a step-by-step guide.",
+    rateLimitProtected: true,
   },
   "inner-ai": {
     id: "inner-ai",
@@ -477,6 +511,7 @@ export const WEB_COOKIE_PROVIDERS = {
     riskNoticeVariant: "webCookie",
     authHint:
       "Paste your token cookie and email separated by a space: open DevTools → Application → Cookies → .innerai.com, copy the token value, then append a space and your Inner.ai login email. Example: eyJhbG... user@example.com",
+    rateLimitProtected: true,
   },
   "adapta-web": {
     id: "adapta-web",
@@ -490,6 +525,7 @@ export const WEB_COOKIE_PROVIDERS = {
     riskNoticeVariant: "webCookie",
     authHint:
       "Paste your __client cookie value from .clerk.agent.adapta.one (DevTools → Application → Cookies)",
+    rateLimitProtected: true,
   },
   lmarena: {
     id: "lmarena",
@@ -505,6 +541,7 @@ export const WEB_COOKIE_PROVIDERS = {
     authHint:
       "Paste the full Cookie header from lmarena.ai (DevTools → Network → request → Cookie). The session is now split across arena-auth-prod-v1.0, .1, … — copy the whole header. Optional — works with free tier for basic comparisons.",
     riskNoticeVariant: "webCookie",
+    rateLimitProtected: true,
   },
   huggingchat: {
     id: "huggingchat",
@@ -520,6 +557,7 @@ export const WEB_COOKIE_PROVIDERS = {
     authHint:
       "Paste your hf-chat cookie value from huggingface.co/chat (DevTools → Application → Cookies → hf-chat). Optional — works without auth for basic use.",
     riskNoticeVariant: "webCookie",
+    rateLimitProtected: true,
   },
   phind: {
     id: "phind",
@@ -538,6 +576,7 @@ export const WEB_COOKIE_PROVIDERS = {
     deprecated: true,
     deprecationReason:
       "Phind shut down its API (2026-01); the /api/chat endpoint no longer serves (sweep 2026-06-19).",
+    rateLimitProtected: true,
   },
   "poe-web": {
     id: "poe-web",
@@ -550,6 +589,7 @@ export const WEB_COOKIE_PROVIDERS = {
     authHint: "Paste your p-b cookie value from poe.com (DevTools → Application → Cookies → p-b)",
     subscriptionRisk: true,
     riskNoticeVariant: "webCookie",
+    rateLimitProtected: true,
   },
   "venice-web": {
     id: "venice-web",
@@ -561,6 +601,7 @@ export const WEB_COOKIE_PROVIDERS = {
     website: "https://venice.ai",
     authHint: "Paste your session cookie from venice.ai (DevTools → Application → Cookies)",
     riskNoticeVariant: "webCookie",
+    rateLimitProtected: true,
   },
   "v0-vercel-web": {
     id: "v0-vercel-web",
@@ -572,6 +613,7 @@ export const WEB_COOKIE_PROVIDERS = {
     website: "https://v0.dev",
     authHint: "Paste your session cookie from v0.dev (DevTools → Application → Cookies)",
     riskNoticeVariant: "webCookie",
+    rateLimitProtected: true,
   },
   "kimi-web": {
     id: "kimi-web",
@@ -585,6 +627,7 @@ export const WEB_COOKIE_PROVIDERS = {
     authHint: "Paste your session cookie from kimi.moonshot.cn (DevTools → Application → Cookies)",
     subscriptionRisk: true,
     riskNoticeVariant: "webCookie",
+    rateLimitProtected: true,
   },
   "doubao-web": {
     id: "doubao-web",
@@ -597,6 +640,7 @@ export const WEB_COOKIE_PROVIDERS = {
     authHint: "Paste your session cookie from doubao.com (DevTools → Application → Cookies)",
     subscriptionRisk: true,
     riskNoticeVariant: "webCookie",
+    rateLimitProtected: true,
   },
   "qwen-web": {
     id: "qwen-web",
@@ -612,6 +656,7 @@ export const WEB_COOKIE_PROVIDERS = {
     authHint:
       "Open chat.qwen.ai, log in, then open DevTools → Application → Local Storage → " +
       'copy the "token" value (or use tongyi_sso_ticket cookie as Bearer token).',
+    rateLimitProtected: true,
   },
   "gemini-business": {
     id: "gemini-business",
@@ -626,6 +671,7 @@ export const WEB_COOKIE_PROVIDERS = {
       "Free for Google Workspace enterprise accounts — enterprise Gemini models (Pro, Flash, image, video) via direct StreamGenerate HTTP API. No subscription required, just enterprise SSO.",
     authHint:
       "From your enterprise account: open business.gemini.google/home/cid/{your-cid}, then copy __Secure-1PSID and __Secure-1PSIDTS cookies from DevTools → Application → Cookies. Paste as a cookie header below.",
+    rateLimitProtected: true,
   },
 };
 
@@ -643,6 +689,7 @@ export const APIKEY_PROVIDERS = {
     hasFree: true,
     freeNote: "$200 free credits on signup - multi-model routing gateway",
     apiHint: "Get $200 free credits at https://agentrouter.org/register — no credit card required.",
+    rateLimitProtected: true,
   },
   "command-code": {
     id: "command-code",
@@ -655,6 +702,7 @@ export const APIKEY_PROVIDERS = {
     authHint:
       "Use a Command Code API key. Requests are sent to Command Code's /alpha/generate endpoint.",
     apiHint: "Create or copy an API key from Command Code, then paste it here as a Bearer token.",
+    rateLimitProtected: true,
   },
   openrouter: {
     id: "openrouter",
@@ -667,6 +715,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://openrouter.ai",
     hasFree: true,
     freeNote: "Free models at $0/token with :free suffix - 20 RPM / 200 RPD",
+    rateLimitProtected: true,
   },
   orcarouter: {
     id: "orcarouter",
@@ -679,6 +728,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://www.orcarouter.ai",
     apiHint:
       "Create an API key (starts with sk-orca-) at https://www.orcarouter.ai, then paste it as a Bearer token. OpenAI-compatible endpoint at https://api.orcarouter.ai/v1.",
+    rateLimitProtected: true,
   },
   "api-airforce": {
     id: "api-airforce",
@@ -693,6 +743,7 @@ export const APIKEY_PROVIDERS = {
       "55 free tier models including Grok-3, Claude 3.7, Qwen3, Kimi-K2, Gemini 2.5 Flash, DeepSeek-V3",
     apiHint:
       "Get your API key from https://panel.api.airforce — OpenAI-compatible endpoint at https://api.airforce/v1",
+    rateLimitProtected: true,
   },
   qianfan: {
     id: "qianfan",
@@ -704,6 +755,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://cloud.baidu.com/product/wenxinworkshop",
     apiHint:
       "Use a Qianfan API key from Baidu AI Cloud. The default endpoint is OpenAI-compatible v2.",
+    rateLimitProtected: true,
   },
   glm: {
     id: "glm",
@@ -713,6 +765,7 @@ export const APIKEY_PROVIDERS = {
     color: "#2563EB",
     textIcon: "GL",
     website: "https://z.ai/subscribe",
+    rateLimitProtected: true,
   },
   "glm-cn": {
     id: "glm-cn",
@@ -722,6 +775,7 @@ export const APIKEY_PROVIDERS = {
     color: "#DC2626",
     textIcon: "GC",
     website: "https://open.bigmodel.cn",
+    rateLimitProtected: true,
   },
   glmt: {
     id: "glmt",
@@ -732,6 +786,7 @@ export const APIKEY_PROVIDERS = {
     textIcon: "GT",
     website: "https://open.bigmodel.cn",
     apiHint: "Preset GLM profile with higher token budget, thinking enabled, and longer timeout.",
+    rateLimitProtected: true,
   },
   "bailian-coding-plan": {
     id: "bailian-coding-plan",
@@ -741,6 +796,7 @@ export const APIKEY_PROVIDERS = {
     color: "#FF6A00",
     textIcon: "BCP",
     website: "https://www.alibabacloud.com/help/en/model-studio/coding-plan",
+    rateLimitProtected: true,
   },
   kimi: {
     id: "kimi",
@@ -750,6 +806,7 @@ export const APIKEY_PROVIDERS = {
     color: "#1E3A8A",
     textIcon: "KM",
     website: "https://platform.moonshot.ai",
+    rateLimitProtected: true,
   },
   "kimi-coding-apikey": {
     id: "kimi-coding-apikey",
@@ -759,6 +816,7 @@ export const APIKEY_PROVIDERS = {
     color: "#1E40AF",
     textIcon: "KC",
     website: "https://www.kimi.com/code",
+    rateLimitProtected: true,
   },
   minimax: {
     id: "minimax",
@@ -768,6 +826,7 @@ export const APIKEY_PROVIDERS = {
     color: "#7C3AED",
     textIcon: "MM",
     website: "https://www.minimax.io",
+    rateLimitProtected: true,
   },
   "minimax-cn": {
     id: "minimax-cn",
@@ -777,6 +836,7 @@ export const APIKEY_PROVIDERS = {
     color: "#DC2626",
     textIcon: "MC",
     website: "https://www.minimaxi.com",
+    rateLimitProtected: true,
   },
   crof: {
     id: "crof",
@@ -786,6 +846,7 @@ export const APIKEY_PROVIDERS = {
     color: "#0EA5E9",
     textIcon: "CR",
     website: "https://crof.ai",
+    rateLimitProtected: true,
   },
   openai: {
     id: "openai",
@@ -795,6 +856,7 @@ export const APIKEY_PROVIDERS = {
     color: "#10A37F",
     textIcon: "OA",
     website: "https://platform.openai.com",
+    rateLimitProtected: true,
   },
   "azure-openai": {
     id: "azure-openai",
@@ -807,6 +869,7 @@ export const APIKEY_PROVIDERS = {
     authHint:
       "Use your Azure OpenAI API key. Base URL should be your resource endpoint, for example https://my-resource.openai.azure.com.",
     passthroughModels: true,
+    rateLimitProtected: true,
   },
   "azure-ai": {
     id: "azure-ai",
@@ -821,6 +884,7 @@ export const APIKEY_PROVIDERS = {
     apiHint:
       "Foundry uses the OpenAI v1 surface with deployment names as models. OmniRoute normalizes root resource URLs to the v1 chat and /models endpoints.",
     passthroughModels: true,
+    rateLimitProtected: true,
   },
   bedrock: {
     id: "bedrock",
@@ -835,6 +899,7 @@ export const APIKEY_PROVIDERS = {
     apiHint:
       "Native Bedrock integration: model discovery uses Bedrock foundation models and inference profiles, while chat uses the regional Bedrock Runtime Converse/ConverseStream APIs.",
     passthroughModels: true,
+    rateLimitProtected: true,
   },
   watsonx: {
     id: "watsonx",
@@ -849,6 +914,7 @@ export const APIKEY_PROVIDERS = {
     apiHint:
       "The watsonx model gateway exposes OpenAI-compatible /chat/completions and /models under /ml/gateway/v1.",
     passthroughModels: true,
+    rateLimitProtected: true,
   },
   oci: {
     id: "oci",
@@ -863,6 +929,7 @@ export const APIKEY_PROVIDERS = {
     apiHint:
       "OCI exposes OpenAI-compatible chat and responses endpoints. Project ID is optional in OmniRoute but may be required for Responses and agentic workflows.",
     passthroughModels: true,
+    rateLimitProtected: true,
   },
   sap: {
     id: "sap",
@@ -878,6 +945,7 @@ export const APIKEY_PROVIDERS = {
     apiHint:
       "Model discovery uses /v2/lm/scenarios/foundation-models/models on AI_API_URL. Chat requests use deploymentUrl/chat/completions and require AI-Resource-Group.",
     passthroughModels: true,
+    rateLimitProtected: true,
   },
   modal: {
     id: "modal",
@@ -894,6 +962,7 @@ export const APIKEY_PROVIDERS = {
     hasFree: true,
     freeNote: "$30/month free credits for new accounts",
     passthroughModels: true,
+    rateLimitProtected: true,
   },
   reka: {
     id: "reka",
@@ -909,6 +978,7 @@ export const APIKEY_PROVIDERS = {
       "Reka Chat is OpenAI-compatible on /v1. OmniRoute probes /v1/models and routes chat traffic to /v1/chat/completions.",
     hasFree: true,
     freeNote: "$10/month recurring free API credits",
+    rateLimitProtected: true,
   },
   nlpcloud: {
     id: "nlpcloud",
@@ -924,6 +994,7 @@ export const APIKEY_PROVIDERS = {
       "NLP Cloud uses a proprietary chatbot API instead of OpenAI chat/completions. OmniRoute adapts OpenAI messages to input/context/history and exposes a local catalog of supported chatbot models.",
     hasFree: true,
     freeNote: "Trial credits for new accounts",
+    rateLimitProtected: true,
   },
   runwayml: {
     id: "runwayml",
@@ -937,6 +1008,7 @@ export const APIKEY_PROVIDERS = {
       "Use your Runway API key in Authorization: Bearer <key>. OmniRoute targets the current Runway API at https://api.dev.runwayml.com/v1 and sends the required X-Runway-Version header automatically.",
     apiHint:
       "Runway video generation is task-based. OmniRoute submits text-to-video or image-to-video jobs, polls /v1/tasks/{id}, and normalizes the finished video outputs back into the OpenAI-like /v1/videos/generations response.",
+    rateLimitProtected: true,
   },
   anthropic: {
     id: "anthropic",
@@ -946,6 +1018,7 @@ export const APIKEY_PROVIDERS = {
     color: "#D97757",
     textIcon: "AN",
     website: "https://platform.claude.com",
+    rateLimitProtected: true,
   },
   gemini: {
     id: "gemini",
@@ -958,6 +1031,7 @@ export const APIKEY_PROVIDERS = {
     hasFree: true,
     freeNote:
       "Free forever: 1,500 req/day for Gemini 2.5 Flash — no credit card, get key at aistudio.google.com",
+    rateLimitProtected: true,
   },
   deepseek: {
     id: "deepseek",
@@ -969,6 +1043,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://platform.deepseek.com",
     hasFree: true,
     freeNote: "5M free tokens on signup - no credit card required",
+    rateLimitProtected: true,
   },
   groq: {
     id: "groq",
@@ -980,6 +1055,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://groq.com",
     hasFree: true,
     freeNote: "Free tier: 30 RPM / 14.4K RPD — no credit card",
+    rateLimitProtected: true,
   },
   blackbox: {
     id: "blackbox",
@@ -991,6 +1067,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://blackbox.ai",
     hasFree: true,
     freeNote: "Free tier: unlimited basic chat plus Minimax-M2.5, no credit card required",
+    rateLimitProtected: true,
   },
   bazaarlink: {
     id: "bazaarlink",
@@ -1004,6 +1081,7 @@ export const APIKEY_PROVIDERS = {
     freeNote: "Free tier with auto:free routing — zero-cost inference, no credit card required",
     apiHint:
       "Get free API key at https://bazaarlink.ai — use model 'auto:free' for zero-cost inference. OpenAI-compatible.",
+    rateLimitProtected: true,
   },
   xai: {
     id: "xai",
@@ -1013,6 +1091,7 @@ export const APIKEY_PROVIDERS = {
     color: "#1DA1F2",
     textIcon: "XA",
     website: "https://x.ai",
+    rateLimitProtected: true,
   },
   mistral: {
     id: "mistral",
@@ -1024,6 +1103,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://mistral.ai",
     hasFree: true,
     freeNote: "Free Experiment tier: rate-limited access to all models, no credit card required",
+    rateLimitProtected: true,
   },
   perplexity: {
     id: "perplexity",
@@ -1033,6 +1113,7 @@ export const APIKEY_PROVIDERS = {
     color: "#20808D",
     textIcon: "PP",
     website: "https://www.perplexity.ai",
+    rateLimitProtected: true,
   },
   together: {
     id: "together",
@@ -1045,6 +1126,7 @@ export const APIKEY_PROVIDERS = {
     hasFree: true,
     freeNote:
       "$25 signup credits + 3 permanently free models: Llama 3.3 70B, Vision, DeepSeek-R1 distill",
+    rateLimitProtected: true,
   },
   fireworks: {
     id: "fireworks",
@@ -1056,6 +1138,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://fireworks.ai",
     hasFree: true,
     freeNote: "$1 free starter credits on signup for API testing",
+    rateLimitProtected: true,
   },
   cerebras: {
     id: "cerebras",
@@ -1067,6 +1150,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://inference.cerebras.ai",
     hasFree: true,
     freeNote: "Free Trial: 1M tokens/day, 30K TPM, 5 RPM — no credit card.",
+    rateLimitProtected: true,
   },
   cohere: {
     id: "cohere",
@@ -1078,6 +1162,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://cohere.com",
     hasFree: true,
     freeNote: "Free Trial: 1,000 API calls/month for testing, no credit card required",
+    rateLimitProtected: true,
   },
   nvidia: {
     id: "nvidia",
@@ -1089,6 +1174,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://build.nvidia.com",
     hasFree: true,
     freeNote: "Free dev access: ~40 RPM, 70+ models (Kimi K2.5, GLM 4.7, DeepSeek V3.2...)",
+    rateLimitProtected: true,
   },
   nebius: {
     id: "nebius",
@@ -1100,6 +1186,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://nebius.com",
     hasFree: true,
     freeNote: "~$1 trial credits on signup for API testing",
+    rateLimitProtected: true,
   },
   siliconflow: {
     id: "siliconflow",
@@ -1111,6 +1198,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://cloud.siliconflow.com",
     hasFree: true,
     freeNote: "$1 free credits plus permanently free models after identity verification",
+    rateLimitProtected: true,
   },
   hyperbolic: {
     id: "hyperbolic",
@@ -1122,6 +1210,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://hyperbolic.xyz",
     hasFree: true,
     freeNote: "$1-5 trial credits on signup for serverless inference",
+    rateLimitProtected: true,
   },
   kie: {
     id: "kie",
@@ -1131,6 +1220,7 @@ export const APIKEY_PROVIDERS = {
     color: "#2563EB",
     textIcon: "KIE",
     website: "https://kie.ai",
+    rateLimitProtected: true,
   },
   "ollama-cloud": {
     id: "ollama-cloud",
@@ -1141,6 +1231,7 @@ export const APIKEY_PROVIDERS = {
     textIcon: "OC",
     website: "https://ollama.com/settings/api-keys",
     hasFree: true,
+    rateLimitProtected: true,
   },
   huggingface: {
     id: "huggingface",
@@ -1152,6 +1243,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://huggingface.co",
     hasFree: true,
     freeNote: "Free Inference API for thousands of models (Whisper, VITS, SDXL…)",
+    rateLimitProtected: true,
   },
   synthetic: {
     id: "synthetic",
@@ -1162,6 +1254,7 @@ export const APIKEY_PROVIDERS = {
     textIcon: "SY",
     website: "https://synthetic.new",
     passthroughModels: true,
+    rateLimitProtected: true,
   },
   "kilo-gateway": {
     id: "kilo-gateway",
@@ -1172,6 +1265,7 @@ export const APIKEY_PROVIDERS = {
     textIcon: "KG",
     website: "https://kilo.ai",
     passthroughModels: true,
+    rateLimitProtected: true,
   },
   vertex: {
     id: "vertex",
@@ -1183,6 +1277,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://cloud.google.com/vertex-ai",
     hasFree: true,
     authHint: "Provide Service Account JSON or OAuth access_token",
+    rateLimitProtected: true,
   },
   "vertex-partner": {
     id: "vertex-partner",
@@ -1193,6 +1288,7 @@ export const APIKEY_PROVIDERS = {
     textIcon: "VP",
     website: "https://cloud.google.com/vertex-ai",
     authHint: "Provide the same Service Account JSON used for Vertex AI partner models.",
+    rateLimitProtected: true,
   },
   zai: {
     id: "zai",
@@ -1203,6 +1299,7 @@ export const APIKEY_PROVIDERS = {
     textIcon: "ZA",
     website: "https://open.bigmodel.cn",
     apiHint: "API key from https://open.bigmodel.cn/usercenter/apikeys",
+    rateLimitProtected: true,
   },
   wafer: {
     id: "wafer",
@@ -1213,6 +1310,7 @@ export const APIKEY_PROVIDERS = {
     textIcon: "WF",
     website: "https://wafer.ai",
     apiHint: "API key from https://wafer.ai",
+    rateLimitProtected: true,
   },
   "opencode-zen": {
     id: "opencode-zen",
@@ -1222,6 +1320,7 @@ export const APIKEY_PROVIDERS = {
     color: "#6366f1",
     website: "https://opencode.ai/zen",
     anonymousFallback: true,
+    rateLimitProtected: true,
   },
   "opencode-go": {
     id: "opencode-go",
@@ -1231,6 +1330,7 @@ export const APIKEY_PROVIDERS = {
     color: "#6366f1",
     website: "https://opencode.ai/go",
     anonymousFallback: true,
+    rateLimitProtected: true,
   },
   alibaba: {
     id: "alibaba",
@@ -1241,6 +1341,7 @@ export const APIKEY_PROVIDERS = {
     textIcon: "AL",
     website: "https://dashscope-intl.aliyuncs.com",
     hasFree: false,
+    rateLimitProtected: true,
   },
   "alibaba-cn": {
     id: "alibaba-cn",
@@ -1251,6 +1352,7 @@ export const APIKEY_PROVIDERS = {
     textIcon: "AL",
     website: "https://dashscope.aliyuncs.com",
     hasFree: false,
+    rateLimitProtected: true,
   },
   longcat: {
     id: "longcat",
@@ -1263,6 +1365,7 @@ export const APIKEY_PROVIDERS = {
     hasFree: true,
     freeNote:
       "Free: 5M tokens/day on LongCat-2.0-Preview (Flash models retired 2026-05-29); up to 120M/day via feedback.",
+    rateLimitProtected: true,
   },
   pollinations: {
     id: "pollinations",
@@ -1276,6 +1379,7 @@ export const APIKEY_PROVIDERS = {
     anonymousFallback: true,
     freeNote:
       "Free keyless tier: openai, openai-fast, openai-large, qwen-coder, mistral, deepseek, grok, gemini-flash-lite-3.1, perplexity-fast, perplexity-reasoning. Premium models (claude, gemini, midijourney) require a Pollinations API key from enter.pollinations.ai.",
+    rateLimitProtected: true,
   },
   puter: {
     id: "puter",
@@ -1290,6 +1394,7 @@ export const APIKEY_PROVIDERS = {
       "500+ models (GPT-5, Claude Opus 4, Gemini 3 Pro, Grok 4, DeepSeek V3...) — Users pay via free Puter account",
     passthroughModels: true,
     authHint: "Get token at puter.com/dashboard → Copy Auth Token",
+    rateLimitProtected: true,
   },
   uncloseai: {
     id: "uncloseai",
@@ -1303,6 +1408,7 @@ export const APIKEY_PROVIDERS = {
     freeNote: "Free forever — no signup, no credit card. OpenAI-compatible endpoints.",
     passthroughModels: true,
     authHint: "No auth required. API accepts any non-empty string as key for identification.",
+    rateLimitProtected: true,
   },
   hackclub: {
     id: "hackclub",
@@ -1316,6 +1422,7 @@ export const APIKEY_PROVIDERS = {
     freeNote: "Free AI for Hack Club members — 30+ models, no credit card.",
     passthroughModels: true,
     authHint: "Sign in with your Hack Club account at ai.hackclub.com.",
+    rateLimitProtected: true,
   },
   "github-models": {
     id: "github-models",
@@ -1328,6 +1435,7 @@ export const APIKEY_PROVIDERS = {
     hasFree: true,
     freeNote: "Free GPT-5, o-series, DeepSeek-R1, Llama 4, Grok 3 — GitHub account only.",
     authHint: "Create a GitHub PAT with 'models: read' scope at github.com/settings/tokens",
+    rateLimitProtected: true,
   },
   haiper: {
     id: "haiper",
@@ -1338,6 +1446,7 @@ export const APIKEY_PROVIDERS = {
     textIcon: "HP",
     website: "https://haiper.ai",
     authHint: "Get API key at haiper.ai/haiper-api",
+    rateLimitProtected: true,
   },
   leonardo: {
     id: "leonardo",
@@ -1348,6 +1457,7 @@ export const APIKEY_PROVIDERS = {
     textIcon: "LE",
     website: "https://leonardo.ai",
     authHint: "Get API key at leonardo.ai/developer",
+    rateLimitProtected: true,
   },
   ideogram: {
     id: "ideogram",
@@ -1358,6 +1468,7 @@ export const APIKEY_PROVIDERS = {
     textIcon: "ID",
     website: "https://ideogram.ai",
     authHint: "Get API key at ideogram.ai/docs/api",
+    rateLimitProtected: true,
   },
   suno: {
     id: "suno",
@@ -1368,6 +1479,7 @@ export const APIKEY_PROVIDERS = {
     textIcon: "SU",
     website: "https://suno.ai",
     authHint: "Paste session cookie from suno.ai (Clerk auth)",
+    rateLimitProtected: true,
   },
   udio: {
     id: "udio",
@@ -1378,6 +1490,7 @@ export const APIKEY_PROVIDERS = {
     textIcon: "UD",
     website: "https://udio.com",
     authHint: "Paste session cookie from udio.com (Supabase auth)",
+    rateLimitProtected: true,
   },
   "cloudflare-ai": {
     id: "cloudflare-ai",
@@ -1391,6 +1504,7 @@ export const APIKEY_PROVIDERS = {
     freeNote:
       "Free 10K Neurons/day: ~150 LLM responses or 500s Whisper audio — edge inference globally",
     authHint: "Requires API Token AND Account ID (found at dash.cloudflare.com)",
+    rateLimitProtected: true,
   },
   scaleway: {
     id: "scaleway",
@@ -1402,6 +1516,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://www.scaleway.com/en/ai/generative-apis",
     hasFree: true,
     freeNote: "1M free tokens for new accounts — EU/GDPR compliant (Paris), Qwen3 235B & Llama 70B",
+    rateLimitProtected: true,
   },
   deepinfra: {
     id: "deepinfra",
@@ -1413,6 +1528,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://deepinfra.com",
     hasFree: true,
     freeNote: "Free signup credits for API testing and model exploration",
+    rateLimitProtected: true,
   },
   "vercel-ai-gateway": {
     id: "vercel-ai-gateway",
@@ -1422,6 +1538,7 @@ export const APIKEY_PROVIDERS = {
     color: "#111827",
     textIcon: "VAI",
     website: "https://vercel.com/docs/ai-gateway",
+    rateLimitProtected: true,
   },
   "lambda-ai": {
     id: "lambda-ai",
@@ -1431,6 +1548,7 @@ export const APIKEY_PROVIDERS = {
     color: "#7C3AED",
     textIcon: "LA",
     website: "https://lambda.ai",
+    rateLimitProtected: true,
   },
   sambanova: {
     id: "sambanova",
@@ -1442,6 +1560,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://sambanova.ai",
     hasFree: true,
     freeNote: "$5 free credits on signup (30-day validity), no credit card required",
+    rateLimitProtected: true,
   },
   nscale: {
     id: "nscale",
@@ -1453,6 +1572,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://nscale.com",
     hasFree: true,
     freeNote: "$5 free credits on signup for inference testing",
+    rateLimitProtected: true,
   },
   ovhcloud: {
     id: "ovhcloud",
@@ -1462,6 +1582,7 @@ export const APIKEY_PROVIDERS = {
     color: "#2563EB",
     textIcon: "OVH",
     website: "https://www.ovhcloud.com",
+    rateLimitProtected: true,
   },
   baseten: {
     id: "baseten",
@@ -1473,6 +1594,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://baseten.co",
     hasFree: true,
     freeNote: "$30 free trial credits for GPU inference",
+    rateLimitProtected: true,
   },
   publicai: {
     id: "publicai",
@@ -1486,6 +1608,7 @@ export const APIKEY_PROVIDERS = {
     // one-time credit, then it bills per-model. It is NOT a keyless/free tier.
     hasFree: false,
     freeNote: "Requires an API key — one-time signup credit, then paid",
+    rateLimitProtected: true,
   },
   moonshot: {
     id: "moonshot",
@@ -1495,6 +1618,7 @@ export const APIKEY_PROVIDERS = {
     color: "#1E40AF",
     textIcon: "MS",
     website: "https://platform.moonshot.ai",
+    rateLimitProtected: true,
   },
   "meta-llama": {
     id: "meta-llama",
@@ -1504,6 +1628,7 @@ export const APIKEY_PROVIDERS = {
     color: "#0F766E",
     textIcon: "ML",
     website: "https://llama.developer.meta.com",
+    rateLimitProtected: true,
   },
   "v0-vercel": {
     id: "v0-vercel",
@@ -1513,6 +1638,7 @@ export const APIKEY_PROVIDERS = {
     color: "#111827",
     textIcon: "V0",
     website: "https://v0.dev",
+    rateLimitProtected: true,
   },
   morph: {
     id: "morph",
@@ -1524,6 +1650,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://morphllm.com",
     hasFree: true,
     freeNote: "Free tier: 250K credits/month, $0",
+    rateLimitProtected: true,
   },
   "featherless-ai": {
     id: "featherless-ai",
@@ -1535,6 +1662,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://featherless.ai",
     hasFree: true,
     freeNote: "Free tier available — no credit card required",
+    rateLimitProtected: true,
   },
   llm7: {
     id: "llm7",
@@ -1548,6 +1676,7 @@ export const APIKEY_PROVIDERS = {
     freeNote: "No signup required - 2 req/s, 20 RPM, 100 req/hr free tier",
     apiHint:
       "Works without API key (use 'unused' as key). Get free token at token.llm7.io for higher limits.",
+    rateLimitProtected: true,
   },
   kluster: {
     id: "kluster",
@@ -1565,6 +1694,7 @@ export const APIKEY_PROVIDERS = {
     deprecated: true,
     deprecationReason:
       "kluster.ai shut down (2026-06-09); api.kluster.ai no longer resolves (sweep 2026-06-19). Use another OpenAI-compatible provider.",
+    rateLimitProtected: true,
   },
   friendliai: {
     id: "friendliai",
@@ -1576,6 +1706,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://friendli.ai",
     hasFree: true,
     freeNote: "Free tier for serverless inference — no credit card required",
+    rateLimitProtected: true,
   },
   llamagate: {
     id: "llamagate",
@@ -1585,6 +1716,7 @@ export const APIKEY_PROVIDERS = {
     color: "#16A34A",
     textIcon: "LG",
     website: "https://llamagate.ai",
+    rateLimitProtected: true,
   },
   heroku: {
     id: "heroku",
@@ -1594,6 +1726,7 @@ export const APIKEY_PROVIDERS = {
     color: "#7C3AED",
     textIcon: "HK",
     website: "https://www.heroku.com",
+    rateLimitProtected: true,
   },
   galadriel: {
     id: "galadriel",
@@ -1608,6 +1741,7 @@ export const APIKEY_PROVIDERS = {
     deprecated: true,
     deprecationReason:
       "api.galadriel.ai no longer resolves (sweep 2026-06-19); the inference API appears discontinued.",
+    rateLimitProtected: true,
   },
   databricks: {
     id: "databricks",
@@ -1617,6 +1751,7 @@ export const APIKEY_PROVIDERS = {
     color: "#F97316",
     textIcon: "DB",
     website: "https://www.databricks.com",
+    rateLimitProtected: true,
   },
   datarobot: {
     id: "datarobot",
@@ -1631,6 +1766,7 @@ export const APIKEY_PROVIDERS = {
     apiHint:
       "The default gateway catalogs active models from /genai/llmgw/catalog/. Deployment URLs are also supported for direct OpenAI-compatible chat requests.",
     passthroughModels: true,
+    rateLimitProtected: true,
   },
   clarifai: {
     id: "clarifai",
@@ -1645,6 +1781,7 @@ export const APIKEY_PROVIDERS = {
     apiHint:
       "Clarifai exposes OpenAI-compatible chat, responses and /models on /v2/ext/openai/v1. Public/community models typically require a PAT; app-scoped keys only work for resources inside that app.",
     passthroughModels: true,
+    rateLimitProtected: true,
   },
   snowflake: {
     id: "snowflake",
@@ -1654,6 +1791,7 @@ export const APIKEY_PROVIDERS = {
     color: "#29B5E8",
     textIcon: "SF",
     website: "https://www.snowflake.com",
+    rateLimitProtected: true,
   },
   wandb: {
     id: "wandb",
@@ -1663,6 +1801,7 @@ export const APIKEY_PROVIDERS = {
     color: "#FFBE0B",
     textIcon: "WB",
     website: "https://wandb.ai",
+    rateLimitProtected: true,
   },
   volcengine: {
     id: "volcengine",
@@ -1672,6 +1811,7 @@ export const APIKEY_PROVIDERS = {
     color: "#DC2626",
     textIcon: "VE",
     website: "https://www.volcengine.com",
+    rateLimitProtected: true,
   },
   ai21: {
     id: "ai21",
@@ -1683,6 +1823,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://www.ai21.com",
     hasFree: true,
     freeNote: "$10 trial credits on signup (valid 3 months), no credit card required",
+    rateLimitProtected: true,
   },
   gigachat: {
     id: "gigachat",
@@ -1692,6 +1833,7 @@ export const APIKEY_PROVIDERS = {
     color: "#10B981",
     textIcon: "GC",
     website: "https://developers.sber.ru",
+    rateLimitProtected: true,
   },
   venice: {
     id: "venice",
@@ -1701,6 +1843,7 @@ export const APIKEY_PROVIDERS = {
     color: "#0EA5E9",
     textIcon: "VN",
     website: "https://venice.ai",
+    rateLimitProtected: true,
   },
   codestral: {
     id: "codestral",
@@ -1710,6 +1853,7 @@ export const APIKEY_PROVIDERS = {
     color: "#FF7000",
     textIcon: "CS",
     website: "https://mistral.ai",
+    rateLimitProtected: true,
   },
   upstage: {
     id: "upstage",
@@ -1719,6 +1863,7 @@ export const APIKEY_PROVIDERS = {
     color: "#0F766E",
     textIcon: "UP",
     website: "https://www.upstage.ai",
+    rateLimitProtected: true,
   },
   maritalk: {
     id: "maritalk",
@@ -1728,6 +1873,7 @@ export const APIKEY_PROVIDERS = {
     color: "#1D4ED8",
     textIcon: "MT",
     website: "https://www.maritaca.ai",
+    rateLimitProtected: true,
   },
   "xiaomi-mimo": {
     id: "xiaomi-mimo",
@@ -1737,6 +1883,7 @@ export const APIKEY_PROVIDERS = {
     color: "#EA580C",
     textIcon: "MM",
     website: "https://mimo.mi.com",
+    rateLimitProtected: true,
   },
   gitlawb: {
     id: "gitlawb",
@@ -1749,6 +1896,7 @@ export const APIKEY_PROVIDERS = {
     hasFree: false,
     freeNote: "Free MiMo (xiaomi/mimo-v2.5) revoked 2026-05 — Opengateway is now a pay-as-you-go credit gateway; no recurring free model.",
     apiHint: "Get your API key from Gitlawb Opengateway dashboard.",
+    rateLimitProtected: true,
   },
   "gitlawb-gmi": {
     id: "gitlawb-gmi",
@@ -1761,6 +1909,7 @@ export const APIKEY_PROVIDERS = {
     hasFree: false,
     freeNote: "Free Nemotron promo ended 2026-06 — the GMI Cloud route is now pay-as-you-go credit only.",
     apiHint: "Get your API key from Gitlawb Opengateway dashboard.",
+    rateLimitProtected: true,
   },
   "inference-net": {
     id: "inference-net",
@@ -1772,6 +1921,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://inference.net",
     hasFree: true,
     freeNote: "$25 free credits on signup plus research grants available",
+    rateLimitProtected: true,
   },
   nanogpt: {
     id: "nanogpt",
@@ -1781,6 +1931,7 @@ export const APIKEY_PROVIDERS = {
     color: "#4F46E5",
     textIcon: "NG",
     website: "https://nano-gpt.com",
+    rateLimitProtected: true,
   },
   predibase: {
     id: "predibase",
@@ -1797,6 +1948,7 @@ export const APIKEY_PROVIDERS = {
     deprecated: true,
     deprecationReason:
       "serving.app.predibase.com no longer resolves (sweep 2026-06-19); the managed serving API appears discontinued.",
+    rateLimitProtected: true,
   },
   bytez: {
     id: "bytez",
@@ -1808,6 +1960,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://bytez.com",
     hasFree: true,
     freeNote: "$1 free credits, refreshes every 4 weeks",
+    rateLimitProtected: true,
   },
   aimlapi: {
     id: "aimlapi",
@@ -1821,6 +1974,7 @@ export const APIKEY_PROVIDERS = {
     freeNote:
       "Free tier paused (2026) — AI/ML API is now pay-as-you-go only (min $20 top-up); no recurring free credits.",
     passthroughModels: true,
+    rateLimitProtected: true,
   },
   novita: {
     id: "novita",
@@ -1833,6 +1987,7 @@ export const APIKEY_PROVIDERS = {
     hasFree: true,
     freeNote: "$0.50 trial credits on signup (valid about 1 year)",
     passthroughModels: true,
+    rateLimitProtected: true,
   },
   piapi: {
     id: "piapi",
@@ -1843,6 +1998,7 @@ export const APIKEY_PROVIDERS = {
     textIcon: "PI",
     website: "https://piapi.ai",
     passthroughModels: true,
+    rateLimitProtected: true,
   },
   getgoapi: {
     id: "getgoapi",
@@ -1853,6 +2009,7 @@ export const APIKEY_PROVIDERS = {
     textIcon: "GO",
     website: "https://api.getgoapi.com",
     passthroughModels: true,
+    rateLimitProtected: true,
   },
   laozhang: {
     id: "laozhang",
@@ -1863,6 +2020,7 @@ export const APIKEY_PROVIDERS = {
     textIcon: "LZ",
     website: "https://api.laozhang.ai",
     passthroughModels: true,
+    rateLimitProtected: true,
   },
   glhf: {
     id: "glhf",
@@ -1881,6 +2039,7 @@ export const APIKEY_PROVIDERS = {
     deprecated: true,
     deprecationReason:
       "glhf.chat shut down (2026); its api.laf.run gateway no longer serves the catalog (sweep 2026-06-19).",
+    rateLimitProtected: true,
   },
   cablyai: {
     id: "cablyai",
@@ -1892,6 +2051,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://cablyai.com",
     authHint: "Bearer API key for the CablyAI OpenAI-compatible gateway.",
     passthroughModels: true,
+    rateLimitProtected: true,
   },
   thebai: {
     id: "thebai",
@@ -1903,6 +2063,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://theb.ai",
     authHint: "Bearer API key for the TheB.AI OpenAI-compatible gateway.",
     passthroughModels: true,
+    rateLimitProtected: true,
   },
   fenayai: {
     id: "fenayai",
@@ -1914,6 +2075,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://fenayai.com",
     authHint: "Bearer API key for the FenayAI OpenAI-compatible gateway.",
     passthroughModels: true,
+    rateLimitProtected: true,
   },
   empower: {
     id: "empower",
@@ -1927,6 +2089,7 @@ export const APIKEY_PROVIDERS = {
     apiHint:
       "Empower exposes OpenAI-compatible chat on https://app.empower.dev/api/v1 with tool-calling support on empower-functions.",
     passthroughModels: true,
+    rateLimitProtected: true,
   },
   "nous-research": {
     id: "nous-research",
@@ -1942,6 +2105,7 @@ export const APIKEY_PROVIDERS = {
       "Nous exposes an OpenAI-compatible /v1 surface with a large remote /models catalog. The /chat/completions endpoint requires a valid API key for programmatic inference.",
     hasFree: true,
     freeNote: "Free tier: 50 RPM, 500,000 TPM — no credit card",
+    rateLimitProtected: true,
   },
   poe: {
     id: "poe",
@@ -1955,6 +2119,7 @@ export const APIKEY_PROVIDERS = {
     apiHint:
       "Poe exposes OpenAI-compatible chat and responses on https://api.poe.com/v1, with authenticated balance checks on /usage/current_balance.",
     passthroughModels: true,
+    rateLimitProtected: true,
   },
   gitlab: {
     id: "gitlab",
@@ -1966,6 +2131,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://docs.gitlab.com/user/duo_agent_platform/code_suggestions/",
     authHint:
       "GitLab personal access token for the public Code Suggestions API. Configure a self-hosted base URL when not using gitlab.com.",
+    rateLimitProtected: true,
   },
   chutes: {
     id: "chutes",
@@ -1979,6 +2145,7 @@ export const APIKEY_PROVIDERS = {
     freeNote: "No free tier as of 2026 — Chutes moved to pay-as-you-go (free Early Access ended 2026-03).",
     authHint: "Bearer API key for the Chutes OpenAI-compatible gateway.",
     passthroughModels: true,
+    rateLimitProtected: true,
   },
   "voyage-ai": {
     id: "voyage-ai",
@@ -1991,6 +2158,7 @@ export const APIKEY_PROVIDERS = {
     authHint: "Bearer API key for Voyage AI embeddings and rerank APIs.",
     hasFree: true,
     freeNote: "200M free tokens for embeddings and reranking",
+    rateLimitProtected: true,
   },
   "jina-ai": {
     id: "jina-ai",
@@ -2003,6 +2171,7 @@ export const APIKEY_PROVIDERS = {
     authHint: "Bearer API key for the Jina AI rerank API.",
     hasFree: true,
     freeNote: "10M free tokens on signup (non-commercial), no credit card required",
+    rateLimitProtected: true,
   },
   "fal-ai": {
     id: "fal-ai",
@@ -2012,6 +2181,7 @@ export const APIKEY_PROVIDERS = {
     color: "#2563EB",
     textIcon: "FL",
     website: "https://fal.ai",
+    rateLimitProtected: true,
   },
   "stability-ai": {
     id: "stability-ai",
@@ -2021,6 +2191,7 @@ export const APIKEY_PROVIDERS = {
     color: "#8B5CF6",
     textIcon: "SA",
     website: "https://stability.ai",
+    rateLimitProtected: true,
   },
   "black-forest-labs": {
     id: "black-forest-labs",
@@ -2030,6 +2201,7 @@ export const APIKEY_PROVIDERS = {
     color: "#111827",
     textIcon: "BF",
     website: "https://blackforestlabs.ai",
+    rateLimitProtected: true,
   },
   recraft: {
     id: "recraft",
@@ -2039,6 +2211,7 @@ export const APIKEY_PROVIDERS = {
     color: "#EC4899",
     textIcon: "RC",
     website: "https://recraft.ai",
+    rateLimitProtected: true,
   },
   topaz: {
     id: "topaz",
@@ -2048,6 +2221,7 @@ export const APIKEY_PROVIDERS = {
     color: "#059669",
     textIcon: "TP",
     website: "https://topazlabs.com",
+    rateLimitProtected: true,
   },
   baidu: {
     id: "baidu",
@@ -2061,6 +2235,7 @@ export const APIKEY_PROVIDERS = {
     freeNote: "Free ERNIE Speed/Lite models. China's #2 LLM.",
     passthroughModels: true,
     authHint: "Get API key at console.bce.baidu.com",
+    rateLimitProtected: true,
   },
   tencent: {
     id: "tencent",
@@ -2074,6 +2249,7 @@ export const APIKEY_PROVIDERS = {
     freeNote: "Free Hunyuan Lite models. WeChat ecosystem.",
     passthroughModels: true,
     authHint: "Get API key at console.cloud.tencent.com",
+    rateLimitProtected: true,
   },
   iflytek: {
     id: "iflytek",
@@ -2087,6 +2263,7 @@ export const APIKEY_PROVIDERS = {
     freeNote: "Spark Lite is free (2 QPS rate-limited), but iFlytek ToS §2.4(3) prohibits programmatic extraction and requires Chinese real-name auth — use with caution.",
     passthroughModels: true,
     authHint: "Get API key at console.xfyun.cn",
+    rateLimitProtected: true,
   },
   baichuan: {
     id: "baichuan",
@@ -2100,6 +2277,7 @@ export const APIKEY_PROVIDERS = {
     freeNote: "Free Baichuan models. Popular Chinese LLM startup.",
     passthroughModels: true,
     authHint: "Get API key at platform.baichuan-ai.com",
+    rateLimitProtected: true,
   },
   yi: {
     id: "yi",
@@ -2113,6 +2291,7 @@ export const APIKEY_PROVIDERS = {
     freeNote: "No free API tier (2026) — Yi-Light retired; platform.01.ai is pay-as-you-go (Yi-Lightning paid). Open weights are download-only.",
     passthroughModels: true,
     authHint: "Get API key at platform.lingyiwanwu.com",
+    rateLimitProtected: true,
   },
   stepfun: {
     id: "stepfun",
@@ -2126,6 +2305,7 @@ export const APIKEY_PROVIDERS = {
     freeNote: "Free Step-2 models. Chinese AI company.",
     passthroughModels: true,
     authHint: "Get API key at platform.stepfun.com",
+    rateLimitProtected: true,
   },
   coze: {
     id: "coze",
@@ -2139,6 +2319,7 @@ export const APIKEY_PROVIDERS = {
     freeNote: "Free ByteDance agent platform. Bot building + LLM access.",
     passthroughModels: true,
     authHint: "Get API key at coze.com/open/api",
+    rateLimitProtected: true,
   },
   "360ai": {
     id: "360ai",
@@ -2152,6 +2333,7 @@ export const APIKEY_PROVIDERS = {
     freeNote: "Free 360 AI Brain models. Major Chinese security company.",
     passthroughModels: true,
     authHint: "Get API key at ai.360.cn",
+    rateLimitProtected: true,
   },
   doubao: {
     id: "doubao",
@@ -2165,6 +2347,7 @@ export const APIKEY_PROVIDERS = {
     freeNote: "Free Doubao models. ByteDance's chatbot.",
     passthroughModels: true,
     authHint: "Get API key at console.volcengine.com",
+    rateLimitProtected: true,
   },
   sensenova: {
     id: "sensenova",
@@ -2178,6 +2361,7 @@ export const APIKEY_PROVIDERS = {
     freeNote: "Free SenseTime models. Computer vision leader.",
     passthroughModels: true,
     authHint: "Get API key at platform.sensenova.cn",
+    rateLimitProtected: true,
   },
   sparkdesk: {
     id: "sparkdesk",
@@ -2191,6 +2375,7 @@ export const APIKEY_PROVIDERS = {
     freeNote: "Spark Lite free (alias for iflytek), but ToS restricts to personal/non-commercial use and prohibits relaying access to third parties — use with caution.",
     passthroughModels: true,
     authHint: "Get API key at console.xfyun.cn",
+    rateLimitProtected: true,
   },
   phind: {
     id: "phind",
@@ -2204,6 +2389,7 @@ export const APIKEY_PROVIDERS = {
     freeNote: "Discontinued 2026 — phind.com shut down (2026-01); no free tier.",
     passthroughModels: true,
     authHint: "Get API key at phind.com",
+    rateLimitProtected: true,
   },
   huggingchat: {
     id: "huggingchat",
@@ -2217,6 +2403,7 @@ export const APIKEY_PROVIDERS = {
     freeNote: "Free chat with open models (Llama, Mistral, etc.).",
     passthroughModels: true,
     authHint: "No API key required for basic access.",
+    rateLimitProtected: true,
   },
   dify: {
     id: "dify",
@@ -2230,6 +2417,7 @@ export const APIKEY_PROVIDERS = {
     freeNote: "Free open-source AI app builder + RAG platform.",
     passthroughModels: true,
     authHint: "Get API key from your Dify instance.",
+    rateLimitProtected: true,
   },
   "arcee-ai": {
     id: "arcee-ai",
@@ -2243,6 +2431,7 @@ export const APIKEY_PROVIDERS = {
     freeNote: "Free Trinity Large Thinking model (262K context). No credit card required.",
     passthroughModels: true,
     authHint: "Get API key at arcee.ai",
+    rateLimitProtected: true,
   },
   inclusionai: {
     id: "inclusionai",
@@ -2261,6 +2450,7 @@ export const APIKEY_PROVIDERS = {
     deprecated: true,
     deprecationReason:
       "api.inclusionai.tech no longer resolves (sweep 2026-06-19); the inference API appears discontinued.",
+    rateLimitProtected: true,
   },
   liquid: {
     id: "liquid",
@@ -2275,6 +2465,7 @@ export const APIKEY_PROVIDERS = {
       "Free LFM2.5-1.2B-Thinking and LFM2.5-1.2B-Instruct models. MIT spinoff, hybrid architecture.",
     passthroughModels: true,
     authHint: "Get API key at liquid.ai",
+    rateLimitProtected: true,
   },
   nomic: {
     id: "nomic",
@@ -2288,6 +2479,7 @@ export const APIKEY_PROVIDERS = {
     freeNote: "Free Nomic Embed API. Open-source embeddings, no credit card required.",
     passthroughModels: true,
     authHint: "Get API key at atlas.nomic.ai",
+    rateLimitProtected: true,
   },
   monsterapi: {
     id: "monsterapi",
@@ -2301,6 +2493,7 @@ export const APIKEY_PROVIDERS = {
     freeNote: "One-time signup trial credits for decentralized GPU inference (no recurring free plan). No credit card required.",
     passthroughModels: true,
     authHint: "Get API key at monsterapi.ai",
+    rateLimitProtected: true,
   },
   // ── Web Fetch Providers ─────────────────────────────────────────────────────
   firecrawl: {
@@ -2317,6 +2510,7 @@ export const APIKEY_PROVIDERS = {
       apiKeyUrl: "https://firecrawl.dev/app/api-keys",
     },
     serviceKinds: ["webFetch"],
+    rateLimitProtected: true,
   },
   "jina-reader": {
     id: "jina-reader",
@@ -2332,6 +2526,7 @@ export const APIKEY_PROVIDERS = {
       apiKeyUrl: "https://jina.ai/api-dashboard",
     },
     serviceKinds: ["webFetch"],
+    rateLimitProtected: true,
   },
   byteplus: {
     id: "byteplus",
@@ -2347,6 +2542,7 @@ export const APIKEY_PROVIDERS = {
       apiKeyUrl: "https://console.byteplus.com/ark/region:ark+ap-southeast-1/apiKey",
     },
     serviceKinds: ["llm"],
+    rateLimitProtected: true,
   },
   bluesminds: {
     id: "bluesminds",
@@ -2361,6 +2557,7 @@ export const APIKEY_PROVIDERS = {
       "Free daily pi credits — supports 200+ models including GPT-4o, GPT-4.1, Claude Sonnet 4.5, Gemini 2.0 Flash, DeepSeek V4, Qwen, Kimi K2",
     apiHint:
       "Get your API key at https://www.bluesminds.com — OpenAI-compatible endpoint at https://api.bluesminds.com/v1 with free daily credits. VIP models (Claude Opus 4.5, Gemini 2.5 Pro) consume pi credits.",
+    rateLimitProtected: true,
   },
   "freemodel-dev": {
     id: "freemodel-dev",
@@ -2375,6 +2572,7 @@ export const APIKEY_PROVIDERS = {
       "$300 free credits on signup — no credit card required. Access GPT-5.4 and GPT-5.5 (OpenAI's latest flagship models) through an OpenAI-compatible API.",
     apiHint:
       "Get $300 free API credits at https://freemodel.dev — no payment info required. OpenAI-compatible endpoint. GPT-5.4 and GPT-5.5 models available.",
+    rateLimitProtected: true,
   },
   freeaiapikey: {
     id: "freeaiapikey",
@@ -2386,6 +2584,7 @@ export const APIKEY_PROVIDERS = {
     website: "https://freeaiapikey.com",
     apiHint:
       "Discounted API proxy for 40+ models including GPT-5, Claude Opus 4.6, Claude Sonnet 4.6, Qwen 3.5. Get your API key at https://freeaiapikey.com/dashboard. Base URL: https://freeaiapikey.com/v1.",
+    rateLimitProtected: true,
   },
   zenmux: {
     id: "zenmux",
@@ -2402,6 +2601,7 @@ export const APIKEY_PROVIDERS = {
       "Use your ZenMux API key in Authorization: Bearer <key>. ZenMux is fully OpenAI-compatible. Base URL: https://zenmux.ai/api/v1.",
     apiHint:
       "ZenMux exposes an OpenAI-compatible chat completions endpoint at /api/v1/chat/completions, plus Anthropic Messages (/api/anthropic/v1/messages) and Google Gemini (/api/vertex-ai) protocol surfaces. OmniRoute uses the OpenAI protocol.",
+    rateLimitProtected: true,
   },
   openadapter: {
     id: "openadapter",
@@ -2418,6 +2618,7 @@ export const APIKEY_PROVIDERS = {
       "Use your OpenAdapter API key in Authorization: Bearer sk-cv-<key>. Fully OpenAI-compatible. API base URL: https://api.openadapter.in/v1.",
     apiHint:
       "OpenAdapter exposes an OpenAI-compatible chat completions endpoint at https://api.openadapter.in/v1/chat/completions, aggregating 70+ open-source models (DeepSeek, Qwen, Kimi, MiniMax, GLM, Llama, Mistral, …). OmniRoute uses the OpenAI protocol.",
+    rateLimitProtected: true,
   },
   dit: {
     id: "dit",
@@ -2431,6 +2632,7 @@ export const APIKEY_PROVIDERS = {
       "Use your dit.ai API key in Authorization: Bearer <key>. Fully OpenAI-compatible — a drop-in replacement, just change the base URL to https://api.dit.ai/v1.",
     apiHint:
       "dit.ai (Distributed Intelligence Trade) is an OpenAI-compatible router/gateway with dynamic per-request pricing, exposing /v1/chat/completions at https://api.dit.ai/v1. OmniRoute uses the OpenAI protocol; spend/savings analytics live in the dit.ai dashboard.",
+    rateLimitProtected: true,
   },
   tokenrouter: {
     id: "tokenrouter",
@@ -2446,6 +2648,7 @@ export const APIKEY_PROVIDERS = {
       "Use your TokenRouter API key in Authorization: Bearer <key>. Fully OpenAI-compatible. API base URL: https://api.tokenrouter.com/v1.",
     apiHint:
       "TokenRouter exposes an OpenAI-compatible chat completions endpoint at https://api.tokenrouter.com/v1/chat/completions, plus a working /v1/models catalog. OmniRoute uses the OpenAI protocol.",
+    rateLimitProtected: true,
   },
 };
 
@@ -2673,6 +2876,7 @@ export const SEARCH_PROVIDERS = {
     textIcon: "PS",
     website: "https://docs.perplexity.ai/guides/search-quickstart",
     authHint: "Same API key as Perplexity (pplx-...)",
+    rateLimitProtected: true,
   },
   "serper-search": {
     id: "serper-search",
@@ -2685,6 +2889,7 @@ export const SEARCH_PROVIDERS = {
     hasFree: true,
     authHint: "API key from serper.dev dashboard",
     serviceKinds: ["webSearch"],
+    rateLimitProtected: true,
   },
   "brave-search": {
     id: "brave-search",
@@ -2696,6 +2901,7 @@ export const SEARCH_PROVIDERS = {
     website: "https://brave.com/search/api",
     hasFree: true,
     authHint: "Subscription token from Brave Search API dashboard",
+    rateLimitProtected: true,
   },
   "exa-search": {
     id: "exa-search",
@@ -2708,6 +2914,7 @@ export const SEARCH_PROVIDERS = {
     hasFree: true,
     authHint: "API key from dashboard.exa.ai",
     serviceKinds: ["webSearch", "webFetch"],
+    rateLimitProtected: true,
   },
   "tavily-search": {
     id: "tavily-search",
@@ -2720,6 +2927,7 @@ export const SEARCH_PROVIDERS = {
     hasFree: true,
     authHint: "API key from app.tavily.com (format: tvly-...)",
     serviceKinds: ["webSearch", "webFetch"],
+    rateLimitProtected: true,
   },
   "google-pse-search": {
     id: "google-pse-search",
@@ -2730,6 +2938,7 @@ export const SEARCH_PROVIDERS = {
     textIcon: "GP",
     website: "https://developers.google.com/custom-search/v1/overview",
     authHint: "Requires a Google API key and your Programmable Search Engine ID (cx)",
+    rateLimitProtected: true,
   },
   "linkup-search": {
     id: "linkup-search",
@@ -2740,6 +2949,7 @@ export const SEARCH_PROVIDERS = {
     textIcon: "LU",
     website: "https://docs.linkup.so",
     authHint: "Bearer API key from the Linkup dashboard",
+    rateLimitProtected: true,
   },
   "searchapi-search": {
     id: "searchapi-search",
@@ -2750,6 +2960,7 @@ export const SEARCH_PROVIDERS = {
     textIcon: "SA",
     website: "https://www.searchapi.io/docs",
     authHint: "API key from SearchAPI (query param or Bearer auth)",
+    rateLimitProtected: true,
   },
   "youcom-search": {
     id: "youcom-search",
@@ -2760,6 +2971,7 @@ export const SEARCH_PROVIDERS = {
     textIcon: "YOU",
     website: "https://you.com/docs/search/overview",
     authHint: "X-API-Key from the You.com platform dashboard",
+    rateLimitProtected: true,
   },
   "searxng-search": {
     id: "searxng-search",
@@ -2772,6 +2984,7 @@ export const SEARCH_PROVIDERS = {
     hasFree: true,
     authHint:
       "API key is optional. Set your SearXNG base URL. Some instances may require a bearer token for access.",
+    rateLimitProtected: true,
   },
   "ollama-search": {
     id: "ollama-search",
@@ -2782,6 +2995,7 @@ export const SEARCH_PROVIDERS = {
     textIcon: "OS",
     website: "https://ollama.com/settings/api-keys",
     authHint: "Same API key as Ollama Cloud (from ollama.com/settings/api-keys)",
+    rateLimitProtected: true,
   },
 };
 
@@ -2795,6 +3009,7 @@ export const AUDIO_ONLY_PROVIDERS = {
     color: "#13EF93",
     textIcon: "DG",
     website: "https://deepgram.com",
+    rateLimitProtected: true,
   },
   assemblyai: {
     id: "assemblyai",
@@ -2804,6 +3019,7 @@ export const AUDIO_ONLY_PROVIDERS = {
     color: "#0062FF",
     textIcon: "AA",
     website: "https://assemblyai.com",
+    rateLimitProtected: true,
   },
   elevenlabs: {
     id: "elevenlabs",
@@ -2813,6 +3029,7 @@ export const AUDIO_ONLY_PROVIDERS = {
     color: "#6C47FF",
     textIcon: "EL",
     website: "https://elevenlabs.io",
+    rateLimitProtected: true,
   },
   cartesia: {
     id: "cartesia",
@@ -2822,6 +3039,7 @@ export const AUDIO_ONLY_PROVIDERS = {
     color: "#FF4F8B",
     textIcon: "CA",
     website: "https://cartesia.ai",
+    rateLimitProtected: true,
   },
   playht: {
     id: "playht",
@@ -2831,6 +3049,7 @@ export const AUDIO_ONLY_PROVIDERS = {
     color: "#00B4D8",
     textIcon: "PH",
     website: "https://play.ht",
+    rateLimitProtected: true,
   },
   inworld: {
     id: "inworld",
@@ -2840,6 +3059,7 @@ export const AUDIO_ONLY_PROVIDERS = {
     color: "#7B2EF2",
     textIcon: "IW",
     website: "https://inworld.ai",
+    rateLimitProtected: true,
   },
   "aws-polly": {
     id: "aws-polly",
@@ -2851,6 +3071,7 @@ export const AUDIO_ONLY_PROVIDERS = {
     website: "https://aws.amazon.com/polly/",
     authHint:
       "Use AWS Secret Access Key as API key; set providerSpecificData.accessKeyId and optional region.",
+    rateLimitProtected: true,
   },
 };
 
@@ -2881,6 +3102,7 @@ export const UPSTREAM_PROXY_PROVIDERS = {
     configDir: "~/.cli-proxy-api",
     binaryName: "cli-proxy-api",
     githubRepo: "router-for-me/CLIProxyAPI",
+    rateLimitProtected: true,
   },
   "9router": {
     id: "9router",
@@ -2896,6 +3118,7 @@ export const UPSTREAM_PROXY_PROVIDERS = {
     embedded: true,
     isEmbeddedService: true,
     riskNoticeVariant: "embedded-service" as const,
+    rateLimitProtected: true,
   },
 };
 
@@ -2909,6 +3132,7 @@ export const CLOUD_AGENT_PROVIDERS = {
     textIcon: "JL",
     website: "https://jules.google",
     authHint: "Jules API key for creating and managing cloud coding tasks.",
+    rateLimitProtected: true,
   },
   devin: {
     id: "devin",
@@ -2919,6 +3143,7 @@ export const CLOUD_AGENT_PROVIDERS = {
     textIcon: "DV",
     website: "https://devin.ai",
     authHint: "Devin API key for cloud agent sessions.",
+    rateLimitProtected: true,
   },
   "codex-cloud": {
     id: "codex-cloud",
@@ -2929,6 +3154,7 @@ export const CLOUD_AGENT_PROVIDERS = {
     textIcon: "CC",
     website: "https://openai.com/codex",
     authHint: "OpenAI API key with Codex Cloud task access.",
+    rateLimitProtected: true,
   },
 };
 
