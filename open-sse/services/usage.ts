@@ -12,6 +12,7 @@ import {
   toClientAntigravityQuotaModelId,
 } from "../config/antigravityModelAliases.ts";
 import { isUserCallableAgyModelId } from "../config/agyModels.ts";
+import { buildCodexUsageQuotas } from "./codexUsageQuotas.ts";
 import { getGlmQuotaUrl } from "../config/glmProvider.ts";
 import { getGitHubCopilotInternalUserHeaders } from "../config/providerHeaderProfiles.ts";
 import { safePercentage } from "@/shared/utils/formatting";
@@ -91,6 +92,9 @@ const NANOGPT_CONFIG = {
 };
 
 const OPENCODE_GO_QUOTA_URL =
+  // Note: api.z.ai rejects opencode-go keys with {"code":401}. This default is a
+  // known broken placeholder (see issues #10448, #16017). The env-var override lets
+  // operators point at a working endpoint once OpenCode ships one.
   process.env.OMNIROUTE_OPENCODE_GO_QUOTA_URL ?? "https://api.z.ai/api/monitor/usage/quota/limit";
 const OPENCODE_GO_QUOTA_TOTALS = {
   session: 12,
@@ -946,10 +950,18 @@ async function getOpenCodeGoUsage(apiKey: string) {
   if (!res.ok) {
     if (res.status === 401 || res.status === 403) {
       return {
-        message: "OpenCode Go quota endpoint rejected this API key. Chat requests still work.",
+        message:
+          "OpenCode Go does not expose a public quota API. Chat requests still work. " +
+          "Set OMNIROUTE_OPENCODE_GO_QUOTA_URL to a working endpoint, or follow " +
+          "https://github.com/anomalyco/opencode/issues/16017 for upstream status.",
       };
     }
-    return { message: `OpenCode Go quota API error (${res.status})` };
+    return {
+      message:
+        `OpenCode Go quota API error (${res.status}). ` +
+        "Set OMNIROUTE_OPENCODE_GO_QUOTA_URL to a working endpoint, or follow " +
+        "https://github.com/anomalyco/opencode/issues/16017 for upstream status.",
+    };
   }
 
   let json: unknown;
@@ -962,7 +974,10 @@ async function getOpenCodeGoUsage(apiKey: string) {
   const code = toNumber((json as Record<string, unknown>).code, 200);
   if (code === 401 || code === 403 || (json as Record<string, unknown>).success === false) {
     return {
-      message: "OpenCode Go quota endpoint rejected this API key. Chat requests still work.",
+      message:
+        "OpenCode Go does not expose a public quota API. Chat requests still work. " +
+        "Set OMNIROUTE_OPENCODE_GO_QUOTA_URL to a working endpoint, or follow " +
+        "https://github.com/anomalyco/opencode/issues/16017 for upstream status.",
     };
   }
 
@@ -2866,80 +2881,7 @@ async function getCodexUsage(
 
     const data = await response.json();
 
-    // Parse rate limit info (supports both snake_case and camelCase)
-    const rateLimit = toRecord(getFieldValue(data, "rate_limit", "rateLimit"));
-    const primaryWindow = toRecord(getFieldValue(rateLimit, "primary_window", "primaryWindow"));
-    const secondaryWindow = toRecord(
-      getFieldValue(rateLimit, "secondary_window", "secondaryWindow")
-    );
-
-    // Parse reset times (reset_at is Unix timestamp in seconds)
-    const parseWindowReset = (window: unknown) => {
-      const resetAt = toNumber(getFieldValue(window, "reset_at", "resetAt"), 0);
-      const resetAfterSeconds = toNumber(
-        getFieldValue(window, "reset_after_seconds", "resetAfterSeconds"),
-        0
-      );
-      if (resetAt > 0) return parseResetTime(resetAt * 1000);
-      if (resetAfterSeconds > 0) return parseResetTime(Date.now() + resetAfterSeconds * 1000);
-      return null;
-    };
-
-    // Build quota windows
-    const quotas: Record<string, UsageQuota> = {};
-
-    // Primary window (5-hour)
-    if (Object.keys(primaryWindow).length > 0) {
-      const usedPercent = toNumber(getFieldValue(primaryWindow, "used_percent", "usedPercent"), 0);
-      quotas.session = {
-        used: usedPercent,
-        total: 100,
-        remaining: 100 - usedPercent,
-        resetAt: parseWindowReset(primaryWindow),
-        unlimited: false,
-      };
-    }
-
-    // Secondary window (weekly)
-    if (Object.keys(secondaryWindow).length > 0) {
-      const usedPercent = toNumber(
-        getFieldValue(secondaryWindow, "used_percent", "usedPercent"),
-        0
-      );
-      quotas.weekly = {
-        used: usedPercent,
-        total: 100,
-        remaining: 100 - usedPercent,
-        resetAt: parseWindowReset(secondaryWindow),
-        unlimited: false,
-      };
-    }
-
-    // Code review rate limit (3rd window — differs per plan: Plus/Pro/Team)
-    const codeReviewRateLimit = toRecord(
-      getFieldValue(data, "code_review_rate_limit", "codeReviewRateLimit")
-    );
-    const codeReviewWindow = toRecord(
-      getFieldValue(codeReviewRateLimit, "primary_window", "primaryWindow")
-    );
-
-    // Only include code review quota if the API returned data for it
-    const codeReviewUsedRaw = getFieldValue(codeReviewWindow, "used_percent", "usedPercent");
-    const codeReviewRemainingRaw = getFieldValue(
-      codeReviewWindow,
-      "remaining_count",
-      "remainingCount"
-    );
-    if (codeReviewUsedRaw !== null || codeReviewRemainingRaw !== null) {
-      const codeReviewUsedPercent = toNumber(codeReviewUsedRaw, 0);
-      quotas.code_review = {
-        used: codeReviewUsedPercent,
-        total: 100,
-        remaining: 100 - codeReviewUsedPercent,
-        resetAt: parseWindowReset(codeReviewWindow),
-        unlimited: false,
-      };
-    }
+    const { rateLimit, quotas } = buildCodexUsageQuotas(data);
 
     return {
       plan: String(getFieldValue(data, "plan_type", "planType") || "unknown"),

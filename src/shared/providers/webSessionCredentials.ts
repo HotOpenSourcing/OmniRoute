@@ -160,7 +160,8 @@ export const WEB_SESSION_CREDENTIAL_REQUIREMENTS = {
   "qwen-web": {
     kind: "cookie",
     credentialName: "full Cookie header (must include cna, ssxmod_itna, token)",
-    placeholder: "cna=...; token=...; ssxmod_itna=...; ssxmod_itna2=... (full Cookie header from chat.qwen.ai)",
+    placeholder:
+      "cna=...; token=...; ssxmod_itna=...; ssxmod_itna2=... (full Cookie header from chat.qwen.ai)",
     acceptsFullCookieHeader: true,
     storageKeys: ["cookie", "token", "ssxmod_itna", "ssxmod_itna2", "cna", "tongyi_sso_ticket"],
   },
@@ -201,10 +202,23 @@ export const WEB_SESSION_CREDENTIAL_REQUIREMENTS = {
   },
   lmarena: {
     kind: "cookie",
-    credentialName: "session",
-    placeholder: "session=... or full Cookie header from lmarena.ai",
+    // lmarena.ai's auth cookie is `arena-auth-prod-v1` (the legacy hint said `session`,
+    // which never matched the real cookie name and confused users). #3810
+    //
+    // #4271: LMArena migrated to Supabase SSR chunked cookies — the single
+    // `arena-auth-prod-v1` cookie is now empty and the session is split across
+    // `arena-auth-prod-v1.0`, `arena-auth-prod-v1.1`, … Users must paste the FULL
+    // Cookie header so the executor can reconstruct the single cookie from chunks.
+    credentialName: "arena-auth-prod-v1",
+    placeholder: "Paste the full Cookie header from lmarena.ai (the session is now split across arena-auth-prod-v1.0, .1, …)",
     acceptsFullCookieHeader: true,
-    storageKeys: ["cookie", "session"],
+    storageKeys: [
+      "cookie",
+      "arena-auth-prod-v1",
+      "arena-auth-prod-v1.0",
+      "arena-auth-prod-v1.1",
+      "session",
+    ],
   },
 } satisfies Record<keyof typeof WEB_COOKIE_PROVIDERS, WebSessionCredentialRequirement>;
 

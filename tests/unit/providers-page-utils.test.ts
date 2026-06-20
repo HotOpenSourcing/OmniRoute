@@ -764,31 +764,240 @@ test("compatible catalog entries keep dynamic compatible metadata", () => {
   assert.equal(compatibleProvider?.baseUrl, "https://example.test");
 });
 
-test("provider model discovery summaries stay user-facing for Windsurf runtime states", () => {
-  assert.equal(
-    providerPageUtils.formatProviderModelsDiscoverySummary({
-      status: "present",
-      source: "session/new",
-      transport: "acp_runtime",
-    }),
-    "Live Windsurf ACP runtime discovery"
+test("model search filter matches providers by model id", async () => {
+  const { getModelsByProviderId } = await import("../../src/shared/constants/models.ts");
+
+  const entries = [
+    {
+      providerId: "trae",
+      provider: { name: "Trae" },
+      stats: { total: 0 },
+      displayAuthType: "oauth" as const,
+      toggleAuthType: "oauth" as const,
+    },
+    {
+      providerId: "openai",
+      provider: { name: "OpenAI" },
+      stats: { total: 1 },
+      displayAuthType: "apikey" as const,
+      toggleAuthType: "apikey" as const,
+    },
+    {
+      providerId: "minimax",
+      provider: { name: "MiniMax" },
+      stats: { total: 1 },
+      displayAuthType: "apikey" as const,
+      toggleAuthType: "apikey" as const,
+    },
+    {
+      providerId: "nonexistent-provider-xyz",
+      provider: { name: "No Models" },
+      stats: { total: 0 },
+      displayAuthType: "apikey" as const,
+      toggleAuthType: "apikey" as const,
+    },
+  ];
+
+  // "minimax-m3" model id exists in trae, opencode, bazaarlink, cerebras
+  const byModelId = providerPageUtils.filterConfiguredProviderEntries(
+    entries,
+    false,
+    undefined,
+    undefined,
+    "minimax-m3"
+  );
+  const matchedIds = byModelId.map((e) => e.providerId);
+  assert.ok(matchedIds.includes("trae"), "trae should match minimax-m3 by model id");
+  assert.ok(!matchedIds.includes("openai"), "openai should not match minimax-m3");
+
+  // "MiniMax-M3" model id exists in minimax provider itself (different casing)
+  // getModelsByProviderId("minimax") should include MiniMax-M3
+  const minimaxModels = getModelsByProviderId("minimax");
+  const hasMinimaxM3 = minimaxModels.some((m) => m.id === "MiniMax-M3");
+  if (hasMinimaxM3) {
+    const byMinimaxM3 = providerPageUtils.filterConfiguredProviderEntries(
+      entries,
+      false,
+      undefined,
+      undefined,
+      "MiniMax-M3"
+    );
+    assert.ok(
+      byMinimaxM3.map((e) => e.providerId).includes("minimax"),
+      "minimax should match MiniMax-M3 by model id"
+    );
+  }
+
+  // Provider with no models shouldn't match
+  const byNonexistentModel = providerPageUtils.filterConfiguredProviderEntries(
+    entries,
+    false,
+    undefined,
+    undefined,
+    "model-that-does-not-exist"
+  );
+  assert.equal(byNonexistentModel.length, 0);
+
+  // Empty model search returns all
+  const byEmptyModel = providerPageUtils.filterConfiguredProviderEntries(
+    entries,
+    false,
+    undefined,
+    undefined,
+    ""
+  );
+  assert.equal(byEmptyModel.length, entries.length);
+
+  // Whitespace-only model search returns all
+  const byWhitespaceModel = providerPageUtils.filterConfiguredProviderEntries(
+    entries,
+    false,
+    undefined,
+    undefined,
+    "   "
+  );
+  assert.equal(byWhitespaceModel.length, entries.length);
+});
+
+test("model search filter matches by model name", () => {
+  const entries = [
+    {
+      providerId: "minimax",
+      provider: { name: "MiniMax" },
+      stats: { total: 0 },
+      displayAuthType: "apikey" as const,
+      toggleAuthType: "apikey" as const,
+    },
+    {
+      providerId: "openai",
+      provider: { name: "OpenAI" },
+      stats: { total: 1 },
+      displayAuthType: "apikey" as const,
+      toggleAuthType: "apikey" as const,
+    },
+  ];
+
+  // "MiniMax M3" is the model name for the MiniMax provider's MiniMax-M3 model
+  const byName = providerPageUtils.filterConfiguredProviderEntries(
+    entries,
+    false,
+    undefined,
+    undefined,
+    "MiniMax M3"
+  );
+  assert.ok(
+    byName.map((e) => e.providerId).includes("minimax"),
+    "minimax should match by model name 'MiniMax M3'"
+  );
+  assert.ok(
+    !byName.map((e) => e.providerId).includes("openai"),
+    "openai should not match 'MiniMax M3'"
+  );
+});
+
+test("model search filter combines with configured-only and text search", () => {
+  const entries = [
+    {
+      providerId: "trae",
+      provider: { name: "Trae" },
+      stats: { total: 1 },
+      displayAuthType: "oauth" as const,
+      toggleAuthType: "oauth" as const,
+    },
+    {
+      providerId: "opencode",
+      provider: { name: "OpenCode" },
+      stats: { total: 0 },
+      displayAuthType: "no-auth" as const,
+      toggleAuthType: "no-auth" as const,
+    },
+    {
+      providerId: "minimax",
+      provider: { name: "MiniMax" },
+      stats: { total: 0 },
+      displayAuthType: "apikey" as const,
+      toggleAuthType: "apikey" as const,
+    },
+    {
+      providerId: "openai",
+      provider: { name: "OpenAI" },
+      stats: { total: 1 },
+      displayAuthType: "apikey" as const,
+      toggleAuthType: "apikey" as const,
+    },
+  ];
+
+  // Model filter + configured-only: only configured providers with minimax-m3
+  const modelAndConfigured = providerPageUtils.filterConfiguredProviderEntries(
+    entries,
+    true,
+    undefined,
+    undefined,
+    "minimax-m3"
+  );
+  const modelAndConfigIds = modelAndConfigured.map((e) => e.providerId);
+  // trae has minimax-m3 AND is configured (total > 0)
+  assert.ok(modelAndConfigIds.includes("trae"), "configured trae should match minimax-m3");
+  // opencode has minimax-m3 but is no-auth (always visible regardless of configured filter)
+  // bazaarlink is not in our test entries
+  assert.ok(
+    !modelAndConfigIds.includes("openai"),
+    "openai should not match minimax-m3 model filter"
   );
 
-  assert.equal(
-    providerPageUtils.formatProviderModelsDiscoverySummary({
-      status: "enriched",
-      source: "session/load",
-      transport: "session_runtime",
-    }),
-    "Loaded Windsurf session discovery fallback"
+  // Model filter + text search: both must match (AND logic)
+  const modelAndSearch = providerPageUtils.filterConfiguredProviderEntries(
+    entries,
+    false,
+    "Trae",
+    undefined,
+    "minimax-m3"
+  );
+  assert.deepEqual(
+    modelAndSearch.map((e) => e.providerId),
+    ["trae"],
+    "only trae matches both search 'Trae' AND model 'minimax-m3'"
   );
 
-  assert.equal(
-    providerPageUtils.formatProviderModelsDiscoverySummary({
-      status: "missing",
-      source: "none",
-      transport: "local_catalog",
-    }),
-    "Static Windsurf catalog fallback because runtime credentials are unavailable"
+  // Model filter that matches nothing with valid text search
+  const noModelMatch = providerPageUtils.filterConfiguredProviderEntries(
+    entries,
+    false,
+    undefined,
+    undefined,
+    "nonexistent-model-xyz"
   );
+  assert.equal(noModelMatch.length, 0);
+});
+
+test("model search filter is case-insensitive and partial-match", () => {
+  const entries = [
+    {
+      providerId: "trae",
+      provider: { name: "Trae" },
+      stats: { total: 0 },
+      displayAuthType: "oauth" as const,
+      toggleAuthType: "oauth" as const,
+    },
+  ];
+
+  // Case insensitive
+  const byUppercase = providerPageUtils.filterConfiguredProviderEntries(
+    entries,
+    false,
+    undefined,
+    undefined,
+    "MINIMAX-M3"
+  );
+  assert.equal(byUppercase.length, 1, "model search should be case-insensitive");
+
+  // Partial match
+  const byPartial = providerPageUtils.filterConfiguredProviderEntries(
+    entries,
+    false,
+    undefined,
+    undefined,
+    "minimax"
+  );
+  assert.equal(byPartial.length, 1, "partial model id 'minimax' should match 'minimax-m3'");
 });

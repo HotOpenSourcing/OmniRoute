@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Card, Button, CardSkeleton, NoAuthProviderCard, NoAuthAccountCard } from "@/shared/components";
+import { Card, Button, CardSkeleton } from "@/shared/components";
 import {
   NOAUTH_PROVIDERS,
   getProviderAlias,
@@ -15,7 +15,10 @@ import {
   supportsApiKeyOnFreeProvider,
 } from "@/shared/constants/providers";
 import { getModelsByProviderId } from "@/shared/constants/models";
-import { compatibleProviderSupportsModelImport, getCompatibleFallbackModels } from "@/lib/providers/managedAvailableModels";
+import {
+  compatibleProviderSupportsModelImport,
+  getCompatibleFallbackModels,
+} from "@/lib/providers/managedAvailableModels";
 import { normalizeModelCatalogSource } from "@/shared/utils/modelCatalogSearch";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
 import useEmailPrivacyStore from "@/store/emailPrivacyStore";
@@ -46,6 +49,7 @@ import ProviderModalsPanel from "./components/ProviderModalsPanel";
 import EmptyConnectionsPlaceholder from "./components/EmptyConnectionsPlaceholder";
 import UpstreamProxyCard from "./components/UpstreamProxyCard";
 import SearchProviderCard from "./components/SearchProviderCard";
+import NoAuthProviderControls from "./components/NoAuthProviderControls";
 // providerText used by UpstreamProxyCard (Phase 1t.7)
 
 export default function ProviderDetailPageClient() {
@@ -192,11 +196,16 @@ export default function ProviderDetailPageClient() {
   const subscriptionRisk = providerInfo?.subscriptionRisk === true;
 
   // ── Phase 1t.3: connection gate + risk-notice modal state ───────────────
-  const { showRiskNoticeModal, gateConnectionFlow, handleConfirmRiskNotice, handleCancelRiskNotice } =
-    useConnectionGate({ providerId, subscriptionRisk });
+  const {
+    showRiskNoticeModal,
+    gateConnectionFlow,
+    handleConfirmRiskNotice,
+    handleCancelRiskNotice,
+  } = useConnectionGate({ providerId, subscriptionRisk });
 
   const providerSupportsPat = supportsApiKeyOnFreeProvider(providerId);
   const isOAuth = providerSupportsOAuth && !providerSupportsPat;
+  const providerAlias = getProviderAlias(providerId);
   const isFreeNoAuth = NOAUTH_PROVIDERS[providerId]?.noAuth === true;
   const registryModels = getModelsByProviderId(providerId);
   // Prefer synced API-discovered models when available, then merge built-ins
@@ -235,7 +244,6 @@ export default function ProviderDetailPageClient() {
     }
     return Array.from(deduped.values());
   }, [providerId, registryModels, syncedAvailableModels, modelMeta.customModels]);
-  const providerAlias = getProviderAlias(providerId);
   const isManagedAvailableModelsProvider = isCompatible || providerId === "openrouter";
   // isSearchProvider declared earlier (before hooks)
   const isUpstreamProxyProvider = providerInfo?.category === "upstream-proxy";
@@ -362,10 +370,7 @@ export default function ProviderDetailPageClient() {
   } = useAuthFileHandlers({ parseApiErrorMessage, getAttachmentFilename, notify, t });
 
   // Phase 1e: compat-state derivations
-  const compat = useModelCompatState(
-    modelMeta.customModels,
-    modelMeta.modelCompatOverrides
-  );
+  const compat = useModelCompatState(modelMeta.customModels, modelMeta.modelCompatOverrides);
   const { customMap } = compat;
   const effectiveModelNormalize = compat.effectiveModelNormalize;
   const effectiveModelPreserveDeveloper = compat.effectiveModelPreserveDeveloper;
@@ -416,7 +421,6 @@ export default function ProviderDetailPageClient() {
 
   // renderModelsSection → components/ProviderModelsSection.tsx (Phase 1m)
 
-
   if (loading) {
     return (
       <div className="flex flex-col gap-8">
@@ -450,7 +454,9 @@ export default function ProviderDetailPageClient() {
         t={t}
       />
 
-      {providerId === "zed" && <ZedImportCard fetchConnections={fetchConnections} notify={notify} />}
+      {providerId === "zed" && (
+        <ZedImportCard fetchConnections={fetchConnections} notify={notify} />
+      )}
 
       {/* CompatibleNodeCard — Phase 1t.2: extracted to components/CompatibleNodeCard.tsx */}
       {isCompatible && providerNode && (
@@ -468,24 +474,12 @@ export default function ProviderDetailPageClient() {
       )}
 
       {/* Connections */}
-      {!isUpstreamProxyProvider && isFreeNoAuth && providerId === "mimocode" && (
-        <NoAuthAccountCard
+      {!isUpstreamProxyProvider && isFreeNoAuth && (
+        <NoAuthProviderControls
           providerId={providerId}
-          providerName="MiMoCode"
-          generateAccountId={() => crypto.randomUUID().replace(/-/g, "")}
+          providerName={providerInfo?.name || providerId}
         />
       )}
-      {!isUpstreamProxyProvider && isFreeNoAuth && providerId === "opencode" && (
-        <NoAuthAccountCard
-          providerId={providerId}
-          providerName="OpenCode"
-          generateAccountId={() => crypto.randomUUID().replace(/-/g, "")}
-        />
-      )}
-      {!isUpstreamProxyProvider &&
-        isFreeNoAuth &&
-        providerId !== "mimocode" &&
-        providerId !== "opencode" && <NoAuthProviderCard />}
       {!isUpstreamProxyProvider && !isFreeNoAuth && (
         <Card>
           <ConnectionsHeaderToolbar
@@ -750,6 +744,7 @@ export default function ProviderDetailPageClient() {
         setShowEditModal={setShowEditModal}
         selectedConnection={selectedConnection}
         handleUpdateConnection={handleUpdateConnection}
+        handleCompatibleImportWithProgress={handleCompatibleImportWithProgress}
         showEditNodeModal={showEditNodeModal}
         setShowEditNodeModal={setShowEditNodeModal}
         providerNode={providerNode}
@@ -784,4 +779,3 @@ export default function ProviderDetailPageClient() {
     </div>
   );
 }
-

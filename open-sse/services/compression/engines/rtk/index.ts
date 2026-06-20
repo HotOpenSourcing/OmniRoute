@@ -3,6 +3,7 @@ import { DEFAULT_RTK_CONFIG, type CompressionResult, type RtkConfig } from "../.
 import type { CompressionEngine, EngineConfigField, EngineValidationResult } from "../types.ts";
 import { detectCommandType } from "./commandDetector.ts";
 import { deduplicateRepeatedLines } from "./deduplicator.ts";
+import { groupSimilarLines } from "./grouper.ts";
 import { matchRtkFilter } from "./filterLoader.ts";
 import { applyLineFilter } from "./lineFilter.ts";
 import { smartTruncate } from "./smartTruncate.ts";
@@ -278,6 +279,7 @@ export function processRtkText(
   let result = text;
 
   const detection = detectCommandType(text, options.command);
+  let matchedFilterPatterns: string[] = [];
   if (!options.skipFilters) {
     const filter = matchRtkFilter(text, detection.command, {
       customFiltersEnabled: config.customFiltersEnabled,
@@ -287,13 +289,14 @@ export function processRtkText(
       if (config.enabledFilters.length === 0 || config.enabledFilters.includes(filter.id)) {
         const filtered = applyLineFilter(result, {
           ...filter,
-          maxLines: filter.maxLines || config.maxLinesPerResult,
+          maxLines: effectiveMaxLines(filter.maxLines || config.maxLinesPerResult, config.intensity),
         });
         result = filtered.text;
         if (filtered.appliedRules.length > 0) {
           techniquesUsed.push("rtk-filter");
           rulesApplied.push(...filtered.appliedRules);
         }
+        matchedFilterPatterns = filter.priorityPatterns;
       }
     }
   }
@@ -303,7 +306,12 @@ export function processRtkText(
     result = result.replace(
       /```([A-Za-z0-9_+.-]*)\r?\n([\s\S]*?)```/g,
       (match, languageHint: string, code: string) => {
-        const stripped = stripCode(code, normalizeCodeLanguage(languageHint));
+        const stripped = stripCode(code, normalizeCodeLanguage(languageHint), {
+          // Opt-in comment removal (default off = no silent production change). Docstrings/JSDoc
+          // are preserved unless explicitly disabled.
+          removeComments: config.stripCodeComments === true,
+          preserveDocstrings: config.preserveDocstrings !== false,
+        });
         if (stripped.strippedLines <= 0 && stripped.text === code.trim()) return match;
         strippedCodeBlocks++;
         const fenceLanguage = languageHint?.trim() || stripped.language;
@@ -323,12 +331,32 @@ export function processRtkText(
     rulesApplied.push("rtk:dedup");
   }
 
+  // R5: grouping — opt-in via enableGrouping flag (default OFF)
+  if (config.enableGrouping) {
+    const grouped = groupSimilarLines(result, {
+      threshold: config.groupingThreshold,
+    });
+    if (grouped.grouped > 0) {
+      result = grouped.text;
+      techniquesUsed.push("rtk-grouping");
+      rulesApplied.push("rtk:grouping");
+    }
+  }
+
+  const defaultPriorityPatterns: RegExp[] = [/error|failed|exception|traceback|TS\d{4}|FAIL|✖/i];
+  const filterPriorityPatterns: RegExp[] = matchedFilterPatterns.flatMap((pattern) => {
+    try {
+      return [new RegExp(pattern, "i")];
+    } catch {
+      return [];
+    }
+  });
   const truncated = smartTruncate(result, {
-    maxLines: config.maxLinesPerResult,
+    maxLines: effectiveMaxLines(config.maxLinesPerResult, config.intensity),
     maxChars: config.maxCharsPerResult,
     preserveHead: config.intensity === "aggressive" ? 16 : 24,
     preserveTail: config.intensity === "aggressive" ? 16 : 24,
-    priorityPatterns: [/error|failed|exception|traceback|TS\d{4}|FAIL|✖/i],
+    priorityPatterns: [...defaultPriorityPatterns, ...filterPriorityPatterns],
   });
   if (truncated.truncated) {
     result = truncated.text;
@@ -430,6 +458,18 @@ function processRtkContent(
   };
 }
 
+/**
+ * Scale a line budget by intensity so minimal / standard / aggressive produce
+ * meaningfully different output on truncation-based filters (B-RTK-INTENSITY).
+ * Truncation always runs through smartTruncate with priorityPatterns, so error /
+ * failure lines survive at EVERY intensity. (Include/collapse filters like docker-logs
+ * compress by content, not line budget, so they are intensity-independent by nature.)
+ */
+export function effectiveMaxLines(base: number, intensity: string | undefined): number {
+  const factor = intensity === "aggressive" ? 0.5 : intensity === "minimal" ? 1.5 : 1;
+  return Math.max(1, Math.round(base * factor));
+}
+
 export function applyRtkCompression(
   body: Record<string, unknown>,
   options: { config?: Partial<RtkConfig>; stepConfig?: Record<string, unknown> } = {}
@@ -440,8 +480,7 @@ export function applyRtkCompression(
       ? { enabled: true, ...options.stepConfig }
       : options.stepConfig;
   const explicitConfig = options.config && Object.keys(options.config).length > 0;
-  const baseConfig =
-    !explicitConfig && !stepConfig ? { enabled: true } : (options.config ?? {});
+  const baseConfig = !explicitConfig && !stepConfig ? { enabled: true } : (options.config ?? {});
   const config = mergeRtkConfig(baseConfig, stepConfig);
   if (!config.enabled) return { body, compressed: false, stats: null };
 
@@ -582,4 +621,12 @@ export {
   detectCommandType,
 } from "./commandDetector.ts";
 export { runRtkFilterTests } from "./verify.ts";
-export { maybePersistRtkRawOutput, readRtkRawOutput, redactRtkRawOutput } from "./rawOutput.ts";
+export {
+  maybePersistRtkRawOutput,
+  readRtkRawOutput,
+  redactRtkRawOutput,
+  listRtkCommandSamples,
+} from "./rawOutput.ts";
+// RTK learn/discover: the sample-source adapter (rawOutput) feeds these pure miners.
+export { discoverRepeatedNoise, type NoiseCandidate, type CommandSample } from "./discover.ts";
+export { suggestFilter, commandToId, type SuggestedFilter } from "./learn.ts";

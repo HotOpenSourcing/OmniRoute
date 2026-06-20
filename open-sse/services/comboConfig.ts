@@ -28,6 +28,10 @@ const DEFAULT_COMBO_CONFIG = {
   trackMetrics: true,
   reasoningTokenBufferEnabled: true,
   manifestRouting: false,
+  // Complexity-aware auto routing (2026): when on, the auto router scores
+  // candidates by how well their tier matches the request's classified
+  // difficulty (feeds tierAffinity/specificityMatch). Opt-in — off by default.
+  complexityAwareRouting: false,
   resetAwareSessionWeight: 0.35,
   resetAwareWeeklyWeight: 0.65,
   resetAwareTieBandPercent: 5,
@@ -175,4 +179,16 @@ export function resolveComboConfig(
  */
 export function getDefaultComboConfig() {
   return { ...DEFAULT_COMBO_CONFIG };
+}
+
+/**
+ * Resolve the effective combo config the same way handleComboChat does: cascade via
+ * resolveComboConfig when settings exist, else the defaults merged with the combo's own
+ * config. Encapsulated here so the ternary lives in one place (DRY) and its inferred union
+ * return type is the single source of truth for ComboContext.config (combo/context.ts).
+ */
+export function resolveComboSetupConfig(combo: ComboConfigLike, settings: ComboSettingsLike) {
+  return settings
+    ? resolveComboConfig(combo, settings)
+    : { ...getDefaultComboConfig(), ...((combo?.config as Record<string, unknown>) || {}) };
 }

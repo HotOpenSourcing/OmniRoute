@@ -2,15 +2,21 @@ import "./setupPolyfill.ts";
 import { Agent, ProxyAgent, type Dispatcher } from "undici";
 import { socksDispatcher } from "fetch-socks";
 import { getUpstreamTimeoutConfig } from "@/shared/utils/runtimeTimeouts";
+import { stripIpv6Brackets, detectIpLiteralFamily, parseProxyFamily } from "./proxyFamily.ts";
+import { createSocksDispatcherWithFamily } from "./socksConnectorWithFamily.ts";
 
 const DISPATCHER_CACHE_KEY = Symbol.for("omniroute.proxyDispatcher.cache");
 const DEFAULT_DISPATCHER_KEY = Symbol.for("omniroute.proxyDispatcher.default");
+const RETRY_DISPATCHER_KEY = Symbol.for("omniroute.proxyDispatcher.retry");
 const SUPPORTED_PROTOCOLS = new Set(["http:", "https:", "socks5:"]);
+const DEFAULT_PROXY_DISPATCHER_CONNECTIONS = 32;
+const MAX_PROXY_DISPATCHER_CONNECTIONS = 256;
 
 type DispatcherCache = Map<string, Dispatcher>;
 type GlobalWithDispatcherCache = typeof globalThis & {
   [DISPATCHER_CACHE_KEY]?: DispatcherCache;
   [DEFAULT_DISPATCHER_KEY]?: Dispatcher;
+  [RETRY_DISPATCHER_KEY]?: Dispatcher;
 };
 type SocksDispatcherOptions = {
   type: number;
@@ -25,6 +31,7 @@ type ProxyConfigObject = {
   port?: string | number | null;
   username?: string;
   password?: string;
+  family?: string;
 };
 
 function getDispatcherCache(): DispatcherCache {
@@ -45,6 +52,7 @@ export function clearDispatcherCache() {
 
   const globalWithCache = globalThis as GlobalWithDispatcherCache;
   delete globalWithCache[DEFAULT_DISPATCHER_KEY];
+  delete globalWithCache[RETRY_DISPATCHER_KEY];
 }
 
 function getDispatcherOptions() {
@@ -57,17 +65,43 @@ function getDispatcherOptions() {
     bodyTimeout: timeouts.fetchBodyTimeoutMs,
     connectTimeout: timeouts.fetchConnectTimeoutMs,
     keepAliveTimeout: timeouts.fetchKeepAliveTimeoutMs,
+    // Without this, an upstream Keep-Alive: timeout=N header clamps
+    // keepAliveTimeout UP to undici's default keepAliveMaxTimeout (600 s),
+    // completely overriding the configured 1 s and restoring zombie-socket risk.
+    keepAliveMaxTimeout: timeouts.fetchKeepAliveTimeoutMs,
   };
 }
 
-function getProxyDispatcherOptions() {
+export function getProxyDispatcherConnectionLimit(
+  env: Record<string, string | undefined> = process.env
+): number {
+  const raw = env.OMNIROUTE_PROXY_DISPATCHER_CONNECTIONS;
+  if (raw == null || raw.trim() === "") return DEFAULT_PROXY_DISPATCHER_CONNECTIONS;
+
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    console.warn(
+      `[ProxyDispatcher] Invalid OMNIROUTE_PROXY_DISPATCHER_CONNECTIONS="${raw}". Using default ${DEFAULT_PROXY_DISPATCHER_CONNECTIONS}.`
+    );
+    return DEFAULT_PROXY_DISPATCHER_CONNECTIONS;
+  }
+
+  return Math.min(Math.floor(parsed), MAX_PROXY_DISPATCHER_CONNECTIONS);
+}
+
+function getProxyDispatcherOptions(env: Record<string, string | undefined> = process.env) {
   const options = getDispatcherOptions();
   // Disable keep-alive and pipelining for proxy connections.
   // Cheap proxy servers aggressively drop idle sockets without sending TCP RST,
   // causing "socket hang up" or "Client network socket disconnected" errors
   // on subsequent requests that try to reuse the pooled connection.
+  //
+  // Keep multiple connections available anyway: with pipelining disabled, long
+  // SSE streams such as Codex /v1/responses otherwise bottleneck through the
+  // cached proxy dispatcher under concurrency (#4163).
   return {
     ...options,
+    connections: getProxyDispatcherConnectionLimit(env),
     keepAliveTimeout: 1,
     keepAliveMaxTimeout: 1,
     pipelining: 0,
@@ -80,6 +114,32 @@ export function getDefaultDispatcher(): Dispatcher {
     globalWithCache[DEFAULT_DISPATCHER_KEY] = new Agent(getDispatcherOptions());
   }
   return globalWithCache[DEFAULT_DISPATCHER_KEY];
+}
+
+/**
+ * Dispatcher for RETRYING a direct request that just failed with a transient
+ * socket error (UND_ERR_SOCKET / "other side closed" / ECONNRESET).
+ *
+ * The default direct dispatcher pools keep-alive sockets for up to
+ * `fetchKeepAliveTimeoutMs` (4 s). Edges such as nvidia / opencode-zen silently
+ * close idle keep-alive sockets within that window, so the next request that
+ * reuses the pooled socket fails — and these failures arrive in bursts (#4252).
+ * Retrying on the SAME pooled dispatcher can grab ANOTHER stale socket, so the
+ * retry uses this no-keep-alive / no-pipelining dispatcher (mirroring the proxy
+ * dispatcher mitigation) to force a fresh socket. Healthy keep-alive reuse on
+ * the first attempt is preserved — only the retry pays the fresh-socket cost.
+ */
+export function getRetryDispatcher(): Dispatcher {
+  const globalWithCache = globalThis as GlobalWithDispatcherCache;
+  if (!globalWithCache[RETRY_DISPATCHER_KEY]) {
+    globalWithCache[RETRY_DISPATCHER_KEY] = new Agent({
+      ...getDispatcherOptions(),
+      keepAliveTimeout: 1,
+      keepAliveMaxTimeout: 1,
+      pipelining: 0,
+    });
+  }
+  return globalWithCache[RETRY_DISPATCHER_KEY];
 }
 
 /**
@@ -161,14 +221,24 @@ export function normalizeProxyUrl(
   source = "proxy",
   { allowSocks5 = isSocks5ProxyEnabled() } = {}
 ): string {
+  // Strip a trailing synthetic `?family=ipv4|ipv6` marker BEFORE anything else.
+  // `extractExplicitPort` slices the authority off the raw string, so a marker
+  // turns the port substring into e.g. `80?family=ipv6`, which fails the digit
+  // test and silently falls back to the default port (8080 for http) — rewriting
+  // an http:80 proxy to :8080. We work on the marker-free string for both port
+  // extraction and URL parsing, then re-append the marker exactly once below.
+  const familyMatch = proxyUrl.match(/\?family=(ipv4|ipv6)$/);
+  const familySuffix = familyMatch ? familyMatch[0] : "";
+  const baseUrl = familySuffix ? proxyUrl.slice(0, -familySuffix.length) : proxyUrl;
+
   // Extract the explicit port from the raw URL string BEFORE parsing,
   // because `new URL()` silently strips default ports (80 for http,
   // 443 for https), which are valid and common for proxy servers.
-  const explicitPort = extractExplicitPort(proxyUrl);
+  const explicitPort = extractExplicitPort(baseUrl);
 
   let parsed;
   try {
-    parsed = new URL(proxyUrl);
+    parsed = new URL(baseUrl);
   } catch {
     throw new Error(`[ProxyDispatcher] Invalid ${source} URL`);
   }
@@ -192,7 +262,15 @@ export function normalizeProxyUrl(
 
   // Build the URL string manually instead of using parsed.toString(),
   // which would strip default ports (80/443) and break the proxy connection.
-  return buildProxyUrlString(parsed, port);
+  // Preserve a synthetic `?family=` directive (the only query param we emit)
+  // so the connect-family pin survives normalization and reaches the dispatcher.
+  // The directive may arrive either as the stripped trailing marker (familySuffix)
+  // or as an inline query on `baseUrl`; resolve both, append the marker once.
+  const fam = parseProxyFamily(
+    (familyMatch ? familyMatch[1] : parsed.searchParams.get("family")) ?? undefined
+  );
+  const base = buildProxyUrlString(parsed, port);
+  return fam === "auto" ? base : `${base}?family=${fam}`;
 }
 
 export function buildVercelRelayHeaders(
@@ -253,7 +331,35 @@ export function proxyConfigToUrl(
 
   const proxyUrlStr = `${type}://${auth}${config.host}:${port}`;
 
-  return normalizeProxyUrl(proxyUrlStr, "context proxy", { allowSocks5 });
+  const fam = parseProxyFamily(config.family);
+  const normalized = normalizeProxyUrl(proxyUrlStr, "context proxy", { allowSocks5 });
+  return fam === "auto" ? normalized : `${normalized}?family=${fam}`;
+}
+
+/** Resolve the concrete connect family for a proxy URL, fail-closed on contradictions. */
+function resolveDispatcherFamily(parsed: URL): 4 | 6 | null {
+  const directive = parseProxyFamily(parsed.searchParams.get("family") ?? undefined);
+  const literal = detectIpLiteralFamily(parsed.hostname);
+  if (directive === "auto") return literal;
+  const want = directive === "ipv6" ? 6 : 4;
+  if (literal !== null && literal !== want) {
+    throw new Error(
+      `[ProxyDispatcher] Proxy family directive ${directive} contradicts ${literal === 6 ? "IPv6" : "IPv4"} literal host`
+    );
+  }
+  return want;
+}
+
+/** Test-only accessor for the resolved family. */
+export function __resolveDispatcherFamilyForTest(proxyUrl: string): 4 | 6 | null {
+  return resolveDispatcherFamily(new URL(proxyUrl));
+}
+
+/** Test-only accessor for proxy dispatcher pool options. */
+export function __getProxyDispatcherOptionsForTest(
+  env: Record<string, string | undefined> = process.env
+) {
+  return getProxyDispatcherOptions(env);
 }
 
 export function createProxyDispatcher(proxyUrl: string): Dispatcher {
@@ -265,28 +371,64 @@ export function createProxyDispatcher(proxyUrl: string): Dispatcher {
   if (dispatcher) return dispatcher;
 
   const parsed = new URL(normalizedUrl);
-  const explicitPort = extractExplicitPort(normalizedUrl);
+  const family = resolveDispatcherFamily(parsed);
+  parsed.searchParams.delete("family");
+  const cleanUri = normalizedUrl.replace(/\?family=(ipv4|ipv6)$/, "");
+  const explicitPort = extractExplicitPort(cleanUri);
   const port = explicitPort || normalizePort(parsed.port, parsed.protocol);
 
   if (parsed.protocol === "socks5:") {
     const socksOptions: SocksDispatcherOptions = {
       type: 5,
-      host: parsed.hostname,
+      host: stripIpv6Brackets(parsed.hostname),
       port: Number(port),
     };
     if (parsed.username) socksOptions.userId = decodeURIComponent(parsed.username);
     if (parsed.password) socksOptions.password = decodeURIComponent(parsed.password);
-    dispatcher = socksDispatcher(
-      socksOptions as Parameters<typeof socksDispatcher>[0],
-      proxyDispatcherOptions
-    ) as Dispatcher;
+    dispatcher =
+      family === null
+        ? (socksDispatcher(
+            socksOptions as Parameters<typeof socksDispatcher>[0],
+            proxyDispatcherOptions
+          ) as Dispatcher)
+        : createSocksDispatcherWithFamily(
+            socksOptions as unknown as Parameters<typeof createSocksDispatcherWithFamily>[0],
+            family,
+            proxyDispatcherOptions
+          );
   } else {
+    // ProxyAgent omits `connect`; the client->proxy socket is built from `proxyTls`.
+    // undici 8.4.1 types `proxyTls?: buildConnector.BuildOptions`, a union whose
+    // `TcpNetConnectOpts` member nominally requires `port` — so TS rejects a bare
+    // `{ family, autoSelectFamily }` pin. At runtime undici merges these options into
+    // net.connect (the uri already carries the host:port), so the partial pin is
+    // valid; the cast suppresses the spurious missing-`port` error.
     dispatcher = new ProxyAgent({
-      uri: normalizedUrl,
+      uri: cleanUri,
       ...proxyDispatcherOptions,
+      ...(family !== null
+        ? { proxyTls: { family, autoSelectFamily: false } as ProxyAgent.Options["proxyTls"] }
+        : {}),
     });
   }
 
   dispatcherCache.set(normalizedUrl, dispatcher);
   return dispatcher;
+}
+
+/** Test-only: returns the SOCKS dispatcher options that would be built for a URL. */
+export function __getSocksOptionsForTest(proxyUrl: string): SocksDispatcherOptions {
+  const normalizedUrl = normalizeProxyUrl(proxyUrl, "proxy dispatcher");
+  const parsed = new URL(normalizedUrl);
+  parsed.searchParams.delete("family");
+  const explicitPort = extractExplicitPort(normalizedUrl);
+  const port = explicitPort || normalizePort(parsed.port, parsed.protocol);
+  const socksOptions: SocksDispatcherOptions = {
+    type: 5,
+    host: stripIpv6Brackets(parsed.hostname),
+    port: Number(port),
+  };
+  if (parsed.username) socksOptions.userId = decodeURIComponent(parsed.username);
+  if (parsed.password) socksOptions.password = decodeURIComponent(parsed.password);
+  return socksOptions;
 }

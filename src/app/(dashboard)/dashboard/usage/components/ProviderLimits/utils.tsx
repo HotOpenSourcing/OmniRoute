@@ -18,6 +18,8 @@ const QUOTA_LABEL_MAP: Record<string, string> = {
   session: "Session",
   weekly: "Weekly",
   code_review: "Code Review",
+  gpt_5_3_codex_spark_session: "GPT-5.3-Codex-Spark",
+  gpt_5_3_codex_spark_weekly: "GPT-5.3-Codex-Spark Weekly",
   agentic_request: "Agentic",
   agentic_request_freetrial: "Agentic (Trial)",
   credits: "AI Credits",
@@ -253,6 +255,8 @@ export function parseQuotaData(provider, data) {
               normalizeQuotaEntry(name, quota, {
                 displayName: quota?.displayName,
                 details: Array.isArray(quota?.details) ? quota.details : undefined,
+                isPercentageOnly:
+                  Number(quota?.total || 0) === 100 && quota?.remainingPercentage !== undefined,
               })
             );
           });
@@ -290,6 +294,7 @@ export function parseQuotaData(provider, data) {
             normalizedQuotas.push(
               normalizeQuotaEntry(modelKey, quota, {
                 modelKey: modelKey,
+                isPercentageOnly: quota?.fractionReported === true,
                 ...(quota?.quotaSource ? { quotaSource: quota.quotaSource } : {}),
                 ...(quota?.fractionReported !== undefined
                   ? { fractionReported: quota.fractionReported }
@@ -303,7 +308,12 @@ export function parseQuotaData(provider, data) {
       case "codex":
         if (data.quotas) {
           Object.entries(data.quotas).forEach(([quotaType, quota]: [string, any]) => {
-            normalizedQuotas.push(normalizeQuotaEntry(quotaType, quota));
+            normalizedQuotas.push(
+              normalizeQuotaEntry(quotaType, quota, {
+                displayName: quota?.displayName,
+                isPercentageOnly: true,
+              })
+            );
           });
         }
         break;
@@ -329,7 +339,11 @@ export function parseQuotaData(provider, data) {
           });
         } else if (data.quotas) {
           Object.entries(data.quotas).forEach(([name, quota]: [string, any]) => {
-            normalizedQuotas.push(normalizeQuotaEntry(name, quota));
+            normalizedQuotas.push(
+              normalizeQuotaEntry(name, quota, {
+                isPercentageOnly: true,
+              })
+            );
           });
         }
         break;
@@ -575,9 +589,7 @@ const QUOTA_BAR_GREEN_THRESHOLD = 50;
 const QUOTA_BAR_YELLOW_THRESHOLD = 20;
 
 function quotaRemainingPercent(q: any): number {
-  if (q?.unlimited) return 100;
-  if (q?.remainingPercentage !== undefined) return Number(q.remainingPercentage);
-  return calculatePercentage(q?.used, q?.total);
+  return getQuotaRemainingPercentage(q);
 }
 
 function quotaStatus(q: any): "critical" | "alert" | "ok" {
@@ -613,6 +625,21 @@ export function topQuotas(quotas: any[], n = 3): any[] {
       return quotaRemainingPercent(a) - quotaRemainingPercent(b);
     })
     .slice(0, n);
+}
+
+export function getQuotaRemainingPercentage(q: any): number {
+  if (q?.unlimited) return 100;
+  if (q?.remainingPercentage !== undefined) return Number(q.remainingPercentage);
+  return calculatePercentage(q?.used, q?.total);
+}
+
+export function isPercentageOnlyQuota(q: any): boolean {
+  return q?.isPercentageOnly === true || q?.fractionReported === true;
+}
+
+export function shouldShowQuotaUsageCount(q: any): boolean {
+  const total = Number(q?.total || 0);
+  return total > 0 && q?.unlimited !== true && !isPercentageOnlyQuota(q);
 }
 
 export function getBarColor(remainingPercentage: number): {

@@ -1,4 +1,9 @@
 import { getCodexRequestDefaults } from "@/lib/providers/requestDefaults";
+import {
+  getCodexModelScope,
+  getCodexRateLimitKey,
+  type CodexQuotaScope,
+} from "../config/codexQuotaScopes.ts";
 import { isFeatureFlagEnabled } from "@/shared/utils/featureFlags";
 import {
   BaseExecutor,
@@ -26,8 +31,10 @@ import {
 } from "../config/codexIdentity.ts";
 import { getAccessToken } from "../services/tokenRefresh.ts";
 import { sanitizeResponsesInputItems } from "../services/responsesInputSanitizer.ts";
+import { normalizeCodexVerbosity } from "../services/codexVerbosity.ts";
 import { getThinkingBudgetConfig, ThinkingMode } from "../services/thinkingBudget.ts";
 import { CORS_HEADERS } from "../utils/cors.ts";
+import * as prl from "../utils/providerRequestLogging.ts";
 import { createRequire } from "module";
 
 // ─── wreq-js lazy loader ───────────────────────────────────────────────────
@@ -98,41 +105,7 @@ function codexWebSocketUnavailableResponse(): Response {
 // Codex has two independent quota pools: "codex" (standard) and "spark" (premium).
 // Exhausting one should NOT block requests to the other.
 // Ref: sub2api PR #1129 (feat(openai): split codex spark rate limiting from codex)
-
-/**
- * Maps model name substrings to their rate-limit scope.
- * Checked in order — first match wins.
- */
-const CODEX_SCOPE_PATTERNS: Array<{ pattern: string; scope: "codex" | "spark" }> = [
-  { pattern: "codex-spark", scope: "spark" },
-  { pattern: "spark", scope: "spark" },
-  { pattern: "codex", scope: "codex" },
-  { pattern: "gpt-5", scope: "codex" }, // gpt-5.2-codex, gpt-5.3-codex, etc.
-];
-
-/**
- * T09: Determine the rate-limit scope for a Codex model.
- * Use this key as the suffix for per-scope rate limit state:
- *   `${accountId}:${getModelScope(model)}`
- *
- * @param model - The Codex model ID (e.g. "gpt-5.3-codex", "codex-spark-mini")
- * @returns "codex" | "spark"
- */
-export function getCodexModelScope(model: string): "codex" | "spark" {
-  const lower = model.toLowerCase();
-  for (const { pattern, scope } of CODEX_SCOPE_PATTERNS) {
-    if (lower.includes(pattern)) return scope;
-  }
-  return "codex"; // default scope
-}
-
-/**
- * T09: Get the scope-keyed rate limit identifier for an account+model combination.
- * Use this as the key for rateLimitState maps to ensure scope isolation.
- */
-export function getCodexRateLimitKey(accountId: string, model: string): string {
-  return `${accountId}:${getCodexModelScope(model)}`;
-}
+export { getCodexModelScope, getCodexRateLimitKey, type CodexQuotaScope };
 
 /**
  * T03: Parsed quota snapshot from Codex response headers.
@@ -1000,6 +973,7 @@ export class CodexExecutor extends BaseExecutor {
             finishStream({ reason: "upstream_closed", closeSocket: false });
           };
           if (!closed) {
+            await prl.captureCurrentProviderBody(url, headers, bodyString, nextInput.log);
             ws.send(bodyString);
           }
         } catch (error) {
@@ -1403,6 +1377,11 @@ export class CodexExecutor extends BaseExecutor {
       return body;
     }
 
+    // GPT-5 verbosity: fold Chat-style `verbosity` / Responses `text.verbosity` into a
+    // single validated `text:{verbosity}` so the allowlist below (which now permits
+    // `text`) lets it reach upstream instead of dropping it silently.
+    normalizeCodexVerbosity(body);
+
     // Issue #2608: Use an allowlist of known Responses API fields instead of a
     // denylist of Chat Completions fields. The denylist approach missed fields
     // like `stop`, `response_format`, `logit_bias`, `function_call`, `functions`,
@@ -1423,6 +1402,8 @@ export class CodexExecutor extends BaseExecutor {
       "previous_response_id",
       "prompt_cache_key",
       "client_metadata",
+      // GPT-5 output verbosity ({ verbosity } — normalized above by normalizeCodexVerbosity).
+      "text",
       // Internal markers used by OmniRoute pipeline
       "_omnirouteResponsesStore",
     ]);
