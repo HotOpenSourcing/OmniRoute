@@ -17,7 +17,6 @@
 
 services:
   omniroute:
-    container_name: omniroute-coolify
     image: ghcr.io/hotopensourcing/omniroute:latest
     restart: unless-stopped
     stop_grace_period: 40s
@@ -115,7 +114,6 @@ services:
       start_period: 15s
 
   redis:
-    container_name: redis-omniroute
     image: redis:8.6.2-alpine
     restart: unless-stopped
     stop_grace_period: 10s
