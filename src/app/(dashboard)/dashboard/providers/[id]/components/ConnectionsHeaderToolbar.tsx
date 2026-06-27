@@ -45,6 +45,7 @@ type ConnectionsHeaderToolbarProps = {
   onOpenImportCodex: () => void;
   onOpenImportClaude: () => void;
   onOpenImportGemini: () => void;
+  onImportAccounts: () => void;
   t: ProviderMessageTranslator;
 };
 
@@ -272,6 +273,14 @@ export default function ConnectionsHeaderToolbar({
               <>
                 <Button size="sm" icon="add" onClick={() => gateConnectionFlow(openPrimaryAddFlow)}>
                   {providerSupportsPat ? "Add PAT" : t("add")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon="upload_file"
+                  onClick={() => gateConnectionFlow(onImportAccounts)}
+                >
+                  {t("importAccounts")}
                 </Button>
                 {providerId === "qoder" && (
                   <Button

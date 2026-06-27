@@ -419,6 +419,157 @@ export default function ProviderDetailPageClient() {
     providerNode,
   });
 
+  // ── Export / Import handlers ───────────────────────────────────────────
+  const handleExportCsv = useCallback(async (ids: string[]) => {
+    try {
+      const res = await fetch(`/api/providers/${providerId}/export?ids=${ids.join(",")}`);
+      if (!res.ok) throw new Error("Export failed");
+      const data = await res.json();
+      const connections = data.connections || [];
+
+      // Build CSV
+      const headers = [
+        "name", "email", "apiKey", "authType", "isActive",
+        "priority", "globalPriority", "defaultModel", "testStatus",
+        "rateLimitedUntil", "maxConcurrent", "proxyEnabled",
+        "providerSpecificData", "tags",
+      ];
+      const escapeCsv = (v: unknown) => {
+        const s = v == null ? "" : String(v);
+        return s.includes(",") || s.includes('"') || s.includes("\n")
+          ? `"${s.replace(/"/g, '""')}"`
+          : s;
+      };
+      const rows = connections.map((c: any) =>
+        headers.map((h) => escapeCsv(c[h] ?? "")).join(",")
+      );
+      const csv = [headers.join(","), ...rows].join("\n");
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${providerId}-connections-${Date.now()}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      notify.success(`Exported ${connections.length} connection(s) as CSV`);
+    } catch (error) {
+      console.error("CSV export error:", error);
+      notify.error("Failed to export CSV");
+    }
+  }, [providerId, notify]);
+
+  const handleExportJson = useCallback(async (ids: string[]) => {
+    try {
+      const res = await fetch(`/api/providers/${providerId}/export?ids=${ids.join(",")}`);
+      if (!res.ok) throw new Error("Export failed");
+      const data = await res.json();
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${providerId}-connections-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      notify.success(`Exported ${data.count} connection(s) as JSON`);
+    } catch (error) {
+      console.error("JSON export error:", error);
+      notify.error("Failed to export JSON");
+    }
+  }, [providerId, notify]);
+
+  const handleImportAccounts = useCallback(() => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".csv,.json";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        let connectionsToImport: any[] = [];
+
+        if (file.name.endsWith(".json")) {
+          const parsed = JSON.parse(text);
+          connectionsToImport = parsed.connections || (Array.isArray(parsed) ? parsed : [parsed]);
+        } else if (file.name.endsWith(".csv")) {
+          // Basic CSV parser
+          const lines = text.split("\n").filter((l) => l.trim());
+          if (lines.length < 2) throw new Error("CSV file has no data rows");
+          const headers = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
+          for (let i = 1; i < lines.length; i++) {
+            const values = lines[i].split(",").map((v) => v.trim().replace(/^"|"$/g, ""));
+            const entry: Record<string, string> = {};
+            headers.forEach((h, idx) => {
+              entry[h] = values[idx] ?? "";
+            });
+            connectionsToImport.push(entry);
+          }
+        } else {
+          notify.error("Unsupported file format. Use .csv or .json");
+          return;
+        }
+
+        if (connectionsToImport.length === 0) {
+          notify.error("No connections found in file");
+          return;
+        }
+
+        // Create each connection via the existing POST endpoint
+        let imported = 0;
+        let errors = 0;
+        for (const conn of connectionsToImport) {
+          try {
+            const body: Record<string, unknown> = {
+              provider: providerId,
+              name: conn.name || conn.email || `Imported ${Date.now()}`,
+              apiKey: conn.apiKey || conn.accessToken || "",
+              authType: conn.authType || "apikey",
+              isActive: conn.isActive !== false,
+              priority: conn.priority || 1,
+              providerSpecificData: conn.providerSpecificData
+                ? (typeof conn.providerSpecificData === "string"
+                    ? JSON.parse(conn.providerSpecificData)
+                    : conn.providerSpecificData)
+                : {},
+            };
+            if (conn.email) body.email = conn.email;
+            if (conn.defaultModel) body.defaultModel = conn.defaultModel;
+            if (conn.maxConcurrent != null) body.maxConcurrent = conn.maxConcurrent;
+
+            const createRes = await fetch("/api/providers", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            });
+
+            if (createRes.ok) {
+              imported++;
+            } else {
+              const errData = await createRes.json().catch(() => ({}));
+              console.error("Import error for", conn.name, errData);
+              errors++;
+            }
+          } catch {
+            errors++;
+          }
+        }
+
+        notify.success(`Imported ${imported} connection(s)` + (errors ? ` (${errors} failed)` : ""));
+        if (imported > 0) {
+          // Refresh the connections list
+          setTimeout(() => fetchConnections(), 500);
+        }
+      } catch (error) {
+        console.error("Import error:", error);
+        notify.error("Failed to import accounts");
+      }
+    };
+    input.click();
+  }, [providerId, fetchConnections, notify]);
+
   // renderModelsSection → components/ProviderModelsSection.tsx (Phase 1m)
 
   if (loading) {
@@ -522,6 +673,7 @@ export default function ProviderDetailPageClient() {
             onOpenImportCodex={() => setImportCodexModalOpen(true)}
             onOpenImportClaude={() => setImportClaudeModalOpen(true)}
             onOpenImportGemini={() => setImportGeminiModalOpen(true)}
+            onImportAccounts={handleImportAccounts}
             t={t}
           />
 
@@ -605,6 +757,8 @@ export default function ProviderDetailPageClient() {
               onExportClaudeAuthFile={handleExportClaudeAuthFile}
               onOpenApplyGeminiModal={setApplyGeminiModalConnectionId}
               onExportGeminiAuthFile={handleExportGeminiAuthFile}
+              onExportCsv={handleExportCsv}
+              onExportJson={handleExportJson}
               gateConnectionFlow={gateConnectionFlow}
               t={t}
             />

@@ -99,8 +99,8 @@ export const GEMINI_CONFIG = {
 // Qwen OAuth Configuration (Device Code Flow with PKCE)
 export const QWEN_CONFIG = {
   clientId: resolvePublicCred("qwen_id", "QWEN_OAUTH_CLIENT_ID"),
-  deviceCodeUrl: "https://chat.qwen.ai/api/v1/oauth2/device/code",
-  tokenUrl: "https://chat.qwen.ai/api/v1/oauth2/token",
+  deviceCodeUrl: "https://qwen.ai/api/v1/oauth2/device/code",
+  tokenUrl: "https://qwen.ai/api/v1/oauth2/token",
   scope: "openid profile email model.completion",
   codeChallengeMethod: "S256",
 };
@@ -118,24 +118,6 @@ const QODER_OAUTH_ENABLED =
   !!QODER_OAUTH_CLIENT_ID &&
   !!QODER_OAUTH_CLIENT_SECRET;
 
-const WINDSURF_OAUTH_AUTHORIZE_URL =
-  process.env.WINDSURF_OAUTH_AUTHORIZE_URL || "https://windsurf.com/editor/signin";
-const WINDSURF_OAUTH_TOKEN_URL = process.env.WINDSURF_OAUTH_TOKEN_URL || "";
-const WINDSURF_OAUTH_CLIENT_ID = process.env.WINDSURF_OAUTH_CLIENT_ID || "";
-const WINDSURF_OAUTH_CLIENT_SECRET = process.env.WINDSURF_OAUTH_CLIENT_SECRET || "";
-const WINDSURF_OAUTH_REDIRECT_URI = process.env.WINDSURF_OAUTH_REDIRECT_URI || "";
-const WINDSURF_OAUTH_SCOPES = process.env.WINDSURF_OAUTH_SCOPES || "openid profile email";
-const WINDSURF_AUTH_TOKEN_URL =
-  process.env.WINDSURF_AUTH_TOKEN_URL || "https://windsurf.com/editor/show-auth-token?workflow=";
-const WINDSURF_REGISTER_TOKEN_URL =
-  process.env.WINDSURF_REGISTER_TOKEN_URL || "https://api.codeium.com/register_user/";
-const WINDSURF_REGISTER_API_SERVER_URL =
-  process.env.WINDSURF_REGISTER_API_SERVER_URL || "https://register.windsurf.com";
-const WINDSURF_DEFAULT_API_SERVER_URL =
-  process.env.WINDSURF_DEFAULT_API_SERVER_URL || "https://server.codeium.com";
-const WINDSURF_OAUTH_ENABLED =
-  !!WINDSURF_OAUTH_TOKEN_URL && !!WINDSURF_OAUTH_CLIENT_ID && !!WINDSURF_OAUTH_REDIRECT_URI;
-
 export const QODER_CONFIG = {
   enabled: QODER_OAUTH_ENABLED,
   clientId: QODER_OAUTH_CLIENT_ID,
@@ -149,7 +131,18 @@ export const QODER_CONFIG = {
   },
 };
 
-
+// CodeBuddy CN (Tencent — copilot.tencent.com) OAuth Configuration
+// (Custom Device-Auth Flow: POST stateUrl → open authUrl → GET pollUrl?state=).
+// No client_id/secret — the upstream CLI ships none.
+export const CODEBUDDY_CN_CONFIG = {
+  baseUrl: "https://copilot.tencent.com",
+  stateUrl: "https://copilot.tencent.com/v2/plugin/auth/state",
+  tokenUrl: "https://copilot.tencent.com/v2/plugin/auth/token",
+  refreshUrl: "https://copilot.tencent.com/v2/plugin/auth/token/refresh",
+  userAgent: "CLI/2.63.2 CodeBuddy/2.63.2",
+  platform: "CLI",
+  pollInterval: 5000,
+};
 
 // Kimi Coding OAuth Configuration (Device Code Flow)
 export const KIMI_CODING_CONFIG = {
@@ -282,6 +275,22 @@ export const GITLAB_DUO_CONFIG = {
   codeChallengeMethod: "S256",
 };
 
+// AWS region allowlist — prevents SSRF via region injection into upstream URLs
+// (GHSA-6mwv-4mrm-5p3m). Region values flow user-supplied through the kiro OAuth
+// import surfaces (request body, providerSpecificData) and are interpolated into
+// URLs like `https://oidc.${region}.amazonaws.com/...`. Without this guard, a
+// region like "127.0.0.1" or "evil.com" would redirect the proxy's outbound
+// fetch to an attacker-controlled host. Canonical AWS region shape only:
+// two letters, dash, one-or-more letters, dash, one-or-two digits.
+export const AWS_REGION_PATTERN = /^[a-z]{2}-[a-z]+-\d{1,2}$/;
+
+export function assertValidAwsRegion(region: string): string {
+  if (typeof region !== "string" || !AWS_REGION_PATTERN.test(region)) {
+    throw new Error("Invalid region");
+  }
+  return region;
+}
+
 // Kiro OAuth Configuration
 // Supports multiple auth methods:
 // 1. AWS Builder ID (Device Code Flow)
@@ -403,6 +412,7 @@ export const TRAE_CONFIG = {
 //                          with an IDE-supplied ?state= param (see field below)
 //   - firebaseApiKey     → reserved for Phase 2
 //   - ideName            → sent in extension headers
+<<<<<<< HEAD
 // Z.AI Coding Plan OAuth Configuration
 //
 // Extracted from ZCode app.asar.
@@ -434,6 +444,8 @@ export const ZAI_CODING_PLAN_CONFIG = {
   scopes: [],
 };
 
+=======
+>>>>>>> 7f312256720055d6671f1aac902da13068226595
 export const WINDSURF_CONFIG = {
   // RETIRED 2026-05-29 — endpoint returns 404 post-rebrand. Phase 2 will replace.
   authorizeUrl: "https://app.devin.ai/editor/signin",
@@ -477,9 +489,7 @@ export const PROVIDERS = {
   GEMINI: "gemini-cli",
   QWEN: "qwen",
   QODER: "qoder",
-  WINDSURF: "windsurf",
   ANTIGRAVITY: "antigravity",
-  ZAI_CODING_PLAN: "zai-coding-plan",
   AGY: "agy",
   KIMI_CODING: "kimi-coding",
   OPENAI: "openai",
@@ -490,6 +500,8 @@ export const PROVIDERS = {
   CURSOR: "cursor",
   KILOCODE: "kilocode",
   CLINE: "cline",
+  WINDSURF: "windsurf",
   DEVIN_CLI: "devin-cli",
   TRAE: "trae",
+  CODEBUDDY_CN: "codebuddy-cn",
 };

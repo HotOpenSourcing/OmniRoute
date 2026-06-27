@@ -240,10 +240,18 @@ export function resolveOmniRoutePluginOptions(
   opts?: OmniRoutePluginOptions
 ): Required<Pick<OmniRoutePluginOptions, "providerId" | "displayName" | "modelCacheTtl">> &
   Pick<OmniRoutePluginOptions, "baseURL" | "features"> {
-  const providerId = opts?.providerId ?? OMNIROUTE_PROVIDER_KEY;
+  const rawProviderId = opts?.providerId ?? OMNIROUTE_PROVIDER_KEY;
+  // OC 1.17.8+ native-adapter gate rejects providerID not in
+  // {openai, anthropic, opencode*}. Silently prefix so existing
+  // configs (providerId: "omniroute") keep working.
+  const providerId = rawProviderId.startsWith("opencode-")
+    ? rawProviderId
+    : `opencode-${rawProviderId}`;
   const displayName =
     opts?.displayName ??
-    (providerId === OMNIROUTE_PROVIDER_KEY ? "OmniRoute" : `OmniRoute (${providerId})`);
+    (providerId === `opencode-${OMNIROUTE_PROVIDER_KEY}`
+      ? "OmniRoute"
+      : `OmniRoute (${providerId})`);
   const modelCacheTtl =
     typeof opts?.modelCacheTtl === "number" && opts.modelCacheTtl > 0
       ? opts.modelCacheTtl
@@ -4398,8 +4406,24 @@ export function createOmniRouteConfigHook(
       authJson = undefined;
     }
 
-    const entry = authJson?.[resolved.providerId] as AuthJsonApiEntry | undefined;
-    const apiKey = entry && entry.type === "api" && typeof entry.key === "string" ? entry.key : "";
+    // Try both prefixed (e.g. opencode-omniroute) and unprefixed (e.g. omniroute)
+    // keys so a user who ran `/connect omniroute` before the auto-prefix fix
+    // does not need to re-auth. Also handles dual-key for auth.json entries
+    // written by a newer OC dispatcher with the prefixed key.
+    const bareKey = resolved.providerId.startsWith("opencode-")
+      ? resolved.providerId.slice("opencode-".length)
+      : resolved.providerId;
+    const lookupKeys = [resolved.providerId];
+    if (bareKey !== resolved.providerId) lookupKeys.push(bareKey);
+    let entry;
+    for (const k of lookupKeys) {
+      const e = authJson?.[k];
+      if (e?.type === "api" && typeof e.key === "string" && e.key.length > 0) {
+        entry = e;
+        break;
+      }
+    }
+    const apiKey = entry?.type === "api" && typeof entry.key === "string" ? entry.key : "";
 
     if (!apiKey) {
       // (c) no apiKey — silent no-op (with debug breadcrumb). The operator

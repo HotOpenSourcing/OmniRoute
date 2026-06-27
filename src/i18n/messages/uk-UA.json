@@ -2999,7 +2999,10 @@
     "tierAlwaysProtected": "Завжди захищені",
     "tierPublic": "Публічні",
     "hideInternal": "Приховати внутрішні",
-    "showInternal": "Показати внутрішні"
+    "showInternal": "Показати внутрішні",
+    "customSystemPromptTitle": "Custom System Prompt",
+    "customSystemPromptDescription": "Inject a custom system prompt into every model request",
+    "customSystemPromptPlaceholder": "e.g. Always respond in pirate speak..."
   },
   "endpoints": {
     "tabProxy": "Endpoint Proxy",
@@ -3755,6 +3758,9 @@
     "batchActivateSelected": "__MISSING__:Activate",
     "batchDeactivateSelected": "__MISSING__:Deactivate",
     "batchRetestSelected": "__MISSING__:Retest",
+    "exportCSV": "Експортувати як CSV",
+    "exportJSON": "Експорт як JSON",
+    "importAccounts": "__MISSING__:Import accounts",
     "batchActivateSuccess": "__MISSING__:Activated {count} connection(s)",
     "batchDeactivateSuccess": "__MISSING__:Deactivated {count} connection(s)",
     "batchUpdatePartial": "__MISSING__:{count} updated, {skipped} skipped (no longer exist)",

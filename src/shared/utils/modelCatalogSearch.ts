@@ -6,7 +6,8 @@ export type ModelCatalogSource =
   | "alias"
   | "acp-runtime"
   | "session-runtime"
-  | "local-catalog";
+  | "local-catalog"
+  | "auto";
 
 type ModelCatalogTarget = {
   modelId?: string | null;
@@ -37,6 +38,8 @@ export function normalizeModelCatalogSource(source?: string | null): ModelCatalo
     return "session-runtime";
   }
   if (normalized === "local_catalog" || normalized === "local-catalog") return "local-catalog";
+  // Models discovered live from a custom provider's upstream `/models` endpoint.
+  if (normalized === "auto") return "auto";
   if (normalized === "custom" || normalized === "manual") {
     return "custom";
   }
@@ -60,6 +63,8 @@ export function getModelCatalogSourceLabel(source?: string | null): string {
       return "Session Runtime";
     case "local-catalog":
       return "Static Catalog";
+    case "auto":
+      return "Auto";
     case "system":
     default:
       return "Built-in";
@@ -82,6 +87,8 @@ function getModelCatalogSourceSearchText(source?: string | null): string {
       return "session runtime live fallback discovered windsurf";
     case "local-catalog":
       return "static catalog offline bootstrap cached windsurf";
+    case "auto":
+      return "auto fetched discovered upstream";
     case "system":
     default:
       return "built-in builtin official catalog";

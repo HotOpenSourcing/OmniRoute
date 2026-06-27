@@ -27,6 +27,7 @@ import { trae } from "./trae";
 import { kilocode } from "./kilocode";
 import { cline } from "./cline";
 import { zaiCodingPlan } from "./zaiCodingPlan";
+import { codebuddyCn } from "./codebuddy-cn";
 
 export const PROVIDERS = {
   claude,
@@ -48,6 +49,7 @@ export const PROVIDERS = {
   cline,
   "devin-cli": windsurf,
   "zai-coding-plan": zaiCodingPlan,
+  "codebuddy-cn": codebuddyCn,
 };
 
 export default PROVIDERS;

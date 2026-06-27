@@ -69,6 +69,8 @@ type ConnectionsListPanelProps = {
   onExportClaudeAuthFile: (connId: string) => void;
   onOpenApplyGeminiModal: (connId: string) => void;
   onExportGeminiAuthFile: (connId: string) => void;
+  onExportCsv: (ids: string[]) => void;
+  onExportJson: (ids: string[]) => void;
   gateConnectionFlow: (callback: () => void) => void;
   t: any; // ProviderMessageTranslator
 };
@@ -131,6 +133,8 @@ export default function ConnectionsListPanel({
   onExportClaudeAuthFile,
   onOpenApplyGeminiModal,
   onExportGeminiAuthFile,
+  onExportCsv,
+  onExportJson,
   gateConnectionFlow,
   t,
 }: ConnectionsListPanelProps) {
@@ -188,6 +192,25 @@ export default function ConnectionsListPanel({
         onClick={handleBatchDeleteOpenModal}
       >
         {t("batchDeleteSelected", { count: selectedIds.size })}
+      </Button>
+      <span className="mx-0.5 h-5 w-px bg-border/50" />
+      <Button
+        variant="secondary"
+        size="sm"
+        icon="download"
+        disabled={bulkBusy}
+        onClick={() => onExportCsv(Array.from(selectedIds))}
+      >
+        {t("exportCSV")}
+      </Button>
+      <Button
+        variant="secondary"
+        size="sm"
+        icon="data_object"
+        disabled={bulkBusy}
+        onClick={() => onExportJson(Array.from(selectedIds))}
+      >
+        {t("exportJSON")}
       </Button>
     </div>
   );

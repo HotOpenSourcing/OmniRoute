@@ -174,9 +174,31 @@ const ADVANCED_FIELD_HELP_FALLBACK = {
 };
 
 const LEGACY_COMBO_RESILIENCE_KEYS = new Set([
+  // UI-removed knobs (replaced by per-target timeoutMs on each step)
   "timeoutMs",
   "healthCheckEnabled",
   "healthCheckTimeoutMs",
+  // queueTimeoutMs is still in the schema but the dashboard UI no longer surfaces
+  // it; carrying it forward through edit+save leaves a stale knob in the modal
+  // that surprises operators. Strip it pre-PUT so the persisted config matches
+  // what the UI is currently able to display.
+  "queueTimeoutMs",
+  // Keys that were present in v3.8.31-era combo configs but have since been
+  // removed from comboRuntimeConfigSchema. Mirrors the server-side strip list
+  // in src/app/api/combos/[id]/route.ts so the modal never re-introduces them
+  // when the user clicks Save. See #4382 (combo update returns 400).
+  "queueDepth",
+  "fallbackDelayMs",
+  "handoffProviders",
+  "maxComboDepth",
+  "manifestRouting",
+  "complexityAwareRouting",
+  "pipeline_enabled",
+  "pipelineConcurrency",
+  "shadowRouting",
+  "evalRouting",
+  "resetAwareEnabled",
+  "resetAwareWindow",
 ]);
 const MS_PER_SECOND = 1000;
 
@@ -1925,6 +1947,7 @@ function ComboFormModal({ isOpen, combo, onClose, onSave, activeProviders, combo
   const isExpertMode = normalizeComboConfigMode(comboConfigMode) === "expert";
   const createDraftStateRef = useRef<CreateDraftSnapshot>(getEmptyCreateDraftSnapshot());
   const [name, setName] = useState(combo?.name || "");
+  const [description, setDescription] = useState<string>(combo?.description || "");
   const [models, setModels] = useState(() => {
     return (combo?.models || []).map((m) => normalizeModelEntry(m));
   });
@@ -1985,6 +2008,7 @@ function ComboFormModal({ isOpen, combo, onClose, onSave, activeProviders, combo
           );
 
       setName(nextCombo?.name || "");
+      setDescription(nextCombo?.description || "");
       setModels((nextCombo?.models || []).map((m) => normalizeModelEntry(m)));
       setStrategy(nextCombo?.strategy || comboDefaults?.strategy || "priority");
       setConfig(nextConfig);
@@ -2716,6 +2740,14 @@ function ComboFormModal({ isOpen, combo, onClose, onSave, activeProviders, combo
       strategy,
     };
 
+    // Per-combo description (#5005). Free-text, optional, persisted in combo data.
+    if (description.trim()) {
+      saveData.description = description.trim();
+    } else if (isEdit) {
+      // Editing: send null to explicitly clear a previously-set description.
+      saveData.description = null;
+    }
+
     // Include config only if any values are set
     const configToSave = sanitizeComboRuntimeConfig(config);
     // Add round-robin specific fields to config
@@ -2900,6 +2932,25 @@ function ComboFormModal({ isOpen, combo, onClose, onSave, activeProviders, combo
                 {!isExpertMode && (
                   <p className="text-[10px] text-text-muted mt-0.5">{t("nameHint")}</p>
                 )}
+              </div>
+
+              {/* Description (#5005) — optional free-text note for this combo */}
+              <div>
+                <label className="text-[11px] font-medium text-text-muted block mb-0.5">
+                  {getI18nOrFallback(t, "comboDescription", "Description")}
+                </label>
+                <textarea
+                  rows={2}
+                  data-testid="combo-description-input"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder={getI18nOrFallback(
+                    t,
+                    "comboDescriptionPlaceholder",
+                    "Optional note describing this combo"
+                  )}
+                  className="w-full text-xs py-1.5 px-2 rounded border border-black/10 dark:border-white/10 bg-transparent focus:border-primary focus:outline-none resize-none"
+                />
               </div>
 
               {!isEdit && !isExpertMode && (
