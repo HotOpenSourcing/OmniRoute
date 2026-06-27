@@ -1,7 +1,8 @@
 // scripts/test-kimchi-provider.mjs
 // Verifies that the Kimchi provider is correctly registered in the
-// open-sse provider registry, and tests a live chat completion against
-// llm.kimchi.dev with the Stainless headers required by the Cast AI router.
+// open-sse provider registry, and tests live chat completions against
+// llm.kimchi.dev for all 5 models + streaming SSE, with the Stainless
+// headers required by the Cast AI router.
 
 import { kimchiProvider, getKimchiHeaders } from "../open-sse/config/providers/registry/kimchi/index.ts";
 import { REGISTRY as providerRegistry } from "../open-sse/config/providers/index.ts";
@@ -48,7 +49,6 @@ check("providerRegistry.kimchi === kimchiProvider",
   providerRegistry.kimchi === kimchiProvider);
 check("providerRegistry.agentrouter still present", !!providerRegistry.agentrouter);
 
-console.log("\n─── 4. Live chat completion test ───");
 const fs = await import("node:fs");
 let apiKey = process.env.KIMCHI_API_KEY;
 if (!apiKey) {
@@ -60,13 +60,62 @@ if (!apiKey) {
     try { apiKey = fs.readFileSync(p, "utf8").trim(); if (apiKey) { console.log(`  loaded key from ${p}`); break; } } catch {}
   }
 }
-if (!apiKey) {
-  console.log("  ⚠ KIMCHI_API_KEY env var not set and no key file found — skipping live test");
-} else {
-  console.log(`  using API key: ${apiKey.slice(0, 20)}…`);
-  console.log(`  posting to ${kimchiProvider.baseUrl}`);
-  console.log(`  model: minimax-m3, stream: false, max_tokens: 60`);
 
+if (!apiKey) {
+  console.log("\n─── 4/5/6 skipped ───");
+  console.log("  ⚠ KIMCHI_API_KEY env var not set and no key file found — skipping live tests");
+} else {
+  console.log(`\n─── 4. Live chat completions: all 5 models ───`);
+  console.log(`  using API key: ${apiKey.slice(0, 20)}…`);
+
+  for (const modelId of expectedModels) {
+    console.log(`\n  [model: ${modelId}]`);
+    const t0 = Date.now();
+    try {
+      const res = await fetch(kimchiProvider.baseUrl, {
+        method: "POST",
+        headers: {
+          ...headers,
+          "authorization": `Bearer ${apiKey}`,
+          "content-type": "application/json",
+          "accept": "application/json",
+        },
+        body: JSON.stringify({
+          model: modelId,
+          max_tokens: 60,
+          temperature: 0.2,
+          reasoning_effort: "low",
+          messages: [{ role: "user", content: "Dis bonjour en français." }],
+        }),
+      });
+      const ms = Date.now() - t0;
+      const text = await res.text();
+      let j;
+      try { j = JSON.parse(text); } catch { j = null; }
+      console.log(`    HTTP ${res.status}  ${ms}ms`);
+      check(`${modelId} HTTP 200`, res.status === 200);
+      if (j) {
+        const content = j?.choices?.[0]?.message?.content || "";
+        const usage = j?.usage || {};
+        console.log(`    model:    ${j.model}`);
+        console.log(`    content:  ${JSON.stringify(content)}`);
+        console.log(`    usage:    total=${usage.total_tokens}`);
+        check(`${modelId} has choices`, Array.isArray(j.choices));
+        check(`${modelId} content non-empty`, content.length > 0);
+        check(`${modelId} model echoed`, j.model === modelId);
+      } else {
+        console.log(`    raw body: ${text.slice(0, 200)}`);
+        fail++;
+      }
+    } catch (err) {
+      console.log(`    ✗ ${modelId} network error: ${err.message}`);
+      fail++;
+    }
+  }
+
+  console.log(`\n─── 5. Streaming SSE test ───`);
+  const streamModel = "minimax-m3";
+  console.log(`  [model: ${streamModel}, stream=true]`);
   const t0 = Date.now();
   try {
     const res = await fetch(kimchiProvider.baseUrl, {
@@ -75,37 +124,45 @@ if (!apiKey) {
         ...headers,
         "authorization": `Bearer ${apiKey}`,
         "content-type": "application/json",
-        "accept": "application/json",
+        "accept": "text/event-stream",
       },
       body: JSON.stringify({
-        model: "minimax-m3",
+        model: streamModel,
         max_tokens: 60,
         temperature: 0.2,
         reasoning_effort: "low",
-        messages: [{ role: "user", content: "Dis bonjour en un mot." }],
+        stream: true,
+        messages: [{ role: "user", content: "Compte de 1 à 3." }],
       }),
     });
     const ms = Date.now() - t0;
-    const text = await res.text();
-    let j;
-    try { j = JSON.parse(text); } catch { j = null; }
     console.log(`  HTTP ${res.status}  ${ms}ms`);
-    check("HTTP 200", res.status === 200);
-    if (j) {
-      const content = j?.choices?.[0]?.message?.content || "";
-      const usage = j?.usage || {};
-      console.log(`  model:    ${j.model}`);
-      console.log(`  content:  ${JSON.stringify(content)}`);
-      console.log(`  usage:    total=${usage.total_tokens}  reasoning=${usage.completion_tokens_details?.reasoning_tokens}  text=${usage.completion_tokens_details?.text_tokens}`);
-      check("response has choices", Array.isArray(j.choices));
-      check("content non-empty", content.length > 0);
-      check("model echoed = minimax-m3", j.model === "minimax-m3");
-    } else {
-      console.log(`  raw body: ${text.slice(0, 200)}`);
+    check("streaming HTTP 200", res.status === 200);
+    check("streaming content-type is event-stream",
+      (res.headers.get("content-type") || "").includes("text/event-stream"));
+
+    const body = await res.text();
+    const lines = body.split("\n").filter(l => l.startsWith("data:"));
+    console.log(`  received ${lines.length} SSE data lines`);
+    check("at least 2 SSE data lines", lines.length >= 2);
+
+    let fullContent = "";
+    let gotDone = false;
+    for (const line of lines) {
+      const payload = line.replace(/^data:\s*/, "").trim();
+      if (payload === "[DONE]") { gotDone = true; break; }
+      try {
+        const chunk = JSON.parse(payload);
+        const delta = chunk?.choices?.[0]?.delta?.content || "";
+        if (delta) fullContent += delta;
+      } catch {}
     }
+    console.log(`  streamed content: ${JSON.stringify(fullContent)}`);
+    check("streaming has content", fullContent.length > 0);
+    check("streaming got [DONE]", gotDone);
   } catch (err) {
-    console.log(`  ✗ network error: ${err.message}`);
-    fail++;
+    console.log(`  ✗ streaming error: ${err.message}`);
+    fail += 4;
   }
 }
 
