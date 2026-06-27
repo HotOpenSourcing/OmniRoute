@@ -1,0 +1,179 @@
+### Z.AI Coding Plan — Exemples de Requêtes HTTP
+### Provider: zai-coding-plan (alias: zcp)
+### Base URL: https://zcode.z.ai/api/v1/zcode-plan/anthropic/v1/messages
+### Auth: Bearer token (code-<hex>)
+
+### ==========================================================
+### 1. OAuth — Obtenir l'URL d'autorisation
+### ==========================================================
+### Ouvrir dans un navigateur :
+### https://chat.z.ai/api/oauth/authorize?response_type=code&client_id=client_P8X5CMWmlaRO9gyO-KSqtg&redirect_uri=zcode://zai-auth/callback&state=<random_hex>
+###
+### Après autorisation, le navigateur est redirigé vers :
+### zcode://zai-auth/callback?code=code-<hex>&state=<state>
+###
+### Utiliser ce code comme Bearer token dans les requêtes ci-dessous.
+
+### ==========================================================
+### 2. Chat non-streaming (Anthropic Messages API)
+### ==========================================================
+POST https://zcode.z.ai/api/v1/zcode-plan/anthropic/v1/messages
+Authorization: Bearer code-<REPLACE_WITH_YOUR_CODE>
+Content-Type: application/json
+anthropic-version: 2023-06-01
+
+{
+  "model": "glm-5.2",
+  "max_tokens": 200,
+  "messages": [
+    {
+      "role": "user",
+      "content": "What is the capital of France?"
+    }
+  ]
+}
+
+### ==========================================================
+### 3. Chat streaming
+### ==========================================================
+POST https://zcode.z.ai/api/v1/zcode-plan/anthropic/v1/messages
+Authorization: Bearer code-<REPLACE_WITH_YOUR_CODE>
+Content-Type: application/json
+anthropic-version: 2023-06-01
+
+{
+  "model": "glm-5.2",
+  "max_tokens": 500,
+  "messages": [
+    {
+      "role": "user",
+      "content": "Write a short story about a robot learning to paint"
+    }
+  ],
+  "stream": true
+}
+
+### ==========================================================
+### 4. Chat avec reasoning (thinking)
+### ==========================================================
+POST https://zcode.z.ai/api/v1/zcode-plan/anthropic/v1/messages
+Authorization: Bearer code-<REPLACE_WITH_YOUR_CODE>
+Content-Type: application/json
+anthropic-version: 2023-06-01
+
+{
+  "model": "glm-5.2",
+  "max_tokens": 4096,
+  "messages": [
+    {
+      "role": "user",
+      "content": "Solve this problem: A train leaves Station A at 60 km/h. Another train leaves Station B at 80 km/h. If the stations are 280 km apart, when will they meet?"
+    }
+  ],
+  "thinking": {
+    "type": "enabled",
+    "budget_tokens": 1024
+  }
+}
+
+### ==========================================================
+### 5. Chat avec outils (function calling)
+### ==========================================================
+POST https://zcode.z.ai/api/v1/zcode-plan/anthropic/v1/messages
+Authorization: Bearer code-<REPLACE_WITH_YOUR_CODE>
+Content-Type: application/json
+anthropic-version: 2023-06-01
+
+{
+  "model": "glm-5.2",
+  "max_tokens": 1024,
+  "messages": [
+    {
+      "role": "user",
+      "content": "What's the weather in Tokyo?"
+    }
+  ],
+  "tools": [
+    {
+      "name": "get_weather",
+      "description": "Get current weather for a location",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "description": "City name"
+          }
+        },
+        "required": ["location"]
+      }
+    }
+  ]
+}
+
+### ==========================================================
+### 6. Chat avec image (glm-4.5v uniquement)
+### ==========================================================
+POST https://zcode.z.ai/api/v1/zcode-plan/anthropic/v1/messages
+Authorization: Bearer code-<REPLACE_WITH_YOUR_CODE>
+Content-Type: application/json
+anthropic-version: 2023-06-01
+
+{
+  "model": "glm-4.5v",
+  "max_tokens": 1024,
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Describe this image"
+        },
+        {
+          "type": "image",
+          "source": {
+            "type": "base64",
+            "media_type": "image/jpeg",
+            "data": "<base64_encoded_image>"
+          }
+        }
+      ]
+    }
+  ]
+}
+
+### ==========================================================
+### 7. Vérifier le solde de tokens
+### ==========================================================
+GET https://zcode.z.ai/api/v1/zcode-plan/billing/balance?app_version=3.1.1
+Authorization: Bearer code-<REPLACE_WITH_YOUR_CODE>
+
+### ==========================================================
+### 8. Vérifier le plan actuel
+### ==========================================================
+GET https://zcode.z.ai/api/v1/zcode-plan/billing/current?app_version=3.1.1
+Authorization: Bearer code-<REPLACE_WITH_YOUR_CODE>
+
+### ==========================================================
+### 9. Liste des modèles disponibles
+### ==========================================================
+GET https://api.z.ai/api/coding/paas/v4
+
+### ==========================================================
+### 10. Tentative de refresh token
+### ==========================================================
+POST https://zcode.z.ai/api/v1/oauth/token
+Content-Type: application/json
+
+{
+  "grant_type": "refresh_token",
+  "refresh_token": "<REPLACE_WITH_REFRESH_TOKEN>",
+  "client_id": "client_P8X5CMWmlaRO9gyO-KSqtg"
+}
+
+### ==========================================================
+### 11. User info
+### ==========================================================
+GET https://chat.z.ai/api/oauth/userinfo
+Authorization: Bearer code-<REPLACE_WITH_YOUR_CODE>

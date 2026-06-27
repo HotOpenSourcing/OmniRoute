@@ -1,0 +1,30 @@
+{
+  "timestamp": "2026-06-24T12:24:26.694Z",
+  "oauth_provider_ids": [
+    "zai"
+  ],
+  "oauth_urls": [],
+  "storage_keys": [
+    "oauth:active_provider",
+    "oauth:zai:access_token",
+    "oauth:zai:refresh_token",
+    "oauth:zai:user_info"
+  ],
+  "oauth_paths": [
+    "/oauth/callback/bigmodel"
+  ],
+  "custom_headers": [
+    "X-ZCode-App-Version",
+    "X-Title",
+    "X-ZCode-Agent"
+  ],
+  "error_codes": [
+    "coding_plan_not_authenticated",
+    "coding_plan_not_connected",
+    "coding_plan_auth_failed",
+    "coding_plan_not_entitled"
+  ],
+  "has_init_function": true,
+  "has_poll_function": true,
+  "has_random_bytes": true
+}

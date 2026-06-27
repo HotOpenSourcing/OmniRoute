@@ -412,6 +412,37 @@ export const TRAE_CONFIG = {
 //                          with an IDE-supplied ?state= param (see field below)
 //   - firebaseApiKey     → reserved for Phase 2
 //   - ideName            → sent in extension headers
+// Z.AI Coding Plan OAuth Configuration
+//
+// Extracted from ZCode app.asar.
+// IMPORTANT: The authorize redirect returns a `code-...` value that IS the
+// Bearer token directly — no token exchange POST is needed. The tokenUrl
+// is used for token REFRESH only, not initial exchange.
+//
+// Flow:
+//   1. GET authorizeUrl → user authorizes → redirect with `code=code-<hex>`
+//   2. Use `code-<hex>` directly as `Authorization: Bearer code-<hex>`
+//   3. (Optional) POST tokenUrl with `refresh_token` for token refresh
+//   4. GET userinfoUrl for user profile (optional)
+//
+// Client ID is public (extracted from ZCode binary, PKCE).
+export const ZAI_CODING_PLAN_CONFIG = {
+  clientId: resolvePublicCred("zai_coding_plan_id", "ZAI_CODING_PLAN_CLIENT_ID"),
+  authorizeUrl: "https://chat.z.ai/api/oauth/authorize",
+  // Token URL is used for REFRESH only (grant_type: refresh_token).
+  // The initial code does NOT need exchange — it IS the bearer token.
+  tokenUrl: "https://zcode.z.ai/api/v1/oauth/token",
+  userinfoUrl: "https://chat.z.ai/api/oauth/userinfo",
+  businessLoginUrl: "https://api.z.ai/api/auth/z/login",
+  modelsUrl: "https://api.z.ai/api/coding/paas/v4",
+  apiBaseUrl: "https://zcode.z.ai/api/v1/zcode-plan/anthropic",
+  // ZCode native redirect URI scheme (used by the ZCode desktop client).
+  // OmniRoute overrides this with http://localhost:<port>/callback when
+  // initiating the flow server-side.
+  redirectUri: "zcode://zai-auth/callback",
+  scopes: [],
+};
+
 export const WINDSURF_CONFIG = {
   // RETIRED 2026-05-29 — endpoint returns 404 post-rebrand. Phase 2 will replace.
   authorizeUrl: "https://app.devin.ai/editor/signin",

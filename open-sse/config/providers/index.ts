@@ -125,6 +125,7 @@ import { windsurfProvider } from "./registry/windsurf/index.ts";
 import { nanogptProvider } from "./registry/nanogpt/index.ts";
 import { scalewayProvider } from "./registry/scaleway/index.ts";
 import { agentrouterProvider } from "./registry/agentrouter/index.ts";
+import { kimchiProvider } from "./registry/kimchi/index.ts";
 import { zaiProvider } from "./registry/zai/index.ts";
 import { zaiCodingPlanProvider } from "./registry/zai-coding-plan/index.ts";
 import { waferProvider } from "./registry/wafer/index.ts";
@@ -295,6 +296,7 @@ export const REGISTRY: Record<string, RegistryEntry> = {
   nanogpt: nanogptProvider,
   scaleway: scalewayProvider,
   agentrouter: agentrouterProvider,
+  kimchi: kimchiProvider,
   zai: zaiProvider,
   "zai-coding-plan": zaiCodingPlanProvider,
   huggingchat: huggingchatProvider,

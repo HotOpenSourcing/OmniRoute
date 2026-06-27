@@ -1,0 +1,56 @@
+{
+  "timestamp": "2026-06-24T12:07:51.152Z",
+  "oauth_endpoints": [
+    ")},help:s(e=>`zcode ${e}\n\nUsage:\n  zcode [command] [options]\n\nWith no command, zcode opens the full-screen TUI.\n\nCommands:\n  app-server Run the ZCode Protocol stdio app server\n  commands   List custom slash commands (\\`commands list\\`)\n  doctor     Inspect runtime and packaging assumptions\n  login      Sign in with Z.AI OAuth for model access\n  logout     Remove the shared Z.AI login credentials\n  plugins    List and enable installed plugins (\\`plugins list\\`)\n  skills     List local skills (\\`skills list\\`)\n  tui        Open the terminal UI\n  version    Print the CLI version\n\nOptions:\n  -h, --help       Show help\n  -v, --version    Show version\n  --prompt <text>  Run a single prompt without opening the TUI\n  --attach <path>  Attach a local file to --prompt; repeat for multiple files\n  --cwd <path>     Run this command from the given directory\n  --locale <locale>  UI locale: en-US, zh-CN, or auto\n  --mode <mode>    Permission mode for prompts: build, edit, plan, or yolo (default: yolo for --prompt)\n  --resume <sessionId>  Resume a persisted session by sessionId (sess_...)\n  --target <text>  Run or set the session goal in headless mode\n  --target-replace Replace any existing session goal set by --target\n  -c, --continue        Resume the latest session for the current directory\n  --json           Print machine-readable JSON where supported\n  --no-browser     Print the OAuth URL without opening a browser\n  --no-color       Disable ANSI colors\n  --verbose        Print extra diagnostic detail\n\nSlash Commands:\n  /help [command]       Show slash command help\n  /login                Sign in with Z.AI OAuth\n  /logout               Remove the shared Z.AI login credentials\n  /compact [instructions]  Compact the current conversation\n  /expert [status|resume|stop|<task>]  Run or manage the expert workflow\n  /fork [latest|checkpointId]  Fork a new session from a workspace checkpoint\n  /mcp [list|status|connect|disconnect]  Show or manage MCP servers\n  /mode [mode]          Show or switch permission mode: build, edit, plan, or yolo\n  /model [id]           Show or switch the current session model\n  /new                  Start a fresh session in the TUI\n  /resume [sessionId]   Resume a session by sessionId; omit it for latest in cwd\n  /rewind [latest|checkpointId]  Show latest checkpoint or restore workspace files\n  /skill [name] [task]  List skills, or force the next prompt to load one\n  /goal [action]        Show or set the current session goal\n`,",
+    ")},help:s(e=>`zcode ${e}\n\n\\u7528\\u6CD5:\n  zcode [command] [options]\n\n\\u4E0D\\u4F20 command \\u65F6\\uFF0Czcode \\u4F1A\\u6253\\u5F00\\u5168\\u5C4F TUI\\u3002\n\n\\u547D\\u4EE4:\n  app-server \\u8FD0\\u884C ZCode Protocol stdio app server\n  commands   \\u5217\\u51FA\\u81EA\\u5B9A\\u4E49 slash commands\\uFF08\\`commands list\\`\\uFF09\n  doctor     \\u68C0\\u67E5\\u8FD0\\u884C\\u65F6\\u548C\\u6253\\u5305\\u5047\\u8BBE\n  login      \\u4F7F\\u7528 Z.AI OAuth \\u767B\\u5F55\\u6A21\\u578B\\u8BBF\\u95EE\n  logout     \\u5220\\u9664\\u5171\\u4EAB\\u7684 Z.AI \\u767B\\u5F55\\u51ED\\u636E\n  plugins    \\u5217\\u51FA\\u5E76\\u542F\\u7528\\u5DF2\\u5B89\\u88C5\\u63D2\\u4EF6\\uFF08\\`plugins list\\`\\uFF09\n  skills     \\u5217\\u51FA\\u672C\\u5730 skills\\uFF08\\`skills list\\`\\uFF09\n  tui        \\u6253\\u5F00\\u7EC8\\u7AEF UI\n  version    \\u6253\\u5370 CLI \\u7248\\u672C\n\n\\u9009\\u9879:\n  -h, --help       \\u663E\\u793A\\u5E2E\\u52A9\n  -v, --version    \\u663E\\u793A\\u7248\\u672C\n  --prompt <text>  \\u5355\\u6B21\\u8FD0\\u884C prompt\\uFF0C\\u4E0D\\u6253\\u5F00 TUI\n  --attach <path>  \\u7ED9 --prompt \\u9644\\u52A0\\u672C\\u5730\\u6587\\u4EF6\\uFF1B\\u53EF\\u91CD\\u590D\\u4F20\\u5165\n  --cwd <path>     \\u4ECE\\u6307\\u5B9A\\u76EE\\u5F55\\u8FD0\\u884C\\u547D\\u4EE4\n  --locale <locale>  UI \\u8BED\\u8A00\\uFF1Aen-US\\u3001zh-CN \\u6216 auto\n  --mode <mode>    prompt \\u6743\\u9650\\u6A21\\u5F0F\\uFF1Abuild\\u3001edit\\u3001plan \\u6216 yolo\\uFF08--prompt \\u9ED8\\u8BA4 yolo\\uFF09\n  --resume <sessionId>  \\u6309 sessionId \\u6062\\u590D\\u6301\\u4E45\\u5316 session\\uFF08sess_...\\uFF09\n  --target <text>  \\u5728 headless \\u6A21\\u5F0F\\u8FD0\\u884C\\u6216\\u8BBE\\u7F6E session goal\n  --target-replace \\u66FF\\u6362 --target \\u5DF2\\u5B58\\u5728\\u7684 goal\n  -c, --continue        \\u6062\\u590D\\u5F53\\u524D\\u76EE\\u5F55\\u6700\\u8FD1\\u7684 session\n  --json           \\u5728\\u652F\\u6301\\u7684\\u547D\\u4EE4\\u4E2D\\u8F93\\u51FA\\u673A\\u5668\\u53EF\\u8BFB JSON\n  --no-browser     \\u4E0D\\u6253\\u5F00\\u6D4F\\u89C8\\u5668\\uFF0C\\u53EA\\u6253\\u5370 OAuth URL\n  --no-color       \\u7981\\u7528 ANSI \\u989C\\u8272\n  --verbose        \\u6253\\u5370\\u66F4\\u591A\\u8BCA\\u65AD\\u4FE1\\u606F\n\nSlash Commands:\n  /help [command]       \\u663E\\u793A slash command \\u5E2E\\u52A9\n  /login                \\u4F7F\\u7528 Z.AI OAuth \\u767B\\u5F55\n  /logout               \\u5220\\u9664\\u5171\\u4EAB\\u7684 Z.AI \\u767B\\u5F55\\u51ED\\u636E\n  /compact [instructions]  \\u538B\\u7F29\\u5F53\\u524D\\u5BF9\\u8BDD\n  /expert [status|resume|stop|<task>]  \\u8FD0\\u884C\\u6216\\u7BA1\\u7406 expert workflow\n  /fork [latest|checkpointId]  \\u4ECE workspace checkpoint \\u6D3E\\u751F\\u65B0 session\n  /mcp [list|status|connect|disconnect]  \\u67E5\\u770B\\u6216\\u7BA1\\u7406 MCP servers\n  /mode [mode]          \\u67E5\\u770B\\u6216\\u5207\\u6362\\u6743\\u9650\\u6A21\\u5F0F\\uFF1Abuild\\u3001edit\\u3001plan \\u6216 yolo\n  /model [id]           \\u67E5\\u770B\\u6216\\u5207\\u6362\\u5F53\\u524D session \\u6A21\\u578B\n  /new                  \\u5728 TUI \\u4E2D\\u5F00\\u59CB\\u65B0 session\n  /resume [sessionId]   \\u6309 sessionId \\u6062\\u590D session\\uFF1B\\u7701\\u7565\\u65F6\\u6062\\u590D\\u5F53\\u524D cwd \\u6700\\u65B0 session\n  /rewind [latest|checkpointId]  \\u67E5\\u770B\\u6700\\u65B0 checkpoint \\u6216\\u6062\\u590D workspace \\u6587\\u4EF6\n  /skill [name] [task]  \\u5217\\u51FA skills\\uFF0C\\u6216\\u5F3A\\u5236\\u4E0B\\u4E00\\u6B21 prompt \\u52A0\\u8F7D\\u67D0\\u4E2A skill\n  /goal [action]        \\u67E5\\u770B\\u6216\\u8BBE\\u7F6E\\u5F53\\u524D session goal\n`,",
+    "/.well-known/oauth-authorization-server",
+    ")&&(n=n.slice(0,-1)),o.push({url:new URL(`/.well-known/oauth-authorization-server${n}`,t.origin),type:",
+    ",trace:e.trace,url:`${t}/oauth/cli/init`},n);return aoo(i.data)},async poll(o,n){let i=encodeURIComponent(o.flowId),a=await _Cr(e.httpClient,{headers:{Authorization:`Bearer ${o.pollToken}`},method:",
+    ",trace:e.trace,url:`${t}/oauth/cli/poll/${i}`},n);return soo(a.data)}}}function vCr(){return(0,xCr.randomBytes)(noo).toString(",
+    "/oauth/callback/bigmodel"
+  ],
+  "refresh_functions_count": 0,
+  "polling_intervals_ms": [],
+  "token_storage_keys": [
+    "oauth:active_provider",
+    "oauth:zai:access_token",
+    "oauth:zai:refresh_token",
+    "oauth:zai:user_info"
+  ],
+  "custom_headers": [
+    "X-ZCode-App-Version",
+    "X-Title",
+    "X-ZCode-Agent"
+  ],
+  "http_error_codes": [
+    "124",
+    "180",
+    "196",
+    "200",
+    "202",
+    "216",
+    "217",
+    "218",
+    "219",
+    "221",
+    "249",
+    "254",
+    "255",
+    "270",
+    "401",
+    "403",
+    "404",
+    "405"
+  ],
+  "domains": [
+    "https://zcode.z.ai",
+    "https://bigmodel.cn",
+    "https://dev.bigmodel.cn",
+    "https://open.bigmodel.cn",
+    "https://api.z.ai",
+    "https://docs.z.ai",
+    "https://docs.bigmodel.cn"
+  ],
+  "timeouts_ms": [],
+  "cli_flow_found": true
+}

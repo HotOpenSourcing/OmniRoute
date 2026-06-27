@@ -1,35 +1,32 @@
 import { ZAI_CODING_PLAN_CONFIG } from "../constants/oauth";
 
 /**
- * Z.AI Coding Plan OAuth Provider
+ * Z.AI Coding Plan OAuth Provider (Déprécié — Import Manuel Requis)
  *
- * Uses standard OAuth 2.0 Authorization Code flow with PKCE:
- * - Authorization URL: https://chat.z.ai/auth/oauth/authorize
- * - Client ID: client_P8X5CMWmlaRO9gyO-KSqtg (from ZCode binary)
- * - Redirect URI: zcode://zai-auth/callback (custom URI scheme)
- * - Code Challenge Method: S256 (SHA-256)
- * 
- * Flow:
- * 1. Build authorization URL with PKCE code_challenge
- * 2. User authorizes in browser → redirect to zcode:// with code
- * 3. Exchange code for access_token
- * 4. Use access_token as Bearer token for API calls
+ * ⚠️ Le flow OAuth externe n'est pas fonctionnel.
+ * Les endpoints /oauth/cli/init et /oauth/cli/poll ne sont pas accessibles
+ * depuis l'extérieur du desktop ZCode (redirection Next.js 404).
+ *
+ * Solution actuelle : Import manuel du JWT depuis config.json de ZCode.
+ * Voir le provider registry zai-coding-plan/index.ts pour la procédure.
+ *
+ * Ce fichier est conservé pour référence mais le provider utilise
+ * désormais authType "bearer" sans OAuth.
+ *
+ * Ancien flow (non fonctionnel) :
+ *   1. GET authorizeUrl → code-<hex>
+ *   2. (BLOQUÉ) POST /oauth/cli/init → flow_id
+ *   3. (BLOQUÉ) GET /oauth/cli/poll/{flow_id} → access_token
+ *   4. POST /api/auth/z/login → bizToken
+ *
+ * Client ID (public) : client_P8X5CMWmlaRO9gyO-KSqtg
  */
-
-interface ZaiTokenResponse {
-  access_token: string;
-  token_type: string;
-  expires_in?: number;
-  refresh_token?: string;
-  scope?: string;
-}
-
 export const zaiCodingPlan = {
   config: ZAI_CODING_PLAN_CONFIG,
-  flowType: "authorization_code",
+  flowType: "manual_token",
 
   /**
-   * Build authorization URL with PKCE
+   * Build authorization URL (non fonctionnel).
    */
   buildAuthUrl: (config: typeof ZAI_CODING_PLAN_CONFIG, redirectUri: string, state: string) => {
     const params = new URLSearchParams({
@@ -38,48 +35,21 @@ export const zaiCodingPlan = {
       redirect_uri: redirectUri,
       state: state,
     });
-    
     return `${config.authorizeUrl}?${params.toString()}`;
   },
 
   /**
-   * Exchange authorization code for access token
+   * Échange du code OAuth (non fonctionnel).
+   * La token doit être importée manuellement depuis le desktop ZCode.
    */
-  exchangeToken: async (
-    config: typeof ZAI_CODING_PLAN_CONFIG,
-    code: string,
-    redirectUri: string
-  ) => {
-    const response = await fetch(config.tokenUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Accept: "application/json",
-      },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        client_id: config.clientId,
-        code: code,
-        redirect_uri: redirectUri,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Z.AI token exchange failed: ${error}`);
+  exchangeToken: (_config: typeof ZAI_CODING_PLAN_CONFIG, code: string, _redirectUri: string) => {
+    if (!code || code.length === 0) {
+      throw new Error("Token is required. Paste your JWT from ZCode config.json.");
     }
-
-    return await response.json();
+    return {
+      access_token: code,
+      token_type: "Bearer",
+      scope: "coding",
+    };
   },
-
-  /**
-   * Map tokens to OmniRoute format
-   */
-  mapTokens: (tokens: ZaiTokenResponse) => ({
-    accessToken: tokens.access_token,
-    refreshToken: tokens.refresh_token || null,
-    idToken: null,
-    expiresIn: tokens.expires_in,
-    scope: tokens.scope || "coding",
-  }),
 };
