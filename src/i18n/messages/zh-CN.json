@@ -3999,6 +3999,8 @@
     "exportCSV": "导出为 CSV",
     "exportJSON": "导出为 JSON",
     "importAccounts": "__MISSING__:Import accounts",
+    "exportProvider": "Export provider",
+    "importProvider": "Import provider",
     "batchActivateSuccess": "已启用 {count} 个连接",
     "batchDeactivateSuccess": "已停用 {count} 个连接",
     "batchDeleteConfirmTitle": "删除连接",

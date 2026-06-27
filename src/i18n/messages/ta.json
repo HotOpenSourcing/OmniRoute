@@ -3764,6 +3764,8 @@
     "exportCSV": "CSV ஆக ஏற்றுமதி செய்யவும்",
     "exportJSON": "JSON ஆக ஏற்றுமதி செய்யவும்",
     "importAccounts": "__MISSING__:Import accounts",
+    "exportProvider": "Export provider",
+    "importProvider": "Import provider",
     "batchActivateSuccess": "__MISSING__:Activated {count} connection(s)",
     "batchDeactivateSuccess": "__MISSING__:Deactivated {count} connection(s)",
     "batchUpdatePartial": "__MISSING__:{count} updated, {skipped} skipped (no longer exist)",

@@ -4084,6 +4084,8 @@
     "exportCSV": "Export as CSV",
     "exportJSON": "Export as JSON",
     "importAccounts": "Import accounts",
+    "exportProvider": "Export provider",
+    "importProvider": "Import provider",
     "batchActivateSuccess": "Activated {count} connection(s)",
     "batchDeactivateSuccess": "Deactivated {count} connection(s)",
     "batchTokenRefreshSuccess": "{count} token(s) refreshed successfully",

@@ -570,6 +570,71 @@ export default function ProviderDetailPageClient() {
     input.click();
   }, [providerId, fetchConnections, notify]);
 
+  const handleExportProvider = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/providers/${providerId}/export-provider`);
+      if (!res.ok) throw new Error("Provider export failed");
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${providerId}-full-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      notify.success(`Exported ${data.totalConnections} connection(s) with provider info`);
+    } catch (error) {
+      console.error("Provider export error:", error);
+      notify.error("Failed to export provider");
+    }
+  }, [providerId, notify]);
+
+  const handleImportProvider = useCallback(() => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        const connectionsToImport = parsed.connections || (Array.isArray(parsed) ? parsed : [parsed]);
+
+        if (connectionsToImport.length === 0) {
+          notify.error("No connections found in file");
+          return;
+        }
+
+        const res = await fetch(`/api/providers/${providerId}/import-provider`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ connections: connectionsToImport }),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          notify.error(errData.error || "Import failed");
+          return;
+        }
+
+        const result = await res.json();
+        notify.success(
+          `Imported ${result.imported} connection(s)` +
+            (result.failed > 0 ? ` (${result.failed} failed)` : "")
+        );
+        if (result.imported > 0) {
+          setTimeout(() => fetchConnections(), 500);
+        }
+      } catch (error) {
+        console.error("Provider import error:", error);
+        notify.error("Failed to import provider");
+      }
+    };
+    input.click();
+  }, [providerId, fetchConnections, notify]);
+
   // renderModelsSection → components/ProviderModelsSection.tsx (Phase 1m)
 
   if (loading) {
@@ -602,6 +667,8 @@ export default function ProviderDetailPageClient() {
         isOpenAICompatible={isOpenAICompatible}
         isAnthropicProtocolCompatible={isAnthropicProtocolCompatible}
         onOpenTutorial={() => setShowTutorialModal(true)}
+        onExportProvider={handleExportProvider}
+        onImportProvider={handleImportProvider}
         t={t}
       />
 
