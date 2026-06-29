@@ -11,7 +11,7 @@
  * Cycle-safe: no import from ProviderDetailPageClient.
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/shared/components";
 import { matchesModelCatalogQuery } from "@/shared/utils/modelCatalogSearch";
 import { isFreeModel, sortModelsFreeFirst } from "@/shared/utils/freeModels";
@@ -86,11 +86,7 @@ export interface ProviderModelsSectionProps {
   setAutoHideFailed: (v: boolean) => void;
   setVisibilityFilter: (v: "all" | "visible" | "hidden") => void;
   saveModelCompatFlags: (modelId: string, patch: ModelCompatSavePatch) => Promise<void>;
-  handleToggleModelHidden: (
-    providerKey: string,
-    modelId: string,
-    hidden: boolean
-  ) => Promise<void>;
+  handleToggleModelHidden: (providerKey: string, modelId: string, hidden: boolean) => Promise<void>;
   handleBulkToggleModelHidden: (
     providerKey: string,
     modelIds: string[],
@@ -169,6 +165,20 @@ export default function ProviderModelsSection({
   t,
 }: ProviderModelsSectionProps) {
   const [freeFilter, setFreeFilter] = useState<"all" | "free" | "paid">("all");
+
+  // Passthrough providers (e.g. Kimchi) ship built-in registry models in the
+  // `models` prop, but PassthroughModelsSection only received synced/imported
+  // models and custom models. Merge built-in + synced registry models here and
+  // keep custom models flowing through their dedicated prop so source labels
+  // stay correct and rows are not duplicated.
+  const customModelIds = useMemo(
+    () => new Set(modelMeta.customModels.map((cm: any) => cm.id).filter(Boolean)),
+    [modelMeta.customModels]
+  );
+  const passthroughAvailableModels = useMemo(
+    () => models.filter((m) => !customModelIds.has(m.id)),
+    [models, customModelIds]
+  );
   const [sortFreeFirst, setSortFreeFirst] = useState(false);
   const autoSyncToggle = compatibleSupportsModelImport && canImportModels && (
     <button
@@ -187,8 +197,7 @@ export default function ProviderModelsSection({
     </button>
   );
 
-  const clearAllButton = (modelMeta.customModels.length > 0 ||
-    providerAliasEntries.length > 0) && (
+  const clearAllButton = (modelMeta.customModels.length > 0 || providerAliasEntries.length > 0) && (
     <button
       onClick={handleClearAllModels}
       disabled={clearingModels}
@@ -309,7 +318,7 @@ export default function ProviderModelsSection({
         <PassthroughModelsSection
           providerAlias={providerAlias}
           modelAliases={modelAliases}
-          availableModels={syncedAvailableModels}
+          availableModels={passthroughAvailableModels}
           customModels={modelMeta.customModels}
           description={passthroughDescription}
           inputLabel={passthroughInputLabel}

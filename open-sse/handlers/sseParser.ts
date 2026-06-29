@@ -303,6 +303,29 @@ export function parseSSEToOpenAIResponse(rawSSE, fallbackModel) {
     result.usage = usage;
   }
 
+  // Diagnose silent upstream failures: Kimchi (and similar gateways) return
+  // HTTP 200 with content:null and usage.total_tokens:0 when the upstream quota
+  // is exhausted or the request is rejected. Without this warning the client
+  // sees an empty assistant message with no clue why. Surface a structured
+  // diagnostic so operators can correlate it with provider quota dashboards.
+  const totalTokens =
+    typeof (usage as Record<string, unknown> | null)?.total_tokens === "number"
+      ? ((usage as Record<string, unknown>).total_tokens as number)
+      : 0;
+  if (
+    finishReason === "stop" &&
+    joinedContent.length === 0 &&
+    !joinedReasoning &&
+    finalToolCalls.length === 0 &&
+    totalTokens === 0
+  ) {
+    const modelId =
+      typeof result.model === "string" ? (result.model as string) : "unknown";
+    console.warn(
+      `[chat] upstream returned empty response (model=${modelId}, finish_reason=stop, content_length=0, usage.total_tokens=0) — likely upstream quota exhausted, rate limit, or rejected request. Check provider dashboard.`
+    );
+  }
+
   return result;
 }
 
