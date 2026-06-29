@@ -126,6 +126,8 @@ export interface RegistryEntry {
   defaultContextLength?: number;
   /** Optional session pool config for rate limit management */
   poolConfig?: Record<string, unknown>;
+  /** When true, keep X-Stainless-* headers on OpenAI-compatible requests. */
+  preserveStainlessHeaders?: boolean;
 }
 
 export interface LegacyProvider {
@@ -143,6 +145,8 @@ export interface LegacyProvider {
   chatPath?: string;
   clientVersion?: string;
   timeoutMs?: number;
+  /** When true, keep X-Stainless-* headers on OpenAI-compatible requests. */
+  preserveStainlessHeaders?: boolean;
 }
 
 // Kimi K2.7 Code (released 2026-06-12): coding-focused successor to K2.6 — 1T

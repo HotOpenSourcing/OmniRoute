@@ -378,3 +378,4 @@ zai-analysis/*
 zai-investigation/*
 extract-oauth-client.mjs
 zai-decompiled/*
+.kimchi/*

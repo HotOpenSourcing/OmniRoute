@@ -46,6 +46,9 @@ export function generateLegacyProviders(): Record<string, LegacyProvider> {
     if (typeof entry.timeoutMs === "number") {
       p.timeoutMs = entry.timeoutMs;
     }
+    if (entry.preserveStainlessHeaders === true) {
+      p.preserveStainlessHeaders = true;
+    }
 
     // Headers
     const mergedHeaders = {

@@ -152,6 +152,67 @@ function asRecord(value: unknown): JsonRecord {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : {};
 }
 
+/**
+ * Detect an upstream error that is delivered inside an otherwise HTTP-200 SSE stream.
+ * Some gateways (e.g. Kimchi) emit credit-exhaustion failures as `event: error` or as a
+ * `data: {"error":...}` payload while still returning HTTP 200. Without this check the
+ * streaming pipeline treats the empty body as a successful completion and the user sees
+ * a blank assistant reply.
+ */
+function extractInBandStreamError(
+  payload: unknown,
+  eventType?: string
+): { status: number; message: string; code: string } | null {
+  const record = asRecord(payload);
+
+  // Only treat explicit error frames / error payloads as in-band failures. Leave
+  // normal content-bearing protocols (OpenAI choices, Claude lifecycle, Responses,
+  // Gemini candidates) alone so existing paths keep forwarding them.
+  if (eventType !== "error" && record.error == null) return null;
+
+  const hasContentShape =
+    Array.isArray(record.choices) ||
+    Array.isArray(record.candidates) ||
+    (typeof record.type === "string" &&
+      (record.type.startsWith("message") ||
+        record.type.startsWith("content_block") ||
+        record.type.startsWith("response."))) ||
+    record.object === "chat.completion" ||
+    record.object === "chat.completion.chunk" ||
+    (record.response && typeof record.response === "object" && !Array.isArray(record.response));
+
+  if (hasContentShape) return null;
+
+  const err = record.error;
+  let message = "";
+  let code: unknown;
+
+  if (err && typeof err === "object" && !Array.isArray(err)) {
+    const errRecord = err as JsonRecord;
+    if (typeof errRecord.message === "string") message = errRecord.message;
+    code = errRecord.code;
+  } else if (typeof err === "string") {
+    message = err;
+  }
+
+  if (!message && typeof record.message === "string") {
+    message = record.message;
+  }
+  if (!message) return null;
+
+  let status = HTTP_STATUS.BAD_GATEWAY;
+  if (typeof code === "number" && code >= 400 && code <= 599) {
+    status = code;
+  } else if (typeof code === "string") {
+    const numeric = Number(code);
+    if (Number.isFinite(numeric) && numeric >= 400 && numeric <= 599) {
+      status = numeric;
+    }
+  }
+
+  return { status, message, code: String(code ?? status) };
+}
+
 const STREAM_SUMMARY_TEXT_LIMIT = 64 * 1024;
 
 function appendBoundedText(current: string, next: string): string {
@@ -861,6 +922,44 @@ export function createSSEStream(options: StreamOptions = {}) {
     controller.error(markPendingRequestCleared(new Error(msg)));
   };
 
+  const emitInBandStreamErrorAndAbort = (
+    controller: TransformStreamDefaultController,
+    status: number,
+    message: string,
+    code?: string
+  ) => {
+    clearIdleTimer();
+    console.warn(
+      `[STREAM] Upstream returned in-band error (status=${status}, provider=${provider || "unknown"}, model=${model || "unknown"}): ${message}`
+    );
+    const errorBody = buildErrorBody(status, message);
+    const errOutput = formatSSE(errorBody, FORMATS.OPENAI);
+    reqLogger?.appendConvertedChunk?.(errOutput);
+    clientPayloadCollector.push(errorBody);
+    controller.enqueue(encoder.encode(errOutput));
+    if (shouldEmitDoneTerminator) {
+      const doneLine = "data: [DONE]\n\n";
+      reqLogger?.appendConvertedChunk?.(doneLine);
+      controller.enqueue(encoder.encode(doneLine));
+    }
+    let failureHandled = false;
+    if (onFailure) {
+      try {
+        failureHandled =
+          onFailure({
+            status,
+            message,
+            code: code || String(status),
+            type: "upstream_error",
+          }) === true;
+      } catch {}
+    }
+    if (!failureHandled) {
+      clearPendingRequestFromStream();
+    }
+    controller.error(markPendingRequestCleared(new Error(message)));
+  };
+
   const emitTranslatedClientItem = (
     controller: TransformStreamDefaultController,
     item: Record<string, unknown>
@@ -1172,6 +1271,20 @@ export function createSSEStream(options: StreamOptions = {}) {
                   eventType: passthroughEventPrefix.eventType(),
                 })
               : null;
+
+            const inBandError = extractInBandStreamError(
+              parsedPassthroughData,
+              passthroughEventPrefix.eventType()
+            );
+            if (inBandError) {
+              emitInBandStreamErrorAndAbort(
+                controller,
+                inBandError.status,
+                inBandError.message,
+                inBandError.code
+              );
+              return;
+            }
 
             if (trimmed.startsWith("data:")) {
               const providerPayload = parsedPassthroughData ?? parseSSELine(trimmed);
@@ -1841,6 +1954,18 @@ export function createSSEStream(options: StreamOptions = {}) {
 
           const parsed = parseSSELine(trimmed);
           if (!parsed) continue;
+
+          const inBandError = extractInBandStreamError(parsed);
+          if (inBandError) {
+            emitInBandStreamErrorAndAbort(
+              controller,
+              inBandError.status,
+              inBandError.message,
+              inBandError.code
+            );
+            return;
+          }
+
           providerPayloadCollector.push(parsed);
 
           if (parsed && parsed.done) {

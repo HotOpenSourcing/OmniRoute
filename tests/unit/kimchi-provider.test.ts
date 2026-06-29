@@ -73,10 +73,7 @@ function mockKimchiModelsResponse() {
 
 test("PROVIDER_MODELS_CONFIG has a kimchi entry targeting llm.kimchi.dev/openai/v1/models", () => {
   // Re-import the route module to read the private config via module evaluation.
-  assert.ok(
-    "GET" in modelsRoute,
-    "models route module should export GET"
-  );
+  assert.ok("GET" in modelsRoute, "models route module should export GET");
 });
 
 test("GET /models probes Kimchi upstream with Stainless SDK headers", async () => {
@@ -152,7 +149,11 @@ test("GET /models falls back to local catalog when Kimchi upstream is down", asy
     assert.equal(response.status, 200);
     const body = (await response.json()) as ModelsBody;
     assert.equal(body.provider, "kimchi");
-    assert.equal(body.source, "local_catalog", "must fall back to registry catalog when upstream fails");
+    assert.equal(
+      body.source,
+      "local_catalog",
+      "must fall back to registry catalog when upstream fails"
+    );
     assert.ok(body.models.length > 0, "fallback catalog should contain built-in models");
     const ids = body.models.map((m) => m.id);
     assert.ok(ids.includes("minimax-m3"), `fallback missing minimax-m3: ${ids.join(",")}`);
@@ -236,6 +237,61 @@ test("DefaultExecutor for kimchi emits Stainless SDK headers + Bearer auth", () 
   assert.equal(headers["Content-Type"], "application/json");
 });
 
+test("DefaultExecutor.execute preserves Stainless SDK headers for Kimchi", async () => {
+  await resetStorage();
+  const executor = new DefaultExecutor("kimchi");
+  let capturedHeaders: Record<string, string> = {};
+
+  globalThis.fetch = async (_input, init) => {
+    capturedHeaders = { ...(init?.headers as Record<string, string>) };
+    return new Response(
+      JSON.stringify({
+        id: "chatcmpl-test",
+        object: "chat.completion",
+        model: "kimi-k2.7",
+        choices: [
+          {
+            index: 0,
+            message: { role: "assistant", content: "ok" },
+            finish_reason: "stop",
+          },
+        ],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+  };
+
+  try {
+    await executor.execute({
+      model: "kimi-k2.7",
+      body: { messages: [{ role: "user", content: "hi" }] },
+      stream: false,
+      credentials: { apiKey: FAKE_KIMCHI_KEY },
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.equal(
+    capturedHeaders["user-agent"],
+    "kimchi/0.1.50",
+    "User-Agent must remain kimchi/0.1.50"
+  );
+  assert.equal(
+    capturedHeaders["x-stainless-package-version"],
+    "6.26.0",
+    "x-stainless-package-version must not be stripped"
+  );
+  assert.equal(
+    capturedHeaders["x-stainless-runtime-version"],
+    "v24.3.0",
+    "x-stainless-runtime-version must not be stripped"
+  );
+  assert.ok(capturedHeaders["x-stainless-os"], "x-stainless-os must not be stripped");
+  assert.ok(capturedHeaders["x-stainless-arch"], "x-stainless-arch must not be stripped");
+});
+
 test("DefaultExecutor.buildUrl for kimchi targets the registered base URL", () => {
   const executor = new DefaultExecutor("kimchi");
   const url = executor.buildUrl("minimax-m3", true, 0);
@@ -268,9 +324,7 @@ test("Kimchi registry models declare context length", () => {
 // ── Empty-response detection (silently-empty upstream) ───────────
 
 test("parseSSEToOpenAIResponse warns when upstream returns empty content + 0 tokens", async () => {
-  const { parseSSEToOpenAIResponse } = await import(
-    "../../open-sse/handlers/sseParser.ts"
-  );
+  const { parseSSEToOpenAIResponse } = await import("../../open-sse/handlers/sseParser.ts");
 
   // Simulate the exact Kimchi payload shape from the bug report:
   // single SSE event with content:null delta, finish_reason:stop, usage.total_tokens:0
@@ -303,16 +357,13 @@ test("parseSSEToOpenAIResponse warns when upstream returns empty content + 0 tok
       completion_tokens: 0,
       total_tokens: 0,
     });
-    assert.equal(
-      (result as any).choices[0].finish_reason,
-      "stop",
-      "finish_reason preserved"
-    );
+    assert.equal((result as any).choices[0].finish_reason, "stop", "finish_reason preserved");
     assert.ok(
-      warnings.some((w) =>
-        w.includes("upstream returned empty response") &&
-        w.includes("model=minimax-m3") &&
-        w.includes("usage.total_tokens=0")
+      warnings.some(
+        (w) =>
+          w.includes("upstream returned empty response") &&
+          w.includes("model=minimax-m3") &&
+          w.includes("usage.total_tokens=0")
       ),
       `expected diagnostic warning about empty upstream response; got: ${JSON.stringify(warnings)}`
     );
@@ -322,9 +373,7 @@ test("parseSSEToOpenAIResponse warns when upstream returns empty content + 0 tok
 });
 
 test("parseSSEToOpenAIResponse does NOT warn on a normal successful response", async () => {
-  const { parseSSEToOpenAIResponse } = await import(
-    "../../open-sse/handlers/sseParser.ts"
-  );
+  const { parseSSEToOpenAIResponse } = await import("../../open-sse/handlers/sseParser.ts");
 
   const fakeSSE = [
     "data: " +
@@ -333,9 +382,7 @@ test("parseSSEToOpenAIResponse does NOT warn on a normal successful response", a
         object: "chat.completion.chunk",
         created: 1782697868,
         model: "minimax-m3",
-        choices: [
-          { index: 0, delta: { role: "assistant", content: "Hi!" } },
-        ],
+        choices: [{ index: 0, delta: { role: "assistant", content: "Hi!" } }],
       }),
     "data: " +
       JSON.stringify({
@@ -358,6 +405,80 @@ test("parseSSEToOpenAIResponse does NOT warn on a normal successful response", a
     assert.ok(
       !warnings.some((w) => w.includes("upstream returned empty response")),
       `must not warn on normal response; got: ${JSON.stringify(warnings)}`
+    );
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
+test("extractSSEEventError surfaces Kimchi event:error exhausted-credits payload", async () => {
+  const { extractSSEEventError } = await import("../../open-sse/handlers/sseParser.ts");
+
+  const rawSSE = [
+    "event: error",
+    'data: {"error":{"code":502,"message":"the provider ai-enabler has exhausted its credits"}}',
+    "",
+  ].join("\n");
+
+  const message = extractSSEEventError(rawSSE);
+  assert.equal(
+    message,
+    "the provider ai-enabler has exhausted its credits",
+    "expected sanitized upstream error message"
+  );
+});
+
+test("extractSSEEventError returns null when no error event is present", async () => {
+  const { extractSSEEventError } = await import("../../open-sse/handlers/sseParser.ts");
+
+  const rawSSE = [
+    "data: " +
+      JSON.stringify({
+        id: "chatcmpl-ok",
+        choices: [{ index: 0, delta: { content: "Hi" } }],
+      }),
+  ].join("\n");
+
+  assert.equal(extractSSEEventError(rawSSE), null);
+});
+
+test("parseSSEToOpenAIResponse empty-response warning includes upstream error body", async () => {
+  const { parseSSEToOpenAIResponse } = await import("../../open-sse/handlers/sseParser.ts");
+
+  const rawSSE = [
+    "event: error",
+    'data: {"error":{"code":502,"message":"the provider ai-enabler has exhausted its credits"}}',
+    "",
+    "data: " +
+      JSON.stringify({
+        id: "chatcmpl-bug",
+        object: "chat.completion.chunk",
+        created: 1782697868,
+        model: "minimax-m3",
+        choices: [
+          {
+            index: 0,
+            delta: { role: "assistant", content: null },
+            finish_reason: "stop",
+          },
+        ],
+        usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+      }),
+  ].join("\n");
+
+  const warnings: string[] = [];
+  const originalWarn = console.warn;
+  console.warn = (msg: string) => warnings.push(String(msg));
+  try {
+    const result = parseSSEToOpenAIResponse(rawSSE, "minimax-m3");
+    assert.ok(result);
+    assert.ok(
+      warnings.some(
+        (w) =>
+          w.includes("upstream returned empty response") &&
+          w.includes("ai-enabler has exhausted its credits")
+      ),
+      `expected actionable upstream error in warning; got: ${JSON.stringify(warnings)}`
     );
   } finally {
     console.warn = originalWarn;
