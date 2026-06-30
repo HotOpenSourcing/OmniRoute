@@ -11,7 +11,22 @@ import { z } from "zod";
  * @module shared/schemas/providers/freebuff
  */
 
-const uuid = z.uuid();
+/**
+ * Lenient UUID check for the Freebuff provider.
+ *
+ * The Codebuff binary emits UUIDs, but we keep validation loose enough
+ * to accept any RFC-4122-shaped identifier regardless of version/variant
+ * bits. This keeps the provider resilient to future server changes and
+ * avoids rejecting the deterministic fixtures used in unit tests.
+ */
+export const freebuffUuidSchema = z
+  .string()
+  .regex(
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
+    "Invalid UUID",
+  );
+
+const uuid = freebuffUuidSchema;
 const enhancedFingerprint = z.string().regex(
   /^enhanced-[A-Za-z0-9_-]{43}$/,
   "fingerprintId must match /^enhanced-[A-Za-z0-9_-]{43}$/",

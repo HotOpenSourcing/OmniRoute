@@ -11,7 +11,7 @@ import { resolve } from "node:path";
  * file stays on `node:test` so it runs in the cheap `test:unit` lane.
  */
 
-const ROOT = resolve(__dirname, "../../../..");
+const ROOT = resolve(import.meta.dirname, "../../../..");
 
 function readJson(relativePath: string): Record<string, unknown> {
   return JSON.parse(

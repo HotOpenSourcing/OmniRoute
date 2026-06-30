@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { createRequire } from "node:module";
 import { arch, cpus, hostname, networkInterfaces, platform } from "node:os";
 import { z } from "zod";
 
@@ -67,8 +68,12 @@ function detectShell(): string {
 export function captureFreebuffHardwareSnapshot(): FreebuffHardwareSnapshot {
   let machineId = "";
   try {
-    // node-machine-id is declared in types/global.d.ts
-    const mod = require("node-machine-id") as {
+    // The project is ESM ("type": "module"); use createRequire so this works
+    // under Node ESM without converting captureFreebuffHardwareSnapshot to
+    // async (it is called from synchronous OAuth paths).
+    // node-machine-id is declared in types/global.d.ts.
+    const requireFromHere = createRequire(import.meta.url);
+    const mod = requireFromHere("node-machine-id") as {
       machineIdSync?: (original?: boolean) => string;
       default?: { machineIdSync?: (original?: boolean) => string };
     };

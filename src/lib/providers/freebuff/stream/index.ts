@@ -1,45 +1,45 @@
 /**
- * Freebuff (Codebuff Free Tier) SSE transformer.
+ * Freebuff (Codebuff Free Tier) SSE transformer — facade module.
  *
  * Converts the proprietary Codebuff SSE stream emitted by `freebuff.exe`
  * into standard OpenAI / Anthropic SSE formats consumable by third-party
  * clients (openai SDK, anthropic SDK, Open WebUI, etc.).
  *
- * SPEC-DERIVED TYPES — NOTE
- * --------------------------
- * The `CodebuffEvent` shapes below are derived from the prose of the
- * Freebuff chunked spec (Chunks 1 / 5). They cover the events named in the
- * spec — `response-chunk`, `reasoning_delta`, `subagent-response-chunk`,
- * `tool-call-request`, `prompt-response`, `prompt-error` — but the precise
- * field names of the JSON payloads (especially `agentId` / `arguments` /
- * `countryBlockReason`) are best-effort guesses and **must be recalibrated**
- * once Chunk 1 lands real zod schemas extracted from the binary.
+ * ALINGED WITH `events.ts` — Chunk 1
+ * ----------------------------------
+ * As of Chunk 1, the canonical event types live in
+ * `src/lib/providers/freebuff/events.ts` (extracted from
+ * `~/.config/manicode/freebuff.exe`). This module:
  *
- * Each consumer of these types should import them from this module so the
- * recalibration is a one-file diff.
+ *   - Re-exports `CodebuffEvent` and the canonical parser
+ *   - Owns the SSE-framing `CodebuffSseParser` that turns raw bytes into
+ *     `CodebuffEvent` instances via `parseCodebuffEvent`
+ *   - Owns the `formatSseFrame` helper used by both transformers
+ *   - Owns the `friendlyErrorMessage` mapper (Chunk 5 acceptance:
+ *     country_blocked → readable message, no stack traces)
+ *   - Owns the `createTransformer` factory
+ *
+ * The per-format transformers (`openaiTransformer.ts`,
+ * `anthropicTransformer.ts`) consume `CodebuffEvent` directly and have
+ * no knowledge of SSE framing.
  */
 
 // ---------------------------------------------------------------------------
-// Source event types (Codebuff SSE).
+// Re-export the canonical event types and parser from `events.ts`.
 // ---------------------------------------------------------------------------
 
-export type CodebuffEvent =
-  | { type: "response-chunk"; text: string }
-  | { type: "reasoning_delta"; text: string }
-  | { type: "subagent-response-chunk"; agentId: string; text: string }
-  | {
-      type: "tool-call-request";
-      id: string;
-      name: string;
-      arguments: unknown;
-    }
-  | { type: "prompt-response" }
-  | {
-      type: "prompt-error";
-      code?: string;
-      message: string;
-      countryBlockReason?: string;
-    };
+export type {
+  CodebuffEvent,
+  ReasoningDeltaEvent,
+  ToolCallEvent,
+  ToolCallRequestEvent,
+  ResponseChunkEvent,
+  SubagentResponseChunkEvent,
+  PromptResponseEvent,
+  PromptErrorEvent,
+} from "../events.ts";
+
+export { parseCodebuffEvent, safeParseCodebuffEvent } from "../events.ts";
 
 // ---------------------------------------------------------------------------
 // Transformer contract.
@@ -60,15 +60,20 @@ export interface TransformerOptions {
 }
 
 // ---------------------------------------------------------------------------
-// SSE parser — consumes raw bytes and yields typed Codebuff events.
+// SSE parser — consumes raw bytes and yields canonical CodebuffEvent
+// instances via `parseCodebuffEvent`. The framing (event:/data: lines)
+// is split here; payload normalisation is delegated to events.ts.
 // ---------------------------------------------------------------------------
+
+import type { CodebuffEvent } from "../events.ts";
+import { safeParseCodebuffEvent } from "../events.ts";
 
 const EVENT_SEPARATOR = "\n\n";
 
 export class CodebuffSseParser {
   private buffer = "";
 
-  /**Feed a chunk of decoded text. Returns 0..N complete events. */
+  /** Feed a chunk of decoded text. Returns 0..N complete events. */
   push(chunk: string): CodebuffEvent[] {
     this.buffer += chunk;
     const events: CodebuffEvent[] = [];
@@ -82,7 +87,7 @@ export class CodebuffSseParser {
     return events;
   }
 
-  /**Flush any trailing partial block at end-of-stream. */
+  /** Flush any trailing partial block at end-of-stream. */
   flush(): CodebuffEvent[] {
     if (this.buffer.trim().length === 0) return [];
     const block = this.buffer;
@@ -103,74 +108,30 @@ function parseBlock(block: string): CodebuffEvent | null {
     } else if (line.startsWith("data:")) {
       dataLines.push(line.slice("data:".length).trimStart());
     }
-    // Comment lines (starting with ":") and other fields are ignored.
+    // Comment lines (":…") and other fields are ignored.
   }
 
-  if (!eventType) return null;
-
   const data = dataLines.join("\n");
-  let parsed: Record<string, unknown> = {};
-  if (data.length > 0) {
+
+  // Build the payload — three cases:
+  //   1. data is empty → use the event type as a hint, otherwise null
+  //   2. data is valid JSON → use it directly
+  //   3. data is non-JSON → treat it as raw text (binary-observed shape)
+  let payload: unknown;
+  if (data.length === 0) {
+    payload = eventType ? { type: eventType } : null;
+  } else {
     try {
-      parsed = JSON.parse(data);
+      payload = JSON.parse(data);
     } catch {
-      // Non-JSON data is treated as an empty payload. This is intentional —
-      // `prompt-response` and similar end-marker events may not carry data.
+      payload = data;
     }
   }
 
-  switch (eventType) {
-    case "response-chunk":
-      return { type: "response-chunk", text: stringField(parsed, "text", "") };
-    case "reasoning_delta":
-      return {
-        type: "reasoning_delta",
-        text: stringField(parsed, "text", ""),
-      };
-    case "subagent-response-chunk":
-      return {
-        type: "subagent-response-chunk",
-        agentId: stringField(parsed, "agentId", ""),
-        text: stringField(parsed, "text", ""),
-      };
-    case "tool-call-request":
-      return {
-        type: "tool-call-request",
-        id: stringField(parsed, "id", ""),
-        name: stringField(parsed, "name", ""),
-        arguments: parsed.arguments,
-      };
-    case "prompt-response":
-      return { type: "prompt-response" };
-    case "prompt-error":
-      return {
-        type: "prompt-error",
-        code: optionalStringField(parsed, "code"),
-        message: stringField(parsed, "message", "Unknown error"),
-        countryBlockReason: optionalStringField(parsed, "countryBlockReason"),
-      };
-    default:
-      // Unknown events are dropped on the floor. The transformer must be
-      // forward-compatible with future Codebuff event additions.
-      return null;
-  }
-}
+  if (payload === null || payload === undefined) return null;
 
-function stringField(
-  obj: Record<string, unknown>,
-  key: string,
-  fallback: string,
-): string {
-  const v = obj[key];
-  return typeof v === "string" ? v : fallback;
-}
-
-function optionalStringField(
-  obj: Record<string, unknown>,
-  key: string,
-): string | undefined {
-  const v = obj[key];
-  return typeof v === "string" ? v : undefined;
+  const result = safeParseCodebuffEvent(payload);
+  return result.ok ? result.event : null;
 }
 
 // ---------------------------------------------------------------------------

@@ -15,6 +15,7 @@ import {
   freebuffStreakSchema,
   getStreak,
   FreebuffMetaError,
+  resolveFreebuffConnectionId,
 } from "@/lib/providers/freebuff/metaService";
 
 export async function GET(request: Request) {
@@ -24,9 +25,21 @@ export async function GET(request: Request) {
       { status: 401 },
     );
   }
+  const connectionId = resolveFreebuffConnectionId(request);
+  if (!connectionId) {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Missing ?connectionId= query parameter",
+          type: "missing_connection_id",
+        },
+      },
+      { status: 400 },
+    );
+  }
 
   try {
-    const streak = await getStreak();
+    const streak = await getStreak(connectionId);
     const parsed = freebuffStreakSchema.parse(streak);
     return NextResponse.json({ provider: "freebuff", streak: parsed });
   } catch (error) {

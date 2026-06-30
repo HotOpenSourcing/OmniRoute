@@ -21,9 +21,10 @@ import {
   pollLoginStatus,
   FreebuffMetaError,
 } from "@/lib/providers/freebuff/metaService";
+import { freebuffUuidSchema } from "@/shared/schemas/providers/freebuff";
 
 const querySchema = z.object({
-  flowId: z.string().uuid(),
+  flowId: freebuffUuidSchema,
 });
 
 export async function GET(request: Request) {

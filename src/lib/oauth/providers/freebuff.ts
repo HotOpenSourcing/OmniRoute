@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { generatePKCE } from "../utils/pkce";
+import { freebuffUuidSchema } from "@/shared/schemas/providers/freebuff";
+import { resolveFreebuffBaseUrl } from "@/lib/providers/freebuff/base";
 
 export const FREEBUFF_OAUTH_CONFIG = {
   id: "freebuff",
@@ -16,9 +18,26 @@ export const FREEBUFF_OAUTH_CONFIG = {
   pollTimeoutMs: 300000,
 } as const;
 
+/**
+ * Returns the OAuth authorize endpoint for the current tier.
+ * Honors `FREEBUFF_TIER` (defaults to `free` → freebuff.com).
+ */
+function resolveAuthorizeUrl(): string {
+  const base = resolveFreebuffBaseUrl().replace(/\/$/, "");
+  return `${base}/api/auth/cli/code`;
+}
+
+/**
+ * Returns the OAuth token/status endpoint for the current tier.
+ */
+function resolveTokenUrl(): string {
+  const base = resolveFreebuffBaseUrl().replace(/\/$/, "");
+  return `${base}/api/auth/cli/status`;
+}
+
 export const freebuffTokenSchema = z.object({
-  authToken: z.uuid(),
-  userId: z.uuid().optional(),
+  authToken: freebuffUuidSchema,
+  userId: freebuffUuidSchema.optional(),
   email: z.string().email().optional(),
 });
 export type FreebuffToken = z.infer<typeof freebuffTokenSchema>;
@@ -33,8 +52,8 @@ export type FreebuffPollStatus = z.infer<typeof freebuffPollStatusSchema>;
 
 export const freebuffPollResponseSchema = z.object({
   status: freebuffPollStatusSchema,
-  authToken: z.uuid().optional(),
-  userId: z.uuid().optional(),
+  authToken: freebuffUuidSchema.optional(),
+  userId: freebuffUuidSchema.optional(),
   email: z.string().email().optional(),
   error: z.string().optional(),
 });
@@ -132,7 +151,7 @@ export const freebuff = {
 
     let response: Response;
     try {
-      response = await doFetch(config.authorizeUrl, {
+      response = await doFetch(resolveAuthorizeUrl(), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -219,7 +238,7 @@ export const freebuff = {
         return { status: "error", error: "aborted" };
       }
 
-      const url = new URL(config.tokenUrl);
+      const url = new URL(resolveTokenUrl());
       url.searchParams.set("fingerprintId", fingerprintId);
       url.searchParams.set("fingerprintHash", fingerprintHash);
       url.searchParams.set("expiresAt", String(expiresAt));

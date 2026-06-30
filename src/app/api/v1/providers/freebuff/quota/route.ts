@@ -15,6 +15,7 @@ import {
   freebuffQuotaStateSchema,
   getQuotaState,
   FreebuffMetaError,
+  resolveFreebuffConnectionId,
 } from "@/lib/providers/freebuff/metaService";
 
 export async function GET(request: Request) {
@@ -24,9 +25,21 @@ export async function GET(request: Request) {
       { status: 401 },
     );
   }
+  const connectionId = resolveFreebuffConnectionId(request);
+  if (!connectionId) {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Missing ?connectionId= query parameter",
+          type: "missing_connection_id",
+        },
+      },
+      { status: 400 },
+    );
+  }
 
   try {
-    const quota = await getQuotaState();
+    const quota = await getQuotaState(connectionId);
     // Re-validate the response at the route boundary — defends against
     // upstream schema drift after Chunk 4 lands.
     const parsed = freebuffQuotaStateSchema.parse(quota);

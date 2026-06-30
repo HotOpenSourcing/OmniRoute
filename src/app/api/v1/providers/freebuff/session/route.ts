@@ -11,7 +11,11 @@
 
 import { NextResponse } from "next/server";
 import { isAuthenticated } from "@/shared/utils/apiAuth";
-import { releaseSession, FreebuffMetaError } from "@/lib/providers/freebuff/metaService";
+import {
+  releaseSession,
+  FreebuffMetaError,
+  resolveFreebuffConnectionId,
+} from "@/lib/providers/freebuff/metaService";
 
 export async function DELETE(request: Request) {
   if (!(await isAuthenticated(request))) {
@@ -20,9 +24,21 @@ export async function DELETE(request: Request) {
       { status: 401 },
     );
   }
+  const connectionId = resolveFreebuffConnectionId(request);
+  if (!connectionId) {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Missing ?connectionId= query parameter",
+          type: "missing_connection_id",
+        },
+      },
+      { status: 400 },
+    );
+  }
 
   try {
-    await releaseSession();
+    await releaseSession(connectionId);
     return new NextResponse(null, { status: 204 });
   } catch (error) {
     if (error instanceof FreebuffMetaError) {

@@ -33,13 +33,14 @@
  */
 
 import { z } from "zod";
+import { freebuffUuidSchema } from "@/shared/schemas/providers/freebuff";
 
 // ---------------------------------------------------------------------------
 // Shared building blocks.
 // ---------------------------------------------------------------------------
 
-/** UUID v4 — matches the `crypto.randomUUID()` calls observed in the binary. */
-export const codebuffUuidSchema = z.uuid();
+/** UUID — matches the identifiers observed in the Codebuff binary. */
+export const codebuffUuidSchema = freebuffUuidSchema;
 
 /** Confirmed wire shape for the `reasoning_delta` event. */
 export const reasoningDeltaEventSchema = z.object({
@@ -233,6 +234,10 @@ export type CodebuffEvent = z.infer<typeof codebuffEventSchema>;
  */
 export function parseCodebuffEvent(input: unknown): CodebuffEvent {
   if (typeof input === "string") {
+    // Spec-derived end-of-stream marker.
+    if (input === "prompt-response") {
+      return { type: "prompt-response" };
+    }
     // Binary-observed shape: text chunks are raw strings.
     return { type: "response-chunk", text: input };
   }
