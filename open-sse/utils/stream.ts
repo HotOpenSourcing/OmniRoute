@@ -752,6 +752,10 @@ export function createSSEStream(options: StreamOptions = {}) {
 
   // Guard against duplicate [DONE] events — ensures exactly one per stream
   let doneSent = false;
+  // Once an in-band upstream error has been enqueued, prevent transform/flush from
+  // emitting any more data or calling controller.error() (which would ResetQueue
+  // and lose the error SSE + [DONE] already enqueued).
+  let errorHandled = false;
   const providerPayloadCollector = createStructuredSSECollector({
     stage: "provider_response",
   });
@@ -919,7 +923,7 @@ export function createSSEStream(options: StreamOptions = {}) {
     if (decrementPendingRequest && !failureHandled) {
       clearPendingRequestFromStream();
     }
-    controller.error(markPendingRequestCleared(new Error(msg)));
+    errorHandled = true;
   };
 
   const emitInBandStreamErrorAndAbort = (
@@ -957,7 +961,7 @@ export function createSSEStream(options: StreamOptions = {}) {
     if (!failureHandled) {
       clearPendingRequestFromStream();
     }
-    controller.error(markPendingRequestCleared(new Error(message)));
+    errorHandled = true;
   };
 
   const emitTranslatedClientItem = (
@@ -1197,6 +1201,7 @@ export function createSSEStream(options: StreamOptions = {}) {
 
       transform(chunk, controller) {
         if (streamTimedOut) return;
+        if (errorHandled) return;
         lastChunkTime = Date.now();
         const text = decoder.decode(chunk, { stream: true });
         buffer += text;
@@ -2304,6 +2309,8 @@ export function createSSEStream(options: StreamOptions = {}) {
               controller.enqueue(encoder.encode(output));
             }
 
+            if (errorHandled) return;
+
             if (shouldInjectClaudeEmptyResponseOnFlush(claudeEmptyResponseLifecycle)) {
               emitClaudeEmptyStreamErrorAndAbort(controller);
               return;
@@ -2571,9 +2578,7 @@ export function createSSEStream(options: StreamOptions = {}) {
             if (!failureHandled) {
               clearPendingRequestFromStream();
             }
-            controller.error(
-              markPendingRequestCleared(new Error(err.message || "Upstream failure"))
-            );
+            errorHandled = true;
             return;
           }
 
