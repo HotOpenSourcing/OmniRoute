@@ -38,6 +38,10 @@ export function getKimchiHeaders(): Record<string, string> {
     "x-stainless-runtime": "node",
     "x-stainless-runtime-version": KIMCHI_STAINLESS_RUNTIME_VERSION,
     "x-stainless-timeout": "300",
+    // Required by Cast AI router for streaming to return 200 (part of the
+    // Stainless SDK session tracking that the router whitelists)
+    "x-session-id": "omniroute-kimchi",
+    "x-turn-index": "0",
   };
 }
 

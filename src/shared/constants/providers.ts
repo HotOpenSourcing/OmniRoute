@@ -428,6 +428,18 @@ export const APIKEY_PROVIDERS = {
     freeNote: "$200 free credits on signup - multi-model routing gateway",
     apiHint: "Get $200 free credits at https://agentrouter.org/register — no credit card required.",
   },
+  kimchi: {
+    id: "kimchi",
+    alias: "kimchi",
+    name: "Kimchi AI (Cast AI)",
+    icon: "eco",
+    color: "#E63946",
+    textIcon: "KC",
+    passthroughModels: false,
+    website: "https://kimchi.dev",
+    apiHint:
+      "Get a Kimchi API key (format: castai_v1_…) and paste it here. Requests are routed to https://llm.kimchi.dev/openai/v1/chat/completions.",
+  },
   "command-code": {
     id: "command-code",
     alias: "cmd",
@@ -2861,6 +2873,15 @@ export function getProviderByAlias(alias: string): AiProviderDefinition | null {
   }
   return null;
 }
+
+// Helper: Get provider by id (exact key lookup, falls back to alias scan)
+export function getProviderById(id: string): AiProviderDefinition | undefined {
+  if (Object.prototype.hasOwnProperty.call(AI_PROVIDERS, id)) {
+    return AI_PROVIDERS[id as AiProviderId];
+  }
+  return getProviderByAlias(id) ?? undefined;
+}
+
 
 // Helper: Get provider ID from alias
 export function resolveProviderId(aliasOrId: string): string {

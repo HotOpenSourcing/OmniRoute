@@ -12,10 +12,8 @@ import pino from "pino";
 import { buildErrorBody } from "@omniroute/open-sse/utils/error.ts";
 
 import { requireManagementAuth } from "@/lib/api/requireManagementAuth";
-import {
-  getAllKimchiModelMetadata,
-  refreshKimchiMetadata,
-} from "@/lib/db/kimchiMetadata";
+import { getAllKimchiModelMetadata } from "@/lib/db/kimchiMetadata";
+import { refreshKimchiMetadata } from "@omniroute/open-sse/services/kimchiMetadataPoller.ts";
 import { getProviderConnectionById } from "@/lib/db/providers";
 
 const logger = pino({ name: "kimchi-metadata-api" });

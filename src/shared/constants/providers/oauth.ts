@@ -228,4 +228,21 @@ export const OAUTH_PROVIDERS = {
       text: "Z.AI Coding Plan requires OAuth authentication via ZCode CLI flow. The provider uses JWT tokens for API access.",
     },
   },
+  freebuff: {
+    id: "freebuff",
+    alias: "fb",
+    name: "Freebuff (Codebuff Free Tier)",
+    icon: "zap",
+    color: "#F97316",
+    textIcon: "FB",
+    website: "https://codebuff.com",
+    authHint:
+      "Codebuff free tier (codebuff.com). Login via OAuth PKCE, or paste credentials.json from ~/.config/manicode/. Note: the hardware fingerprint may not match between OmniRoute server and your local CLI; paste mode is recommended for remote deployments.",
+    serviceKinds: ["llm"],
+    subscriptionRisk: true,
+    riskNoticeVariant: "oauth",
+    notice: {
+      text: "Freebuff uses a PKCE polling OAuth flow against codebuff.com. If polling fails (fingerprint mismatch, headless server), paste credentials.json exported from the local manicode CLI.",
+    },
+  },
 };

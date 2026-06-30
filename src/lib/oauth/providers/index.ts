@@ -28,6 +28,7 @@ import { kilocode } from "./kilocode";
 import { cline } from "./cline";
 import { zaiCodingPlan } from "./zaiCodingPlan";
 import { codebuddyCn } from "./codebuddy-cn";
+import { freebuff } from "./freebuff";
 
 export const PROVIDERS = {
   claude,
@@ -50,6 +51,7 @@ export const PROVIDERS = {
   "devin-cli": windsurf,
   "zai-coding-plan": zaiCodingPlan,
   "codebuddy-cn": codebuddyCn,
+  freebuff,
 };
 
 export default PROVIDERS;
