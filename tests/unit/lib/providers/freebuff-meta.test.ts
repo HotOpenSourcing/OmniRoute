@@ -2,17 +2,11 @@ import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  NOT_IMPLEMENTED_ERROR,
   FreebuffMetaError,
   freebuffQuotaStateSchema,
   freebuffStreakSchema,
   freebuffLoginStartSchema,
   freebuffLoginStatusSchema,
-  getQuotaState,
-  getStreak,
-  startLogin,
-  pollLoginStatus,
-  releaseSession,
   unauthorizedError,
 } from "../../../../src/lib/providers/freebuff/metaService.ts";
 
@@ -30,33 +24,7 @@ import {
 } from "../../../../src/lib/providers/freebuff/stream/index.ts";
 
 // ---------------------------------------------------------------------------
-// metaService — stubs throw NOT_IMPLEMENTED_ERROR.
-// ---------------------------------------------------------------------------
-
-describe("freebuff metaService stubs", () => {
-  test("getQuotaState throws NOT_IMPLEMENTED_ERROR", async () => {
-    await assert.rejects(getQuotaState, { message: NOT_IMPLEMENTED_ERROR });
-  });
-
-  test("getStreak throws NOT_IMPLEMENTED_ERROR", async () => {
-    await assert.rejects(getStreak, { message: NOT_IMPLEMENTED_ERROR });
-  });
-
-  test("startLogin throws NOT_IMPLEMENTED_ERROR", async () => {
-    await assert.rejects(startLogin, { message: NOT_IMPLEMENTED_ERROR });
-  });
-
-  test("pollLoginStatus throws NOT_IMPLEMENTED_ERROR regardless of flowId", async () => {
-    await assert.rejects(() => pollLoginStatus("00000000-0000-0000-0000-000000000000"), {
-      message: NOT_IMPLEMENTED_ERROR,
-    });
-  });
-
-  test("releaseSession throws NOT_IMPLEMENTED_ERROR", async () => {
-    await assert.rejects(releaseSession, { message: NOT_IMPLEMENTED_ERROR });
-  });
-});
-
+// Public schemas round-trip the documented shapes.
 // ---------------------------------------------------------------------------
 // Public schemas round-trip the documented shapes.
 // ---------------------------------------------------------------------------

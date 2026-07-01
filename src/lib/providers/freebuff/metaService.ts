@@ -4,9 +4,8 @@ import {
   freebuffSessionStatusSchema,
   getFreebuffQuota,
   releaseFreebuffSlot,
-  FREEBUFF_OAUTH_CONFIG,
 } from "@/lib/providers/freebuff";
-import { freebuff } from "@/lib/oauth/providers/freebuff";
+import { freebuff, FREEBUFF_OAUTH_CONFIG } from "@/lib/oauth/providers/freebuff";
 import { generateFreebuffFingerprint } from "@/lib/oauth/freebuff/fingerprint";
 import {
   freebuffConnectionSchema,
@@ -107,10 +106,6 @@ export const notFoundError = (message: string): FreebuffMetaError =>
   new FreebuffMetaError(message, 404, "not_found");
 export const upstreamError = (status: number, message: string): FreebuffMetaError =>
   new FreebuffMetaError(message, 502, `upstream_${status}`);
-
-/** Sentinel kept for backwards compatibility with the original stub. */
-export const NOT_IMPLEMENTED_ERROR =
-  "freebuff metaService not implemented — see Chunk 4 (provider)";
 
 /**
  * Resolve the Freebuff connection for the given provider connection id.

@@ -203,7 +203,7 @@ messages. Stack traces and internal codes are stripped.
 | `401` | Missing / invalid `Authorization` | `{"error": {"message": "Authentication required", "type": "auth_required"}}` |
 | `429` | Codebuff rate limit | `{"error": {"message": "Codebuff rate limit reached. Wait a few seconds...", "type": "rate_limited"}}` |
 | `451` | Region blocked by Codebuff | `{"error": {"message": "Request blocked by Codebuff for region: ...", "type": "country_blocked"}}` |
-| `501` | Provider backend not yet wired (Chunk 4 missing) | `{"error": {"message": "...", "type": "not_implemented", "code": "CHUNK_4_PENDING"}}` |
+| `501` | Provider backend not yet wired | `{"error": {"message": "...", "type": "not_implemented", "code": "CHUNK_4_PENDING"}}` |
 | `502` | Upstream Codebuff unreachable / failed | `{"error": {"message": "...", "type": "upstream_error"}}` |
 | `500` | Unexpected internal error | `{"error": {"message": "Internal error", "type": "internal_error"}}` |
 

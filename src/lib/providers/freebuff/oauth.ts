@@ -21,14 +21,6 @@
  * endpoint paths — those are provided via env vars
  * (`FREEBUFF_OAUTH_BASE_URL`, `FREEBUFF_OAUTH_CLIENT_ID`) with sensible
  * defaults that match the binary's download URL pattern.
- *
- * STATUS — STUB
- * -------------
- * The HTTP client (`oauthHttpRequest`) is a thin `fetch` wrapper that
- * works today against any server returning the documented shapes.
- * Until Chunk 4 lands the persisted connection store, the return value
- * is *not* automatically saved — callers must pass it to
- * `saveFreebuffConnection` (defined in the Chunk 1 zod schema module).
  */
 
 import { z } from "zod";

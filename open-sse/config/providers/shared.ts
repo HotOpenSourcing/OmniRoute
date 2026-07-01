@@ -141,6 +141,12 @@ export interface RegistryEntry {
    * so the authenticated path is never affected.
    */
   anonymousApiKey?: string;
+  /**
+   * When true, preserve Stainless-style headers (x-stainless-*) from the client
+   * request and pass them upstream. Used by providers that expect these headers
+   * for compatibility with Stainless SDK clients.
+   */
+  preserveStainlessHeaders?: boolean;
 }
 
 export interface LegacyProvider {
@@ -158,6 +164,7 @@ export interface LegacyProvider {
   chatPath?: string;
   clientVersion?: string;
   timeoutMs?: number;
+  preserveStainlessHeaders?: boolean;
 }
 
 // Kimi K2.7 Code (released 2026-06-12): coding-focused successor to K2.6 — 1T

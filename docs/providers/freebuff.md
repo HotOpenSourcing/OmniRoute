@@ -129,7 +129,7 @@ is fetched on demand — click **Refresh**.
 | `country_blocked` errors | Datacenter IP blocked by Codebuff | Route through residential proxy |
 | `fingerprint mismatch` on first PKCE attempt | Running OmniRoute in Docker / cloud | Use **Path B** instead |
 | `409 Conflict` on first request | Another `freebuff` instance is running | Sign out or kill the other instance |
-| All routes return `501 Not Implemented` | Chunk 4 (provider layer) not deployed | Upgrade to a release that ships the provider |
+| All routes return `501 Not Implemented` | Provider backend not yet wired for this endpoint | Check OmniRoute release notes for the provider backend status |
 
 ## Environment variables
 
@@ -144,4 +144,3 @@ is fetched on demand — click **Refresh**.
 
 - [freebuff-api.md](./freebuff-api.md) — Developer reference for the
   HTTP endpoints and SSE wire formats.
-- [Chunk 9 CHANGELOG entry](../../CHANGELOG.md) — release notes.

@@ -5,7 +5,7 @@
  * into standard OpenAI / Anthropic SSE formats consumable by third-party
  * clients (openai SDK, anthropic SDK, Open WebUI, etc.).
  *
- * ALINGED WITH `events.ts` — Chunk 1
+ * ALIGNED WITH `events.ts` — Chunk 1
  * ----------------------------------
  * As of Chunk 1, the canonical event types live in
  * `src/lib/providers/freebuff/events.ts` (extracted from
@@ -115,7 +115,10 @@ function parseBlock(block: string): CodebuffEvent | null {
 
   // Build the payload — three cases:
   //   1. data is empty → use the event type as a hint, otherwise null
-  //   2. data is valid JSON → use it directly
+  //   2. data is valid JSON → use it directly, then stamp `type` from the
+  //      SSE `event:` line so discriminated unions in `events.ts` can
+  //      route on it. The upstream server does not always include
+  //      `type` inside the JSON body, so the event line is authoritative.
   //   3. data is non-JSON → treat it as raw text (binary-observed shape)
   let payload: unknown;
   if (data.length === 0) {
@@ -123,6 +126,14 @@ function parseBlock(block: string): CodebuffEvent | null {
   } else {
     try {
       payload = JSON.parse(data);
+      if (
+        eventType &&
+        payload &&
+        typeof payload === "object" &&
+        !Array.isArray(payload)
+      ) {
+        (payload as Record<string, unknown>).type = eventType;
+      }
     } catch {
       payload = data;
     }
