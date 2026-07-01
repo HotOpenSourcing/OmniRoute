@@ -1,13 +1,15 @@
 /**
  * POST /api/v1/providers/freebuff/login/start
  *
- * Starts a new PKCE login flow against Codebuff. Returns a `loginUrl` the
- * user must open in a browser, plus a `flowId` for polling status.
+ * Starts a new device-code login flow against Codebuff. Returns a
+ * `loginUrl` the user must open in a browser, plus the `fingerprintHash`
+ * and `expiresAt` the caller must persist to poll status.
  *
  * Auth: Bearer OmniRoute API key.
  *
- * Response shape: see `freebuffLoginStartSchema` in
- * `src/lib/providers/freebuff/metaService.ts`.
+ * Response shape: see `freebuffLoginStartSchema` (re-exported from
+ * `src/lib/providers/freebuff/oauth.ts`) — wire format per rapport
+ * `rapport-architecture-reseau-avance.md` §5.3.
  */
 
 import { NextResponse } from "next/server";
@@ -28,7 +30,16 @@ export async function POST(request: Request) {
 
   try {
     const start = await startLogin();
-    const parsed = freebuffLoginStartSchema.parse(start);
+    // `startLogin` returns the wire-format shape (loginUrl, fingerprintHash,
+    // expiresAt) directly — no translation needed. The legacy `flowId`
+    // field is kept on the internal API for backward compatibility with
+    // older dashboard clients but is intentionally dropped from the wire.
+    const wireShape = {
+      loginUrl: start.loginUrl,
+      fingerprintHash: start.fingerprintHash,
+      expiresAt: start.expiresAt,
+    };
+    const parsed = freebuffLoginStartSchema.parse(wireShape);
     return NextResponse.json({ provider: "freebuff", login: parsed });
   } catch (error) {
     if (error instanceof FreebuffMetaError) {

@@ -191,6 +191,12 @@ const RENAMED_MIGRATION_COMPATIBILITY = [
     toVersion: "059",
     toName: "manifest_routing",
   },
+  {
+    fromVersion: "108",
+    fromName: "kimchi_model_metadata",
+    toVersion: "110",
+    toName: "kimchi_model_metadata",
+  },
 ] as const;
 
 const LEGACY_VERSION_SLOT_MIGRATIONS = [
@@ -526,6 +532,11 @@ function isSchemaAlreadyApplied(
       // was dropped on integration; this canonical migration creates the table
       // that recordPluginExecution()/getPluginAnalytics() rely on.
       return hasTable(db, "plugin_analytics");
+    case "110":
+      // Retroactive guard for kimchi_model_metadata migration renumbered from 108
+      // (108 collided with 108_provider_quota_reset_events on merge). DBs that
+      // already applied 108_kimchi_model_metadata should not re-run as 110.
+      return hasTable(db, "provider_model_metadata");
     default:
       return false;
   }

@@ -1,26 +1,31 @@
 /**
- * Freebuff OAuth / device-code flow — Chunk 2.
+ * Freebuff OAuth / device-code flow.
  *
- * PROTOCOL OBSERVED IN freebuff.exe
- * --------------------------------
- * The CLI starts a "device code" style flow rather than standard PKCE.
- * Concretely, the binary:
+ * PROTOCOL OBSERVED IN codebuff/freebuff CLI
+ * -----------------------------------------
+ * The CLI starts a device-code style flow (no standard PKCE). Static
+ * analysis of the monorepo at `~/.config/manicode/codebuff` (rapport
+ * `rapport-architecture-reseau-avance.md` §5.3 + `rapport-architecture-
+ * freebuff.md` §3.3) confirms the wire shape:
  *
- *   1. POSTs to a Codebuff endpoint to obtain an `auth_code` (a short,
- *      opaque, base64-like string).
- *   2. Constructs the user-facing URL as
- *      `https://freebuff.com/login?auth_code=<auth_code>` and prints it
- *      alongside "Open this URL in your browser to login" + "copy link".
- *   3. Polls a status endpoint until the user completes the browser-side
- *      login. The CLI text "Waiting for login..." is the visible
- *      spinner during this loop.
- *   4. On success, the server returns the persisted credentials
- *      (`authToken` + `fingerprintId` + `userId` + `userEmail`).
+ *   1. POST `/api/auth/cli/code` with `{ fingerprintId }` → server returns
+ *      `{ loginUrl, fingerprintHash, expiresAt }`.
+ *   2. User opens `loginUrl` in browser and completes Codebuff login.
+ *   3. CLI polls `GET /api/auth/cli/status?fingerprintId&fingerprintHash
+ *      &expiresAt` every 5 s for up to 5 min.
+ *   4. On success, server returns
+ *      `{ status: "completed", user: { authToken, fingerprintId,
+ *      fingerprintHash, userId, userEmail } }`.
  *
- * This module reproduces the wire shape without hardcoding the exact
- * endpoint paths — those are provided via env vars
- * (`FREEBUFF_OAUTH_BASE_URL`, `FREEBUFF_OAUTH_CLIENT_ID`) with sensible
- * defaults that match the binary's download URL pattern.
+ * The endpoints are env-overridable via `FREEBUFF_OAUTH_BASE_URL` (default
+ * `https://codebuff.com`); for the free tier, set
+ * `FREEBUFF_OAUTH_BASE_URL=https://freebuff.com`.
+ *
+ * Module conventions:
+ * - Bearer auth happens at the call sites (Phase 5), not here.
+ * - The `fingerprintId` is computed upstream by `fingerprint.ts`.
+ * - Errors thrown as `FreebuffOAuthError` carry `(status, code)` so callers
+ *   can branch on `country_blocked`, `rate_limited`, etc.
  */
 
 import { z } from "zod";
@@ -32,11 +37,14 @@ import { freebuffUuidSchema } from "@/shared/schemas/providers/freebuff";
 
 export const FREEBUFF_OAUTH_TIMEOUT_MS = 300_000;
 
+/** Default poll cadence — matches the CLI spinner (5 s between polls). */
+export const FREEBUFF_OAUTH_POLL_INTERVAL_MS = 5_000;
+
 export interface FreebuffOAuthEndpoints {
-  /** POST — start a new device-code flow. Returns auth_code + login_url. */
-  start: string;
+  /** POST — start a new device-code flow. */
+  code: string;
   /** GET — poll status of an in-flight flow. */
-  poll: string;
+  status: string;
 }
 
 export function getFreebuffOAuthEndpoints(): FreebuffOAuthEndpoints {
@@ -44,9 +52,21 @@ export function getFreebuffOAuthEndpoints(): FreebuffOAuthEndpoints {
     process.env.FREEBUFF_OAUTH_BASE_URL ?? "https://codebuff.com"
   ).replace(/\/+$/, "");
   return {
-    start: `${base}/api/v1/cli-auth/start`,
-    poll: `${base}/api/v1/cli-auth/status`,
+    code: `${base}/api/auth/cli/code`,
+    status: `${base}/api/auth/cli/status`,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Fingerprint triple — what callers must persist across the device-code flow.
+// ---------------------------------------------------------------------------
+
+export interface FreebuffFingerprintTriple {
+  fingerprintId: string;
+  /** SHA-256 hex (64 chars) returned by `startLogin`. */
+  fingerprintHash: string;
+  /** ISO-8601 timestamp after which the flow expires. */
+  expiresAt: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -54,35 +74,51 @@ export function getFreebuffOAuthEndpoints(): FreebuffOAuthEndpoints {
 // ---------------------------------------------------------------------------
 
 export const freebuffLoginStartResponseSchema = z.object({
-  flowId: freebuffUuidSchema,
-  authCode: z.string().min(8),
+  /** URL the user must open in a browser to complete the login. */
   loginUrl: z.string().url(),
+  /** Server-returned fingerprint hash; required for status polling. */
+  fingerprintHash: z.string().regex(/^[a-f0-9]{64}$/),
+  /** ISO-8601 timestamp after which the flow expires. */
   expiresAt: z.string().datetime(),
 });
 export type FreebuffLoginStartResponse = z.infer<
   typeof freebuffLoginStartResponseSchema
 >;
 
-export const freebuffLoginStatusResponseSchema = z.object({
-  flowId: freebuffUuidSchema,
-  status: z.enum(["pending", "completed", "expired", "error"]),
-  /** Populated only when status === "completed". */
-  authToken: freebuffUuidSchema.optional(),
-  fingerprintId: z
-    .string()
-    .regex(/^enhanced-[A-Za-z0-9_-]{43}$/)
-    .optional(),
-  fingerprintHash: z
-    .string()
-    .regex(/^[a-f0-9]{64}$/)
-    .optional(),
-  userId: freebuffUuidSchema.optional(),
-  userEmail: z.string().email().optional(),
-  /** Human-readable error when status === "error". */
-  error: z.string().optional(),
-  /** ISO-8601 timestamp after which the flow can no longer complete. */
-  expiresAt: z.string().datetime().optional(),
+const freebuffLoginPendingSchema = z.object({
+  status: z.literal("pending"),
 });
+
+const freebuffLoginExpiredSchema = z.object({
+  status: z.literal("expired"),
+});
+
+const freebuffLoginCompletedSchema = z.object({
+  status: z.literal("completed"),
+  user: z.object({
+    authToken: freebuffUuidSchema,
+    fingerprintId: z.string().min(1),
+    fingerprintHash: z.string().regex(/^[a-f0-9]{64}$/),
+    userId: freebuffUuidSchema,
+    userEmail: z.string().email(),
+  }),
+});
+
+const freebuffLoginErrorSchema = z.object({
+  status: z.literal("error"),
+  /** Human-readable error message. */
+  error: z.string(),
+});
+
+export const freebuffLoginStatusResponseSchema = z.discriminatedUnion(
+  "status",
+  [
+    freebuffLoginPendingSchema,
+    freebuffLoginExpiredSchema,
+    freebuffLoginCompletedSchema,
+    freebuffLoginErrorSchema,
+  ],
+);
 export type FreebuffLoginStatusResponse = z.infer<
   typeof freebuffLoginStatusResponseSchema
 >;
@@ -94,7 +130,7 @@ export type FreebuffLoginStatusResponse = z.infer<
 export interface PollOptions {
   /** Total time budget before giving up. Default 5 min. */
   timeoutMs?: number;
-  /** Initial delay between polls. Default 2 s — matches the CLI spinner. */
+  /** Initial delay between polls. Default 5 s — matches the CLI spinner. */
   intervalMs?: number;
   /** Cap on the polling interval (exponential backoff ceiling). */
   maxIntervalMs?: number;
@@ -108,8 +144,8 @@ export interface PollOptions {
 
 const DEFAULT_POLL: Required<Omit<PollOptions, "signal" | "fetcher">> = {
   timeoutMs: FREEBUFF_OAUTH_TIMEOUT_MS,
-  intervalMs: 2_000,
-  maxIntervalMs: 8_000,
+  intervalMs: FREEBUFF_OAUTH_POLL_INTERVAL_MS,
+  maxIntervalMs: 16_000,
   backoffFactor: 1.5,
 };
 
@@ -117,69 +153,64 @@ const DEFAULT_POLL: Required<Omit<PollOptions, "signal" | "fetcher">> = {
 // Public API.
 // ---------------------------------------------------------------------------
 
+export interface StartLoginOptions {
+  /** Fingerprint id computed upstream by `fingerprint.ts`. */
+  fingerprintId: string;
+  /** Inject a custom fetch (tests use this to mock the HTTP layer). */
+  fetcher?: typeof fetch;
+  /** Optional abort signal — typically the request `signal`. */
+  signal?: AbortSignal;
+}
+
 /**
- * Start a new OAuth flow. Calls the upstream `start` endpoint, then
- * builds the user-facing login URL. The returned `loginUrl` is exactly
- * the shape printed by the CLI:
- *
- *   https://freebuff.com/login?auth_code=<authCode>
- *
- * (or whatever domain `FREEBUFF_OAUTH_BASE_URL` resolves to).
+ * Start a new OAuth flow. POSTs the fingerprint id to the upstream `code`
+ * endpoint and returns the login URL + fingerprint hash that the caller
+ * must persist for the subsequent status poll.
  */
 export async function startLogin(
-  options: { fetcher?: typeof fetch; signal?: AbortSignal } = {},
+  options: StartLoginOptions,
 ): Promise<FreebuffLoginStartResponse> {
   const endpoints = getFreebuffOAuthEndpoints();
-  const clientId = process.env.FREEBUFF_OAUTH_CLIENT_ID ?? "freebuff-cli";
   const fetcher = options.fetcher ?? globalThis.fetch;
 
   if (!fetcher) {
     throw new Error("No fetch implementation available in this runtime");
   }
 
-  const res = await fetcher(endpoints.start, {
+  const res = await fetcher(endpoints.code, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
     },
-    body: JSON.stringify({ clientId }),
+    body: JSON.stringify({ fingerprintId: options.fingerprintId }),
     signal: options.signal,
   });
 
   const body = await res.json().catch(() => null);
   if (!res.ok) {
     const message =
-      body?.error?.message ?? `HTTP ${res.status} from ${endpoints.start}`;
+      body?.error?.message ?? `HTTP ${res.status} from ${endpoints.code}`;
     throw new FreebuffOAuthError(message, res.status, body?.error?.code);
   }
 
-  // The server may return either `authCode` directly, or a `loginUrl` it
-  // constructed server-side. If only `authCode` is present, build the URL
-  // to match the binary's documented pattern.
-  const candidate = freebuffLoginStartResponseSchema
-    .partial({ loginUrl: true })
-    .parse(body);
+  return freebuffLoginStartResponseSchema.parse(body);
+}
 
-  const loginUrl =
-    candidate.loginUrl ??
-    `${process.env.FREEBUFF_OAUTH_BASE_URL ?? "https://freebuff.com"}/login?auth_code=${encodeURIComponent(
-      candidate.authCode,
-    )}`;
-
-  return freebuffLoginStartResponseSchema.parse({
-    ...candidate,
-    loginUrl,
-  });
+export interface PollLoginStatusOptions {
+  /** Inject a custom fetch (tests use this to mock the HTTP layer). */
+  fetcher?: typeof fetch;
+  /** Optional abort signal — typically the request `signal`. */
+  signal?: AbortSignal;
 }
 
 /**
- * Poll a single in-flight flow. Thin wrapper over the status endpoint
- * with zod validation.
+ * Poll the status endpoint once. The caller must keep the `fingerprintHash`
+ * and `expiresAt` returned by `startLogin` for the lifetime of the flow.
  */
 export async function pollLoginStatus(
-  flowId: string,
-  options: { fetcher?: typeof fetch; signal?: AbortSignal } = {},
+  triple: FreebuffFingerprintTriple,
+  options: PollLoginStatusOptions = {},
 ): Promise<FreebuffLoginStatusResponse> {
   const endpoints = getFreebuffOAuthEndpoints();
   const fetcher = options.fetcher ?? globalThis.fetch;
@@ -187,8 +218,10 @@ export async function pollLoginStatus(
     throw new Error("No fetch implementation available in this runtime");
   }
 
-  const url = new URL(endpoints.poll);
-  url.searchParams.set("flowId", flowId);
+  const url = new URL(endpoints.status);
+  url.searchParams.set("fingerprintId", triple.fingerprintId);
+  url.searchParams.set("fingerprintHash", triple.fingerprintHash);
+  url.searchParams.set("expiresAt", triple.expiresAt);
 
   const res = await fetcher(url.href, {
     method: "GET",
@@ -199,7 +232,7 @@ export async function pollLoginStatus(
   const body = await res.json().catch(() => null);
   if (!res.ok && res.status !== 404) {
     const message =
-      body?.error?.message ?? `HTTP ${res.status} from ${endpoints.poll}`;
+      body?.error?.message ?? `HTTP ${res.status} from ${endpoints.status}`;
     throw new FreebuffOAuthError(message, res.status, body?.error?.code);
   }
 
@@ -208,11 +241,10 @@ export async function pollLoginStatus(
 
 /**
  * Poll until the flow completes, expires, or the timeout elapses.
- * Backoff is applied between polls; status updates are emitted via
- * the optional `onPoll` callback for UI spinners.
+ * Backoff is applied between polls.
  */
 export async function waitForLogin(
-  flowId: string,
+  triple: FreebuffFingerprintTriple,
   options: PollOptions = {},
 ): Promise<FreebuffLoginStatusResponse> {
   const opts = { ...DEFAULT_POLL, ...options };
@@ -236,7 +268,7 @@ export async function waitForLogin(
       );
     }
 
-    const status = await pollLoginStatus(flowId, {
+    const status = await pollLoginStatus(triple, {
       fetcher,
       signal: options.signal,
     });

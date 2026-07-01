@@ -13,6 +13,18 @@ import {
   type FreebuffConnection,
 } from "@/shared/schemas/providers/freebuff";
 
+// Re-export the canonical OAuth schemas/types from `oauth.ts` (Phase 1).
+// The local `freebuffLoginStartSchema` / `freebuffLoginStatusSchema` that
+// previously lived here used the legacy `flowId` field which has been
+// removed; callers should now use the wire-format-correct schemas in
+// `oauth.ts`.
+export {
+  freebuffLoginStartResponseSchema as freebuffLoginStartSchema,
+  freebuffLoginStatusResponseSchema as freebuffLoginStatusSchema,
+  type FreebuffLoginStartResponse as FreebuffLoginStart,
+  type FreebuffLoginStatusResponse as FreebuffLoginStatus,
+} from "./oauth.ts";
+
 /**
  * Freebuff provider meta-service.
  *
@@ -254,33 +266,24 @@ export async function getQuotaState(
   };
 }
 
-/** Returns the gamification streak state for the authenticated user. */
+/**
+ * Returns the gamification streak state for the authenticated user.
+ *
+ * NOTE: the upstream Codebuff/Freebuff backend does NOT expose a
+ * `/api/v1/freebuff/streak` endpoint — streak data is computed entirely
+ * client-side from local state (rapport-architecture-freebuff.md §10.1
+ * + `common/src/util/freebuff-streak.ts`). This function now returns a
+ * zeroed placeholder so the dashboard renders the Streak card without an
+ * upstream fetch; the UI is expected to populate it via local
+ * check-in events. Replace with a local store read once one exists.
+ */
 export async function getStreak(
-  connectionId: string,
+  _connectionId: string,
 ): Promise<FreebuffStreak> {
-  const { connection } = { connection: await loadFreebuffConnection(connectionId) };
-  const baseUrl = FREEBUFF_OAUTH_CONFIG.streakUrl.replace(/\/api\/v1\/freebuff\/streak$/, "");
-  const res = await fetch(`${baseUrl}/api/v1/freebuff/streak`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${connection.authToken}`,
-      Accept: "application/json",
-    },
-  });
-  if (!res.ok) {
-    throw upstreamError(res.status, `Streak fetch failed: HTTP ${res.status}`);
-  }
-  const raw = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  const streak = typeof raw.streak === "number" ? raw.streak : 0;
-  const longest =
-    typeof raw.longestStreak === "number" ? raw.longestStreak : streak;
   return {
-    currentStreak: streak,
-    longestStreak: longest,
-    lastCheckInAt:
-      typeof raw.lastCheckInAt === "string" ? raw.lastCheckInAt : null,
-    bonusCredits:
-      typeof raw.bonusCredits === "number" ? raw.bonusCredits : undefined,
+    currentStreak: 0,
+    longestStreak: 0,
+    lastCheckInAt: null,
   };
 }
 
@@ -288,27 +291,37 @@ export async function getStreak(
  * Starts a PKCE login flow. Returns the `loginUrl` the user must open
  * and a `flowId` to poll status with.
  *
- * The flowId is stored as a transient row in the connection store keyed
- * by the generated `auth_token` UUID so `pollLoginStatus` can recover it.
+ * The `flowId` is synthesized client-side and stored as a transient row
+ * in the connection store so `pollLoginStatus` can recover the upstream
+ * `fingerprintHash` + `expiresAt` triple returned by `startLogin` (rapport
+ * §5.3). The actual upstream call is delegated to `oauth.startLogin` which
+ * targets `POST /api/auth/cli/code` (the wire-format-correct endpoint).
  */
 export async function startLogin(): Promise<FreebuffLoginStart> {
   const { fingerprintId } = generateFreebuffFingerprint();
-  const { flowId, loginUrl, fingerprintHash, expiresAt } =
-    await freebuff.requestDeviceCode(FREEBUFF_OAUTH_CONFIG, fingerprintId);
+  const { startLogin: oauthStartLogin } = await import("./oauth.ts");
+  const { loginUrl, fingerprintHash, expiresAt } = await oauthStartLogin({
+    fingerprintId,
+  });
 
-  // Persist the transient flow state inside a sentinel connection.
+  // Synthesize a flowId (opaque client handle) and persist the triple
+  // keyed by it so pollLoginStatus can recover it.
+  const flowId = freebuffUuidSchema.parse(
+    globalThis.crypto.randomUUID(),
+  );
+
   const transient: FreebuffConnection = {
     authToken: "00000000-0000-4000-8000-000000000000", // placeholder
     fingerprintId,
     fingerprintHash,
-    loginCompletedAt: expiresAt,
+    loginCompletedAt: typeof expiresAt === "string" ? Date.parse(expiresAt) : expiresAt,
   };
   await saveFreebuffConnection(transient);
 
   return {
     flowId,
     loginUrl,
-    expiresAt: new Date(expiresAt).toISOString(),
+    expiresAt: typeof expiresAt === "string" ? expiresAt : new Date(expiresAt).toISOString(),
   };
 }
 
@@ -318,8 +331,6 @@ export async function pollLoginStatus(
 ): Promise<FreebuffLoginStatus> {
   const all = await listFreebuffConnections();
   // The most-recently created transient connection is the active flow.
-  // `loginCompletedAt` carries the original `expiresAt` timestamp from
-  // `requestDeviceCode`. We re-derive the fingerprintId from it.
   const transient = all
     .map((c) => c.connection)
     .find((c) => c.authToken === "00000000-0000-4000-8000-000000000000");
@@ -331,39 +342,40 @@ export async function pollLoginStatus(
     };
   }
 
-  const expiresAt = transient.loginCompletedAt ?? Date.now() + 60_000;
-  const response = await freebuff.pollToken(
-    FREEBUFF_OAUTH_CONFIG,
-    flowId,
-    transient.fingerprintId,
-    transient.fingerprintHash ?? "0".repeat(64),
-    expiresAt,
-  );
+  const expiresAt =
+    transient.loginCompletedAt ?? Date.now() + 60_000;
+  const triple = {
+    fingerprintId: transient.fingerprintId,
+    fingerprintHash: transient.fingerprintHash ?? "0".repeat(64),
+    expiresAt: new Date(expiresAt).toISOString(),
+  };
 
-  if (response.status === "success" && response.authToken) {
+  const { pollLoginStatus: oauthPollLoginStatus } = await import("./oauth.ts");
+  const response = await oauthPollLoginStatus(triple);
+
+  if (response.status === "completed") {
     // Persist the real connection, replacing the transient.
-    await saveFreebuffConnection(
-      {
-        authToken: response.authToken,
-        fingerprintId: transient.fingerprintId,
-        fingerprintHash: transient.fingerprintHash,
-        userId: response.userId,
-        userEmail: response.email,
-        accessTier: "limited",
-        loginCompletedAt: Date.now(),
-      },
-    );
+    const { user } = response;
+    await saveFreebuffConnection({
+      authToken: user.authToken,
+      fingerprintId: transient.fingerprintId,
+      fingerprintHash: transient.fingerprintHash,
+      userId: user.userId,
+      userEmail: user.userEmail,
+      accessTier: "limited",
+      loginCompletedAt: Date.now(),
+    });
     return {
       flowId,
       status: "completed",
-      authToken: response.authToken,
+      authToken: user.authToken,
       fingerprintId: transient.fingerprintId,
-      userId: response.userId,
-      userEmail: response.email,
+      userId: user.userId,
+      userEmail: user.userEmail,
     };
   }
   if (response.status === "expired") {
-    return { flowId, status: "expired", error: response.error };
+    return { flowId, status: "expired" };
   }
   if (response.status === "error") {
     return { flowId, status: "error", error: response.error };
@@ -395,3 +407,202 @@ export {
 
 // Avoid an unused-binding lint for the helper kept for API symmetry.
 void freebuffSessionStatusSchema;
+
+// ---------------------------------------------------------------------------
+// Freebuff session lifecycle (rapport-architecture-freebuff.md §6.1 + §7.1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Response schema for `GET/POST /api/v1/freebuff/session`. Discriminated
+ * union on `status`. The upstream returns one of these shapes depending
+ * on whether the caller holds an active queue seat, is waiting, has been
+ * blocked, or is in a transient error state.
+ */
+export const freebuffSessionServerResponseSchema = z.discriminatedUnion(
+  "status",
+  [
+    z.object({
+      status: z.literal("none"),
+      accessTier: z.enum(["full", "limited"]),
+      rateLimitsByModel: z.record(z.unknown()).optional(),
+      referral: z.unknown().optional(),
+    }),
+    z.object({
+      status: z.literal("active"),
+      instanceId: z.string().min(1),
+      model: z.string().min(1),
+      admittedAt: z.string().datetime(),
+      expiresAt: z.string().datetime(),
+      remainingMs: z.number().int().nonnegative(),
+      rateLimit: z
+        .object({
+          model: z.string(),
+          limit: z.number().int().nonnegative(),
+          period: z.enum(["pacific_day", "pacific_week"]),
+          resetTimeZone: z.string(),
+          resetAt: z.string().datetime(),
+          windowHours: z.number().int().nonnegative().optional(),
+          recentCount: z.number().int().nonnegative(),
+        })
+        .optional(),
+    }),
+    z.object({
+      status: z.literal("ended"),
+      instanceId: z.string().optional(),
+      gracePeriodRemainingMs: z.number().int().nonnegative().optional(),
+      rateLimitsByModel: z.record(z.unknown()).optional(),
+    }),
+    z.object({
+      status: z.literal("superseded"),
+    }),
+    z.object({
+      status: z.literal("country_blocked"),
+      countryCode: z.string().length(2),
+      countryBlockReason: z.string(),
+      ipPrivacySignals: z.unknown().optional(),
+    }),
+    z.object({
+      status: z.literal("banned"),
+    }),
+    z.object({
+      status: z.literal("model_locked"),
+      currentModel: z.string(),
+      requestedModel: z.string(),
+    }),
+    z.object({
+      status: z.literal("model_unavailable"),
+      requestedModel: z.string(),
+      availableHours: z.string().optional(),
+    }),
+    z.object({
+      status: z.literal("rate_limited"),
+    }),
+    z.object({
+      status: z.literal("premium_slot_taken"),
+    }),
+    z.object({
+      status: z.literal("takeover_prompt"),
+    }),
+  ],
+);
+export type FreebuffSessionServerResponse = z.infer<
+  typeof freebuffSessionServerResponseSchema
+>;
+
+export interface FreebuffSessionFetchOptions {
+  authToken: string;
+  /** Freebuff `instanceId` (from a prior active session). */
+  instanceId?: string;
+  /** Optional fetcher override for tests. */
+  fetcher?: typeof fetch;
+  signal?: AbortSignal;
+}
+
+function sessionEndpoint(): string {
+  return FREEBUFF_OAUTH_CONFIG.sessionUrl;
+}
+
+/** SDK version string stamped on the `user-agent` header. Matches the
+ * pattern used by the CLI (rapport §8.2). Keep in sync with
+ * `FREEBUFF_SDK_VERSION` in `chatIntegration.ts`. */
+const FREEBUFF_SDK_VERSION = "1.0.0";
+
+/**
+ * Probe the current session state for the authenticated user. Thin
+ * wrapper around `GET /api/v1/freebuff/session`.
+ */
+export async function getFreebuffSession(
+  options: FreebuffSessionFetchOptions,
+): Promise<FreebuffSessionServerResponse> {
+  const fetcher = options.fetcher ?? globalThis.fetch;
+  if (!fetcher) throw new Error("No fetch implementation available");
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${options.authToken}`,
+    Accept: "application/json",
+    "user-agent": `ai-sdk/openai-compatible/${FREEBUFF_SDK_VERSION}/codebuff`,
+  };
+  if (options.instanceId) {
+    headers["x-freebuff-instance-id"] = options.instanceId;
+  }
+  const res = await fetcher(sessionEndpoint(), {
+    method: "GET",
+    headers,
+    signal: options.signal,
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw upstreamError(
+      res.status,
+      body?.error?.message ?? `HTTP ${res.status} from ${sessionEndpoint()}`,
+    );
+  }
+  return freebuffSessionServerResponseSchema.parse(body);
+}
+
+export interface FreebuffClaimSessionOptions extends FreebuffSessionFetchOptions {
+  /** Model id the caller wants to join the queue for. */
+  modelId: string;
+}
+
+/**
+ * Claim a queue seat (or rotate into a different model's queue) via
+ * `POST /api/v1/freebuff/session`. Sends `x-freebuff-model` so the
+ * upstream knows which model's queue to join.
+ */
+export async function claimFreebuffSession(
+  options: FreebuffClaimSessionOptions,
+): Promise<FreebuffSessionServerResponse> {
+  const fetcher = options.fetcher ?? globalThis.fetch;
+  if (!fetcher) throw new Error("No fetch implementation available");
+  const res = await fetcher(sessionEndpoint(), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${options.authToken}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "user-agent": `ai-sdk/openai-compatible/${FREEBUFF_SDK_VERSION}/codebuff`,
+      "x-freebuff-model": options.modelId,
+    },
+    body: JSON.stringify({ modelId: options.modelId }),
+    signal: options.signal,
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok && res.status !== 409) {
+    throw upstreamError(
+      res.status,
+      body?.error?.message ?? `HTTP ${res.status} from ${sessionEndpoint()}`,
+    );
+  }
+  return freebuffSessionServerResponseSchema.parse(body);
+}
+
+/**
+ * Release the current session via `DELETE /api/v1/freebuff/session`.
+ * Best-effort — failures are surfaced to the caller.
+ */
+export async function deleteFreebuffSession(
+  options: FreebuffSessionFetchOptions,
+): Promise<void> {
+  const fetcher = options.fetcher ?? globalThis.fetch;
+  if (!fetcher) throw new Error("No fetch implementation available");
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${options.authToken}`,
+    "user-agent": `ai-sdk/openai-compatible/${FREEBUFF_SDK_VERSION}/codebuff`,
+  };
+  if (options.instanceId) {
+    headers["x-freebuff-instance-id"] = options.instanceId;
+  }
+  const res = await fetcher(sessionEndpoint(), {
+    method: "DELETE",
+    headers,
+    signal: options.signal,
+  });
+  if (!res.ok && res.status !== 204) {
+    const body = await res.text().catch(() => "");
+    throw upstreamError(
+      res.status,
+      body || `HTTP ${res.status} from ${sessionEndpoint()}`,
+    );
+  }
+}
+

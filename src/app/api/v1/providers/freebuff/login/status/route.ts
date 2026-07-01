@@ -1,16 +1,19 @@
 /**
- * GET /api/v1/providers/freebuff/login/status?flowId=...
+ * GET /api/v1/providers/freebuff/login/status?fingerprintId=...&fingerprintHash=...&expiresAt=...
  *
- * Polls the status of an in-flight PKCE login flow. The dashboard calls
- * this every ~2 seconds after redirecting the user to the `loginUrl`.
+ * Polls the status of an in-flight device-code login flow. The dashboard
+ * calls this every ~5 seconds after redirecting the user to the `loginUrl`,
+ * passing the `fingerprintHash` + `expiresAt` returned by `/login/start`.
  *
  * Auth: Bearer OmniRoute API key.
  *
  * Query params:
- *   - flowId (uuid, required)
+ *   - fingerprintId    (string, required)
+ *   - fingerprintHash  (hex sha-256, 64 chars, required)
+ *   - expiresAt        (ISO-8601 datetime, required)
  *
- * Response shape: see `freebuffLoginStatusSchema` in
- * `src/lib/providers/freebuff/metaService.ts`.
+ * Response shape: see `freebuffLoginStatusSchema` (re-exported from
+ * `src/lib/providers/freebuff/oauth.ts`) — discriminated union on `status`.
  */
 
 import { NextResponse } from "next/server";
@@ -21,10 +24,11 @@ import {
   pollLoginStatus,
   FreebuffMetaError,
 } from "@/lib/providers/freebuff/metaService";
-import { freebuffUuidSchema } from "@/shared/schemas/providers/freebuff";
 
 const querySchema = z.object({
-  flowId: freebuffUuidSchema,
+  fingerprintId: z.string().min(1),
+  fingerprintHash: z.string().regex(/^[a-f0-9]{64}$/),
+  expiresAt: z.string().datetime(),
 });
 
 export async function GET(request: Request) {
@@ -37,14 +41,17 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const rawParams = {
-    flowId: url.searchParams.get("flowId") ?? undefined,
+    fingerprintId: url.searchParams.get("fingerprintId") ?? undefined,
+    fingerprintHash: url.searchParams.get("fingerprintHash") ?? undefined,
+    expiresAt: url.searchParams.get("expiresAt") ?? undefined,
   };
   const parsedQuery = querySchema.safeParse(rawParams);
   if (!parsedQuery.success) {
     return NextResponse.json(
       {
         error: {
-          message: "Invalid or missing flowId query parameter",
+          message:
+            "Invalid or missing query parameter (fingerprintId, fingerprintHash, expiresAt all required)",
           type: "validation_error",
           issues: parsedQuery.error.issues,
         },
@@ -54,7 +61,11 @@ export async function GET(request: Request) {
   }
 
   try {
-    const status = await pollLoginStatus(parsedQuery.data.flowId);
+    const status = await pollLoginStatus({
+      fingerprintId: parsedQuery.data.fingerprintId,
+      fingerprintHash: parsedQuery.data.fingerprintHash,
+      expiresAt: parsedQuery.data.expiresAt,
+    });
     const parsed = freebuffLoginStatusSchema.parse(status);
     return NextResponse.json({ provider: "freebuff", login: parsed });
   } catch (error) {

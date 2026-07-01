@@ -200,3 +200,31 @@ export function hasFreebuffModel(id: string): boolean {
 export function listFreebuffModels(): readonly FreebuffModel[] {
   return FREEBUFF_MODELS;
 }
+
+// ---------------------------------------------------------------------------
+// Freebuff root-agent mapping (rapport §5.2).
+// ---------------------------------------------------------------------------
+
+/**
+ * Model id → Freebuff root agent id. Used by the chat integration to stamp
+ * `codebuff.codebuff_metadata.cost_mode` (via `AGENT_MODE_TO_COST_MODE.LITE
+ * = "free"`) and to enforce the `FREE_MODE_AGENT_MODELS` allowlist server-side.
+ *
+ * Models missing from this map fall back to `base2-free` (generic).
+ */
+export const FREEBUFF_ROOT_AGENT_ID_BY_MODEL: Readonly<Record<string, string>> =
+  Object.freeze({
+    "mimo/mimo-v2.5": "base2-free-mimo",
+    "mimo/mimo-v2.5-pro": "base2-free-mimo-pro",
+    "minimax/minimax-m3": "base2-free-minimax-m3",
+    "minimax/minimax-m2.7": "base2-free",
+    "moonshotai/kimi-k2.6": "base2-free-kimi",
+    "deepseek/deepseek-v4-pro": "base2-free-deepseek",
+    "deepseek/deepseek-v4-flash": "base2-free-deepseek-flash",
+    "z-ai/glm-5.2": "base2-free-glm",
+  });
+
+/** Resolve the root agent id for a given Freebuff model id. */
+export function getFreebuffRootAgentIdForModel(model: string): string {
+  return FREEBUFF_ROOT_AGENT_ID_BY_MODEL[model] ?? "base2-free";
+}
