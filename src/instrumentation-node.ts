@@ -6,6 +6,10 @@
  * and emit spurious "not supported in Edge Runtime" warnings.
  */
 
+declare global {
+  var __omnirouteNodeBooted: boolean | undefined;
+}
+
 function getRandomBytes(byteLength: number): Uint8Array {
   const bytes = new Uint8Array(byteLength);
   globalThis.crypto.getRandomValues(bytes);
@@ -69,6 +73,12 @@ async function ensureSecrets(): Promise<void> {
 }
 
 export async function registerNodejs(): Promise<void> {
+  // Singleton guard — Next.js instrumentation hook should only fire once,
+  // but if the module is ever required through multiple paths this prevents
+  // duplicate background scheduler registrations and memory leaks.
+  if (globalThis.__omnirouteNodeBooted) return;
+  globalThis.__omnirouteNodeBooted = true;
+
   // Initialize proxy fetch patch FIRST (before any HTTP requests)
   await import("@omniroute/open-sse/index.ts");
   console.log("[STARTUP] Global fetch proxy patch initialized");
@@ -242,7 +252,7 @@ export async function registerNodejs(): Promise<void> {
   // Storage-configured scheduled VACUUM (#4437): registers the timer from
   // Settings > System & Storage and persists lastVacuumAt for the UI.
   try {
-    const { initVacuumScheduler } = await import("@/lib/db/vacuumScheduler");
+    const { init: initVacuumScheduler } = await import("@/lib/db/vacuumScheduler");
     initVacuumScheduler();
     console.log("[STARTUP] Scheduled VACUUM initialized (#4437)");
   } catch (err: unknown) {

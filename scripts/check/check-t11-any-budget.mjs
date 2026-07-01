@@ -5,17 +5,12 @@ import path from "node:path";
 
 const cwd = process.cwd();
 
-/**
- * T11 Phase-A budget:
- * keep explicit `any` at zero in files already hardened.
- */
 const budget = [
   { file: "src/app/api/settings/proxy/route.ts", maxAny: 0 },
   { file: "src/app/api/settings/proxy/test/route.ts", maxAny: 0 },
   { file: "src/shared/components/OAuthModal.tsx", maxAny: 0 },
   { file: "open-sse/translator/index.ts", maxAny: 0 },
   { file: "open-sse/translator/registry.ts", maxAny: 0 },
-  // Freeze legacy hot spots to avoid any-regression while strict migration continues.
   { file: "src/lib/db/apiKeys.ts", maxAny: 0 },
   { file: "src/lib/db/cliToolState.ts", maxAny: 0 },
   { file: "src/lib/db/encryption.ts", maxAny: 0 },
@@ -78,7 +73,7 @@ const budget = [
   { file: "open-sse/executors/default.ts", maxAny: 0 },
   { file: "open-sse/handlers/audioSpeech.ts", maxAny: 0 },
   { file: "open-sse/handlers/embeddings.ts", maxAny: 0 },
-  { file: "open-sse/handlers/imageGeneration.ts", maxAny: 3 },
+  { file: "open-sse/handlers/imageGeneration.ts", maxAny: 0 },
   { file: "open-sse/handlers/moderations.ts", maxAny: 0 },
   { file: "open-sse/handlers/rerank.ts", maxAny: 0 },
   { file: "open-sse/handlers/responsesHandler.ts", maxAny: 0 },
@@ -91,7 +86,7 @@ const budget = [
   { file: "open-sse/translator/helpers/responsesApiHelper.ts", maxAny: 0 },
   { file: "open-sse/translator/request/claude-to-gemini.ts", maxAny: 0 },
   { file: "open-sse/translator/request/gemini-to-openai.ts", maxAny: 0 },
-  { file: "open-sse/translator/request/openai-to-claude.ts", maxAny: 1 }, // 1 = string literal "any" (Claude tool_choice value, not a TS type) — #1072
+  { file: "open-sse/translator/request/openai-to-claude.ts", maxAny: 1 },
   { file: "open-sse/translator/request/openai-to-cursor.ts", maxAny: 0 },
   { file: "open-sse/translator/request/openai-to-kiro.ts", maxAny: 0 },
   { file: "open-sse/translator/response/claude-to-openai.ts", maxAny: 0 },
@@ -121,7 +116,6 @@ for (const item of budget) {
   }
 
   const content = fs.readFileSync(absolutePath, "utf8");
-  // Remove block and line comments to avoid false positives with the word "any" in comments
   let cleanContent = content.replace(/\/\*[\s\S]*?\*\//g, "");
   cleanContent = cleanContent.replace(/\/\/.*$/gm, "");
   const matches = cleanContent.match(anyRegex);

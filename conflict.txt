@@ -1,0 +1,19 @@
+diff --cc src/app/(dashboard)/dashboard/providers/[id]/page.tsx
+index 201988577,511fe4986..000000000
+--- a/src/app/(dashboard)/dashboard/providers/[id]/page.tsx
++++ b/src/app/(dashboard)/dashboard/providers/[id]/page.tsx
+@@@ -1506,7 -1509,10 +1509,14 @@@ export default function ProviderDetailP
+    const [batchDeleting, setBatchDeleting] = useState(false);
+    const [batchUpdating, setBatchUpdating] = useState<"activate" | "deactivate" | null>(null);
+    const [batchRetesting, setBatchRetesting] = useState(false);
+++<<<<<<< HEAD
+ +  const [showOnlyActive, setShowOnlyActive] = useState(providerId === "kiro");
+++=======
++   const [healthFilter, setHealthFilter] = useState<string>("all");
++   const [page, setPage] = useState(0);
++   const PAGE_SIZE = 50;
++   const [batchDeleteConfirmOpen, setBatchDeleteConfirmOpen] = useState(false);
+++>>>>>>> e1a9c61179513eedcce9e843137f0affed541b2a
+    const commandCodeAuthWindowRef = useRef<Window | null>(null);
+    const commandCodeAuthTimerRef = useRef<number | null>(null);
+    const pendingRiskActionRef = useRef<(() => void) | null>(null);

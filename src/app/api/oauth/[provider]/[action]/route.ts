@@ -9,10 +9,7 @@ import {
   pollForToken,
   resolveBrowserOAuthRedirectUri,
 } from "@/lib/oauth/providers";
-import {
-  persistOAuthConnection,
-  buildOAuthConnectionCreatePayload,
-} from "@/lib/oauth/connectionPersistence";
+import { persistOAuthConnection } from "@/lib/oauth/connectionPersistence";
 import { createDeviceFlowTicket, getDeviceFlowTicketStatus } from "@/lib/oauth/deviceFlowTickets";
 import {
   createProviderConnection,
@@ -66,7 +63,7 @@ const BROWSER_DEVICE_FLOW_PROVIDERS = new Set(["codex"]);
 const RETIRED_PKCE_PROVIDERS = new Set(["windsurf", "devin-cli"]);
 
 /** Providers that allow direct import of a raw API token (no OAuth exchange). */
-const IMPORT_TOKEN_PROVIDERS = new Set(["windsurf", "devin-cli", "grok-cli"]);
+const IMPORT_TOKEN_PROVIDERS = new Set(["windsurf", "devin-cli"]);
 
 /**
  * Constant-time string comparison to prevent timing-oracle attacks (CWE-208).
@@ -78,6 +75,96 @@ function safeEqual(a: string | null | undefined, b: string | null | undefined): 
   const bb = Buffer.from(String(b));
   if (ba.length !== bb.length) return false;
   return timingSafeEqual(ba, bb);
+}
+
+function parseWindsurfCallbackUrl(callbackUrl: string, expectedState?: string) {
+  let parsed: URL;
+  try {
+    parsed = new URL(callbackUrl);
+  } catch {
+    return {
+      ok: false as const,
+      error: {
+        message: "Invalid request",
+        details: [{ field: "callbackUrl", message: "Paste the full callback URL." }],
+      },
+    };
+  }
+
+  const fragmentParams = parsed.hash
+    .replace(/^#/, "")
+    .split("&")
+    .reduce<Record<string, string>>((acc, pair) => {
+      if (!pair) return acc;
+      const [rawKey, rawValue = ""] = pair.split("=", 2);
+      const key = decodeURIComponent(rawKey || "").trim();
+      if (!key) return acc;
+      acc[key] = decodeURIComponent(rawValue.replace(/\+/g, " ")).trim();
+      return acc;
+    }, {});
+
+  const code =
+    parsed.searchParams.get("code")?.trim() ||
+    parsed.searchParams.get("id_token")?.trim() ||
+    parsed.searchParams.get("access_token")?.trim() ||
+    fragmentParams.id_token ||
+    fragmentParams.access_token ||
+    fragmentParams.code ||
+    "";
+  const state = parsed.searchParams.get("state")?.trim() || fragmentParams.state || undefined;
+
+  if (!code) {
+    return {
+      ok: false as const,
+      error: {
+        message: "Invalid request",
+        details: [
+          {
+            field: "callbackUrl",
+            message:
+              "Callback URL must include a code, id_token, or access_token parameter. Open the Windsurf auth token page and paste the full callback URL after it redirects.",
+          },
+        ],
+      },
+    };
+  }
+
+  if (expectedState && !safeEqual(state, expectedState)) {
+    return {
+      ok: false as const,
+      error: {
+        message: "Invalid request",
+        details: [
+          {
+            field: "state",
+            message: "Callback URL state does not match the current auth session.",
+          },
+        ],
+      },
+    };
+  }
+
+  return { ok: true as const, code, state };
+}
+
+function resolveImportedConnectionMetadata(input: {
+  name?: string;
+  accountName?: string;
+  tagGroupLabel?: string;
+}) {
+  const normalizedName = input.name?.trim() || input.accountName?.trim() || undefined;
+  const normalizedAccountName = input.accountName?.trim() || normalizedName || undefined;
+  const normalizedGroup = input.tagGroupLabel?.trim() || undefined;
+
+  return {
+    name: normalizedName,
+    displayName: normalizedAccountName,
+    group: normalizedGroup,
+    providerSpecificData: {
+      ...(normalizedAccountName ? { accountName: normalizedAccountName } : {}),
+      ...(normalizedGroup ? { tagGroupLabel: normalizedGroup } : {}),
+    },
+  };
 }
 
 /**
@@ -115,7 +202,7 @@ export async function GET(
   // The action permanently does not exist for these providers regardless of who
   // is asking — answering 401 first would mislead callers into thinking the
   // route is gated rather than gone. See spec
-  // _tasks/superpowers/specs/2026-05-29-windsurf-login-fix-design.md.
+  // docs/superpowers/specs/2026-05-29-windsurf-login-fix-design.md.
   try {
     const earlyParams = await params;
     if (
@@ -152,12 +239,11 @@ export async function GET(
         searchParams.get("redirect_uri") || "http://localhost:8080/callback";
       const redirectUri = resolveBrowserOAuthRedirectUri(provider, requestedRedirectUri);
       const authData = generateAuthData(provider, redirectUri);
-      if (provider === "qoder" && !authData.authUrl) {
+      if (!authData.supported) {
         return NextResponse.json({
           ...authData,
           supported: false,
-          error:
-            "Qoder browser OAuth is experimental and disabled by default. Configure QODER_OAUTH_* environment variables or use a Personal Access Token.",
+          error: authData.disabledMessage || `${provider} OAuth is not enabled.`,
         });
       }
       // #3861: GitLab Duo needs a self-registered OAuth app. Without a client_id,
@@ -435,9 +521,37 @@ export async function POST(
     }
 
     if (action === "exchange") {
-      const { code, redirectUri, connectionId, codeVerifier, state } = body;
-      const normalizedState = typeof state === "string" && state.length > 0 ? state : undefined;
+      let { code, callbackUrl, redirectUri, connectionId, codeVerifier, state } = body;
       const providerData = getProvider(provider);
+
+      let windsurfUsedCallbackUrl = false;
+      if (provider === "windsurf" && callbackUrl) {
+        const parsed = parseWindsurfCallbackUrl(
+          callbackUrl,
+          typeof state === "string" ? state : undefined
+        );
+        if (!parsed.ok) {
+          return NextResponse.json({ error: parsed.error }, { status: 400 });
+        }
+
+        code = parsed.code;
+        state = parsed.state ?? state;
+        windsurfUsedCallbackUrl = true;
+      }
+
+      const normalizedState = typeof state === "string" && state.length > 0 ? state : undefined;
+
+      if (providerData.config?.enabled === false && provider !== "windsurf") {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              providerData.config?.disabledMessage ||
+              `${provider} OAuth is intentionally disabled.`,
+          },
+          { status: 400 }
+        );
+      }
 
       if (providerData.flowType === "authorization_code_pkce" && !codeVerifier) {
         return NextResponse.json(
@@ -463,6 +577,13 @@ export async function POST(
       const tokenData = await runWithProxyContextOrDirect(proxy, () =>
         exchangeTokens(provider, code, redirectUri, codeVerifier, normalizedState)
       );
+
+      if (provider === "windsurf" && windsurfUsedCallbackUrl) {
+        tokenData.providerSpecificData = {
+          ...(tokenData.providerSpecificData || {}),
+          authFlow: "windsurf-oauth-pkce",
+        };
+      }
 
       // Normalize: if name is missing, use email or displayName as fallback so accounts
       // always show a real label (e.g. user@gmail.com) instead of "Account #abc123"
@@ -500,9 +621,13 @@ export async function POST(
         }
       }
       if (!connection) {
-        connection = await createProviderConnection(
-          buildOAuthConnectionCreatePayload(provider, tokenData, expiresAt)
-        );
+        connection = await createProviderConnection({
+          provider,
+          authType: "oauth",
+          ...tokenData,
+          expiresAt,
+          testStatus: "active",
+        });
       }
 
       // Auto sync to Cloud if enabled
@@ -520,7 +645,33 @@ export async function POST(
     }
 
     if (action === "poll") {
-      const { deviceCode, connectionId, codeVerifier, extraData } = body;
+      const {
+        deviceCode,
+        connectionId,
+        codeVerifier,
+        extraData,
+        name,
+        accountName,
+        tagGroupLabel,
+      } = body;
+      const providerData = getProvider(provider);
+      const importedMetadata = resolveImportedConnectionMetadata({
+        name,
+        accountName,
+        tagGroupLabel,
+      });
+
+      if (providerData.config?.enabled === false) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              providerData.config?.disabledMessage ||
+              `${provider} OAuth is intentionally disabled.`,
+          },
+          { status: 400 }
+        );
+      }
 
       // Resolve proxy for this provider (provider-level → global → direct)
       const proxy = await resolveProxyForProvider(provider);
@@ -581,6 +732,15 @@ export async function POST(
           if (matchId) {
             connection = await updateProviderConnection(matchId, {
               ...result.tokens,
+              ...(importedMetadata.name ? { name: importedMetadata.name } : {}),
+              ...(importedMetadata.displayName
+                ? { displayName: importedMetadata.displayName }
+                : {}),
+              ...(importedMetadata.group ? { group: importedMetadata.group } : {}),
+              providerSpecificData: {
+                ...(result.tokens.providerSpecificData || {}),
+                ...importedMetadata.providerSpecificData,
+              },
               expiresAt,
               testStatus: "active",
               isActive: true,
@@ -588,9 +748,20 @@ export async function POST(
           }
         }
         if (!connection) {
-          connection = await createProviderConnection(
-            buildOAuthConnectionCreatePayload(provider, result.tokens, expiresAt)
-          );
+          connection = await createProviderConnection({
+            provider,
+            authType: "oauth",
+            ...result.tokens,
+            ...(importedMetadata.name ? { name: importedMetadata.name } : {}),
+            ...(importedMetadata.displayName ? { displayName: importedMetadata.displayName } : {}),
+            ...(importedMetadata.group ? { group: importedMetadata.group } : {}),
+            providerSpecificData: {
+              ...(result.tokens.providerSpecificData || {}),
+              ...importedMetadata.providerSpecificData,
+            },
+            expiresAt,
+            testStatus: "active",
+          });
         }
 
         // Auto sync to Cloud if enabled
@@ -601,6 +772,9 @@ export async function POST(
           connection: {
             id: connection.id,
             provider: connection.provider,
+            name: connection.name,
+            displayName: connection.displayName,
+            group: connection.group,
           },
         });
       }
@@ -717,9 +891,13 @@ export async function POST(
           }
         }
         if (!connection) {
-          connection = await createProviderConnection(
-            buildOAuthConnectionCreatePayload(provider, tokenData, expiresAt)
-          );
+          connection = await createProviderConnection({
+            provider,
+            authType: "oauth",
+            ...tokenData,
+            expiresAt,
+            testStatus: "active",
+          });
         }
 
         await syncToCloudIfEnabled();
@@ -787,9 +965,13 @@ export async function POST(
           }
         }
         if (!connection) {
-          connection = await createProviderConnection(
-            buildOAuthConnectionCreatePayload(provider, tokenData, expiresAt)
-          );
+          connection = await createProviderConnection({
+            provider,
+            authType: "oauth",
+            ...tokenData,
+            expiresAt,
+            testStatus: "active",
+          });
         }
 
         await syncToCloudIfEnabled();

@@ -1,0 +1,86 @@
+# Windsurf Investigation - Temporary Files and Captures
+# Added: 2026-05-03
+
+# Windsurf binary captures (protocol messages)
+windsurf_*.bin
+*.bin
+model_identity_response.bin
+trajectory_for_model_analysis.bin
+
+# Windsurf JSONL captures (runtime traces)
+windsurf-*.jsonl
+windsurf_*.jsonl
+
+# Windsurf temporary investigation files
+tmp_*windsurf*.mjs
+tmp_*windsurf*.cjs
+tmp_*windsurf*.js
+tmp_*windsurf*.py
+tmp_*windsurf*.ps1
+tmp_break_on_*.mjs
+tmp_capture_*.mjs
+tmp_decode_*.cjs
+tmp_deep_scan_*.mjs
+tmp_extract_*.mjs
+tmp_inspect_*.mjs
+tmp_install_*.mjs
+tmp_list_*.mjs
+tmp_live_*.mjs
+tmp_patch_*.mjs
+tmp_read_*.mjs
+tmp_targeted_*.mjs
+tmp_test_*.mjs
+tmp_verify_*.mjs
+
+# Windsurf temporary directories
+tmp/
+tmp_windsurf_*/
+
+# Windsurf auth tokens (sensitive)
+AUTHTOKENWIND
+windsurf_tokens.json
+windsurf_captured_tokens.json
+windsurf_inspector_tokens.json
+windsurf_leveldb_tokens.json
+windsurf_memory_tokens.json
+
+# Windsurf investigation output files
+windsurf_capture_log.txt
+windsurf_api_analysis.json
+windsurf_endpoint_discovery.json
+windsurf_network_monitor.json
+windsurf_probe_final_run.json
+windsurf-*-probe.json
+windsurf-*-capture.json
+windsurf-*-launch.json
+windsurf-*-report.json
+windsurf-*-evidence.json
+windsurf-*-status.json
+windsurf-*-bootstrap.json
+
+# Windsurf log files
+windsurf-*.log
+windsurf_*.log
+
+# Fiddler captures
+fiddler/
+
+# Python cache
+__pycache__/
+*.pyc
+tests/unit/__pycache__/
+
+# Build/output files
+npm-run-verbose.out
+typecheck-core.out
+*.out
+
+# Response/test files
+reponce
+STEP AUTH
+
+# Windsurf root-level documentation (already archived)
+# Keep these commented - decide per file if needed in git
+# WINDSURF_*.md
+# QUICKSTART-TOKEN-CAPTURE.md
+# START_HERE.md

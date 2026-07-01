@@ -66,6 +66,65 @@ export function extractSSEErrorMessage(rawSSE: unknown): string | null {
 }
 
 /**
+ * Extract a provider error message from an explicit SSE `event: error` frame.
+ *
+ * Some gateways (e.g. Kimchi) emit in-band failures as `event: error` with a
+ * `data:` payload such as `{"error":{"code":502,"message":"provider has
+ * exhausted its credits"}}` while still returning HTTP 200. This helper scans
+ * for that frame, parses the adjacent data payload, and returns a sanitized
+ * message so the caller can surface a real 502 instead of swallowing the
+ * actionable upstream reason.
+ */
+export function extractSSEEventError(rawSSE: unknown): string | null {
+  const lines = String(rawSSE || "").split("\n");
+  let pendingErrorEvent = false;
+
+  for (const rawLine of lines) {
+    const line = rawLine.replace(/\r$/, "");
+
+    if (line.startsWith("event:")) {
+      pendingErrorEvent = line.slice(6).trim() === "error";
+      continue;
+    }
+
+    if (line.trim() === "") {
+      pendingErrorEvent = false;
+      continue;
+    }
+
+    if (pendingErrorEvent && line.startsWith("data:")) {
+      const payload = line.slice(5).trim();
+      pendingErrorEvent = false;
+      if (!payload) continue;
+
+      try {
+        const parsed = JSON.parse(payload);
+        const err = (parsed as Record<string, unknown>)?.error;
+        let message = "";
+        if (err && typeof err === "object" && !Array.isArray(err)) {
+          const errRecord = err as Record<string, unknown>;
+          message =
+            typeof errRecord.message === "string"
+              ? errRecord.message
+              : JSON.stringify(err);
+        } else if (typeof parsed?.message === "string") {
+          message = parsed.message;
+        } else {
+          message = JSON.stringify(parsed);
+        }
+        const sanitized = sanitizeErrorMessage(message);
+        if (sanitized) return sanitized;
+      } catch {
+        const sanitized = sanitizeErrorMessage(payload);
+        if (sanitized) return sanitized;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
  * Convert OpenAI-style SSE chunks into a single non-streaming JSON response.
  * Used as a fallback when upstream returns text/event-stream for stream=false.
  */
@@ -301,6 +360,34 @@ export function parseSSEToOpenAIResponse(rawSSE, fallbackModel) {
 
   if (usage) {
     result.usage = usage;
+  }
+
+  // Diagnose silent upstream failures: Kimchi (and similar gateways) return
+  // HTTP 200 with content:null and usage.total_tokens:0 when the upstream quota
+  // is exhausted or the request is rejected. Without this warning the client
+  // sees an empty assistant message with no clue why. Surface a structured
+  // diagnostic so operators can correlate it with provider quota dashboards.
+  const totalTokens =
+    typeof (usage as Record<string, unknown> | null)?.total_tokens === "number"
+      ? ((usage as Record<string, unknown>).total_tokens as number)
+      : 0;
+  if (
+    finishReason === "stop" &&
+    joinedContent.length === 0 &&
+    !joinedReasoning &&
+    finalToolCalls.length === 0 &&
+    totalTokens === 0
+  ) {
+    const modelId =
+      typeof result.model === "string" ? (result.model as string) : "unknown";
+    // Capture any upstream error body that arrived in the same SSE stream so
+    // the warning is actionable instead of a generic quota guess (#kimchi).
+    const upstreamError =
+      extractSSEErrorMessage(rawSSE) || extractSSEEventError(rawSSE);
+    const errorSuffix = upstreamError ? `, upstream_error=${upstreamError}` : "";
+    console.warn(
+      `[chat] upstream returned empty response (model=${modelId}, finish_reason=stop, content_length=0, usage.total_tokens=0${errorSuffix}) — likely upstream quota exhausted, rate limit, or rejected request. Check provider dashboard.`
+    );
   }
 
   return result;

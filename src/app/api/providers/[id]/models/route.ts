@@ -38,6 +38,7 @@ import {
   buildGlmCodingHeaders,
   buildGlmModelsUrl,
 } from "@omniroute/open-sse/config/glmProvider.ts";
+import { getKimchiHeaders } from "@omniroute/open-sse/config/providers/registry/kimchi/index.ts";
 import { getImageProvider } from "@omniroute/open-sse/config/imageRegistry.ts";
 import { getVideoProvider } from "@omniroute/open-sse/config/videoRegistry.ts";
 import { resolveAntigravityVersion } from "@omniroute/open-sse/services/antigravityVersion.ts";
@@ -511,6 +512,18 @@ const PROVIDER_MODELS_CONFIG: Record<string, ProviderModelsConfigEntry> = {
     authHeader: "Authorization",
     authPrefix: "Bearer ",
     parseResponse: (data) => data.data || [],
+  },
+  // Kimchi AI exposes an OpenAI-compatible /v1/models catalog, but the upstream
+  // Cast AI router whitelists the official Kimchi Stainless SDK headers and
+  // User-Agent. Without them the probe gets 402/403 and falls back to the local
+  // catalog, causing sync-models to return 502 (it refuses to sync fallback).
+  kimchi: {
+    url: "https://llm.kimchi.dev/openai/v1/models",
+    method: "GET",
+    headers: getKimchiHeaders(),
+    authHeader: "Authorization",
+    authPrefix: "Bearer ",
+    parseResponse: (data) => normalizeOpenAiLikeModelsResponse(data, "kimchi"),
   },
   glhf: {
     url: "https://glhf.chat/api/openai/v1/models",

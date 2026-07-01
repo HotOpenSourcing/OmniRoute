@@ -199,6 +199,7 @@ const MODELS_DEV_PROVIDER_MAP: Record<string, string[]> = {
   "alibaba-coding-plan": ["bcp", "bailian-coding-plan"],
   zai: ["zai", "glm"], // GLM models via Z.AI
   "zai-coding-plan": ["zai", "glm"],
+  freebuff: ["mimo", "minimax", "kimi", "deepseek", "glm"],
   moonshotai: ["moonshot", "kimi"],
   "moonshotai-cn": ["moonshot", "kimi"],
   moonshot: ["moonshot", "kimi", "kimi-coding", "kmc", "kmca"],

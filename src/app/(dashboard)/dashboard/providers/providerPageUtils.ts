@@ -18,6 +18,12 @@ export interface ProviderStatsSnapshot {
   [key: string]: unknown;
 }
 
+export interface ProviderModelsDiscoverySnapshot {
+  status?: string | null;
+  source?: string | null;
+  transport?: string | null;
+}
+
 export interface ProviderEntry<TProvider = Record<string, unknown>> {
   providerId: string;
   provider: TProvider;
@@ -275,6 +281,38 @@ export function resolveDashboardProviderInfo(
   }
 ): ResolvedProviderCatalogEntry | null {
   return resolveProviderCatalogEntry(providerId, options);
+}
+
+export function formatProviderModelsDiscoverySummary(
+  discovery?: ProviderModelsDiscoverySnapshot | null
+): string | null {
+  if (!discovery) return null;
+
+  const transport = typeof discovery.transport === "string" ? discovery.transport.trim() : "";
+  const source = typeof discovery.source === "string" ? discovery.source.trim() : "";
+  const status = typeof discovery.status === "string" ? discovery.status.trim() : "";
+
+  if (transport === "acp_runtime") {
+    return "Live Windsurf ACP runtime discovery";
+  }
+
+  if (transport === "session_runtime") {
+    return source === "session/resume"
+      ? "Resumed Windsurf session discovery fallback"
+      : "Loaded Windsurf session discovery fallback";
+  }
+
+  if (transport === "local_catalog") {
+    if (status === "missing") {
+      return "Static Windsurf catalog fallback because runtime credentials are unavailable";
+    }
+    if (status === "failed") {
+      return "Static Windsurf catalog fallback because runtime discovery failed";
+    }
+    return "Static Windsurf catalog fallback";
+  }
+
+  return null;
 }
 
 /**

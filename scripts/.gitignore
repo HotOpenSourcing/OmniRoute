@@ -1,0 +1,329 @@
+# Windsurf Authentication Toolkit — Git Ignore
+
+# ============================================================================
+# CRITICAL: Security-sensitive files
+# ============================================================================
+
+# Token files (NEVER commit these!)
+tokens.json
+tokens_*.json
+*.tokens.json
+
+# Session files
+session_*.json
+windsurf_session_*.json
+
+# Credentials
+credentials.json
+secrets.json
+.env.local
+.env.*.local
+
+# ============================================================================
+# Python
+# ============================================================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+
+# pdm
+.pdm.toml
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# ============================================================================
+# IDEs and Editors
+# ============================================================================
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# ============================================================================
+# OS-specific
+# ============================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ============================================================================
+# Project-specific
+# ============================================================================
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# Debug files
+debug/
+*.debug
+
+# Test output
+test_output/
+test_results/
+
+# Cache
+.cache/
+*.cache
+
+# Local configuration
+local_config.json
+config.local.json
+
+# ============================================================================
+# Documentation build artifacts
+# ============================================================================
+
+# Sphinx
+_build/
+_static/
+_templates/
+
+# MkDocs
+site/
+
+# ============================================================================
+# Miscellaneous
+# ============================================================================
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Compiled binaries
+*.exe
+*.dll
+*.dylib
+
+# Package files
+*.deb
+*.rpm
+
+# Node modules (if any JS tooling is added)
+node_modules/
+package-lock.json
+yarn.lock
+
+# ============================================================================
+# Keep these files
+# ============================================================================
+
+# Force include important files even if they match patterns above
+!.gitignore
+!.gitkeep
+!README.md
+!requirements.txt
+!CHANGELOG.md
+!CONTRIBUTING.md
+!LICENSE
+
+# ============================================================================
+# Notes
+# ============================================================================
+
+# This .gitignore is specifically designed for the Windsurf Authentication
+# Toolkit. It protects sensitive token files and credentials from being
+# accidentally committed to version control.
+#
+# CRITICAL: Never commit tokens.json or any file containing sessionId or
+# csrfToken values. These are security-sensitive and should remain local.
+#
+# If you need to share example token files, use placeholder values:
+# {
+#   "sessionId": "example-session-id-abc123",
+#   "csrfToken": "example-csrf-token-xyz789"
+# }

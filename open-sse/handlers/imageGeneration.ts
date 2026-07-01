@@ -268,6 +268,26 @@ const FAL_PRESET_SIZES = {
   "1024x576": "landscape_16_9",
 };
 
+type ImageHandlerCredentials = {
+  apiKey?: string;
+  accessToken?: string;
+  baseUrl?: string;
+  providerSpecificData?: unknown;
+};
+
+type ImageHandlerLog = {
+  info?: (tag: string, msg: string) => void;
+  warn?: (tag: string, msg: string) => void;
+  error?: (tag: string, msg: string) => void;
+} | null;
+
+type ImageEditBody = Record<string, unknown> & {
+  prompt?: string;
+  size?: string;
+  quality?: string;
+  response_format?: string;
+};
+
 /**
  * Handle image generation request
  * @param {object} options
@@ -1126,11 +1146,11 @@ export async function handleImageEdit({
 }: {
   provider: string;
   model: string;
-  body: Record<string, any>;
+  body: ImageEditBody;
   imageBytes: Buffer;
   imageMime?: string; // accepted for symmetry with route layer; not used
-  credentials: any;
-  log: any;
+  credentials: ImageHandlerCredentials;
+  log: ImageHandlerLog;
   signal?: AbortSignal | null;
   clientHeaders?: Record<string, string> | null;
 }) {

@@ -147,6 +147,38 @@ function writeEnvFile(filePath, env) {
   writeFileSync(filePath, lines.join("\n"), "utf8");
 }
 
+function deriveStorageEncryptionKeys(secret) {
+  const salt = createHash("sha256").update(secret).digest().slice(0, 16);
+  const currentKey = scryptSync(secret, salt, 32);
+  const legacyKey = scryptSync(secret, "omniroute-field-encryption-v1", 32);
+  return [currentKey, legacyKey];
+}
+
+function canDecryptCredential(ciphertext, secret) {
+  if (!ciphertext?.startsWith("enc:v1:")) return true;
+
+  const parts = ciphertext.split(":");
+  if (parts.length < 5) return false;
+
+  const iv = Buffer.from(parts[2], "hex");
+  const ct = Buffer.from(parts[3], "hex");
+  const tag = Buffer.from(parts[4], "hex");
+
+  for (const key of deriveStorageEncryptionKeys(secret)) {
+    try {
+      const decipher = createDecipheriv("aes-256-gcm", key, iv);
+      decipher.setAuthTag(tag);
+      decipher.update(ct);
+      decipher.final();
+      return true;
+    } catch {
+      // Try the next supported key derivation.
+    }
+  }
+
+  return false;
+}
+
 // ── Main bootstrap function ──────────────────────────────────────────────────
 /**
  * @param {{ dataDirOverride?: string; quiet?: boolean }} options

@@ -92,7 +92,7 @@ export default function LoginPage() {
       <div className="w-full max-w-lg mx-auto mb-6 animate-in fade-in slide-in-from-top-2 duration-500">
         <div className="bg-red-950/60 border-2 border-red-500/40 rounded-2xl p-6 shadow-lg shadow-red-900/20 backdrop-blur-sm">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <div className="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center shrink-0 mt-0.5">
               <span className="material-symbols-outlined text-red-400 text-[28px]">error</span>
             </div>
             <div className="flex-1 min-w-0">
@@ -142,7 +142,7 @@ export default function LoginPage() {
           className={`w-full max-w-md transition-all duration-700 ease-out ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
         >
           <div className="text-center mb-10">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/10 mb-6">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-linear-to-br from-primary/10 to-primary/5 border border-primary/10 mb-6">
               <span className="material-symbols-outlined text-primary text-[40px]">
                 rocket_launch
               </span>
@@ -180,7 +180,7 @@ export default function LoginPage() {
           className={`w-full max-w-md transition-all duration-700 ease-out ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
         >
           <div className="text-center mb-10">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-amber-500/10 to-amber-500/5 border border-amber-500/10 mb-6">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-linear-to-br from-amber-500/10 to-amber-500/5 border border-amber-500/10 mb-6">
               <span className="material-symbols-outlined text-amber-500 text-[40px]">
                 shield_person
               </span>
@@ -224,7 +224,7 @@ export default function LoginPage() {
           >
             <div className="mb-10">
               <div className="flex items-center gap-3 mb-8">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-linear-to-br from-primary to-primary-hover flex items-center justify-center">
                   <span className="material-symbols-outlined text-white text-[20px]">hub</span>
                 </div>
                 <span className="text-xl font-semibold text-text-main tracking-tight">
@@ -277,7 +277,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary/5 via-primary/3 to-transparent items-center justify-center p-12">
+  <div className="hidden lg:flex lg:w-1/2 bg-linear-to-br from-primary/5 via-primary/3 to-transparent items-center justify-center p-12">
           <div
             className={`max-w-md transition-all duration-700 delay-200 ease-out ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
           >
@@ -309,7 +309,7 @@ export default function LoginPage() {
                     key={item.icon}
                     className="flex items-start gap-4 p-4 rounded-xl bg-surface/50 border border-border"
                   >
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                       <span className="material-symbols-outlined text-primary text-[20px]">
                         {item.icon}
                       </span>

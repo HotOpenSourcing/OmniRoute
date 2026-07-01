@@ -4092,8 +4092,17 @@
     "batchActivateSelected": "Activate",
     "batchDeactivateSelected": "Deactivate",
     "batchRetestSelected": "Retest",
+    "batchRefreshTokensSelected": "Token Shortcut",
+    "exportCSV": "Export as CSV",
+    "exportJSON": "Export as JSON",
+    "importAccounts": "Import accounts",
+    "exportProvider": "Export provider",
+    "importProvider": "Import provider",
     "batchActivateSuccess": "Activated {count} connection(s)",
     "batchDeactivateSuccess": "Deactivated {count} connection(s)",
+    "batchTokenRefreshSuccess": "{count} token(s) refreshed successfully",
+    "batchTokenRefreshFailed": "{count} token(s) failed to refresh",
+    "noOAuthConnectionsSelected": "No OAuth connections selected",
     "batchUpdatePartial": "{count} updated, {skipped} skipped (no longer exist)",
     "batchUpdateNone": "No connections were updated (they may no longer exist)",
     "batchRetestLimit": "Retest up to {max} connections at a time",
@@ -8977,5 +8986,50 @@
     "colAvgScore": "Avg Score",
     "colModels": "Models",
     "colType": "Type"
+  },
+  "freebuff": {
+    "name": "Freebuff",
+    "tagline": "Route OmniRoute through the Codebuff Free Tier — opt-in provider for Codebuff-backed models.",
+    "notEnabled": {
+      "title": "Freebuff provider is not enabled",
+      "description": "Set FREEBUFF_ENABLED=1 in your environment and restart OmniRoute to access this page."
+    },
+    "login": {
+      "title": "Authentication",
+      "description": "Sign in with Codebuff via PKCE, or paste a credentials.json previously exported by `freebuff login`.",
+      "cta": "Login with Codebuff",
+      "starting": "Starting…",
+      "waiting": "Waiting for browser confirmation. Poll started at",
+      "release": "Sign out",
+      "pasteToggle": "Paste credentials.json",
+      "pasteLabel": "credentials.json contents",
+      "pasteSubmit": "Submit",
+      "pasteSubmitting": "Submitting…",
+      "pasteOk": "Accepted (storage pending Chunk 4)"
+    },
+    "quota": {
+      "title": "Quota",
+      "refresh": "Refresh",
+      "loading": "Loading…",
+      "sessionsUsed": "Sessions used today",
+      "sessionsRemaining": "Sessions remaining",
+      "tier": "Access tier",
+      "waitingRoom": "Waiting room position",
+      "resetAt": "Next reset"
+    },
+    "streak": {
+      "title": "Streak",
+      "refresh": "Refresh",
+      "idle": "Click refresh to fetch your streak.",
+      "loading": "Loading…",
+      "current": "Current",
+      "longest": "Longest",
+      "lastCheckIn": "Last check-in",
+      "bonus": "Bonus credits"
+    },
+    "errors": {
+      "notImplementedTitle": "Provider backend not yet wired",
+      "genericTitle": "Error"
+    }
   }
 }

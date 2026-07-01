@@ -1,0 +1,35 @@
+{
+  "graph_id": "G_0",
+  "node_service": null,
+  "language_server": null,
+  "extension_host": null,
+  "edges": [],
+  "events": [],
+  "correlation": {
+    "sessionId_clusters": [],
+    "cascade_chain_detected": false,
+    "evidenceSummary": {}
+  },
+  "status": "no_activity",
+  "reason": "no CDP/IPC/WS cascade signals observed",
+  "cascade_flow": {
+    "startCascade": false,
+    "sendUserCascadeMessage": false,
+    "traceCount": 0
+  },
+  "session_mapping": {
+    "sessionId": null,
+    "propagation_path": []
+  },
+  "llm_state": {
+    "active": false,
+    "confidence": "low",
+    "reason": "No accepted runtime activity"
+  },
+  "observer": {
+    "status": "waiting",
+    "reason": "no cascade emission detected",
+    "evidenceSummary": {},
+    "eventCount": 0
+  }
+}

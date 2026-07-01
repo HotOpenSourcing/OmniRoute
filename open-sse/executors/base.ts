@@ -98,6 +98,8 @@ export type ProviderConfig = {
   requestDefaults?: ProviderRequestDefaults;
   timeoutMs?: number;
   format?: string;
+  /** When true, keep X-Stainless-* headers on OpenAI-compatible requests. */
+  preserveStainlessHeaders?: boolean;
 };
 
 export type ProviderCredentials = {
@@ -218,8 +220,10 @@ export function isOpenAICompatibleEndpoint(provider: string, url: string): boole
 export function stripStainlessHeadersForOpenAICompat(
   headers: Record<string, string>,
   provider: string,
-  url: string
+  url: string,
+  preserveStainlessHeaders?: boolean
 ): string[] {
+  if (preserveStainlessHeaders) return [];
   if (!isOpenAICompatibleEndpoint(provider, url)) return [];
 
   const strippedKeys: string[] = [];
@@ -233,7 +237,10 @@ export function stripStainlessHeadersForOpenAICompat(
   // Normalize User-Agent: SDK-based clients send verbose product strings that some
   // upstreams block. Replace with a clean browser-like UA only when it looks SDK-derived.
   const ua = (headers["User-Agent"] || headers["user-agent"] || "").toLowerCase();
-  if (ua.includes("openai") && (ua.includes("node") || ua.includes("axios") || ua.includes("undici"))) {
+  if (
+    ua.includes("openai") &&
+    (ua.includes("node") || ua.includes("axios") || ua.includes("undici"))
+  ) {
     setUserAgentHeader(headers, "Mozilla/5.0 (compatible; OpenAI Compatible)");
   }
 
@@ -869,7 +876,12 @@ export class BaseExecutor {
 
       // Strip OpenAI SDK (X-Stainless-*) metadata + normalize SDK-derived User-Agent
       // on OpenAI-compatible passthrough requests — some upstream gateways 403 on them.
-      const strippedStainless = stripStainlessHeadersForOpenAICompat(headers, this.provider, url);
+      const strippedStainless = stripStainlessHeadersForOpenAICompat(
+        headers,
+        this.provider,
+        url,
+        this.config.preserveStainlessHeaders
+      );
       if (strippedStainless.length > 0) {
         log?.debug?.(
           "HEADERS",

@@ -22,6 +22,9 @@ test("model catalog source labels stay user-facing", () => {
   assert.equal(getModelCatalogSourceLabel("imported"), "Imported");
   assert.equal(getModelCatalogSourceLabel("fallback"), "Fallback");
   assert.equal(getModelCatalogSourceLabel("alias"), "Alias");
+  assert.equal(getModelCatalogSourceLabel("acp_runtime"), "Runtime ACP");
+  assert.equal(getModelCatalogSourceLabel("session_runtime"), "Session Runtime");
+  assert.equal(getModelCatalogSourceLabel("local_catalog"), "Static Catalog");
 });
 
 test("model catalog query matches id, display name, alias and source label", () => {

@@ -33,6 +33,12 @@ export interface CanonicalModelMetadata {
   qualifiedId: string | null;
   displayName: string;
   aliases: string[];
+  routing: {
+    executionMode: "local_only" | "cloud_only" | "prefer_local" | "prefer_cloud" | "hybrid";
+    requiresLocal: boolean;
+    supportsLocal: boolean;
+    supportsCloud: boolean;
+  };
   capabilities: {
     toolCalling: boolean;
     reasoning: boolean;
@@ -132,6 +138,53 @@ function buildModalities(
   return { input: [], output: [] };
 }
 
+function buildRoutingPolicy(provider: string | null) {
+  const normalized = asNonEmptyString(provider)?.toLowerCase() || null;
+
+  if (normalized === "windsurf-local") {
+    return {
+      executionMode: "local_only" as const,
+      requiresLocal: true,
+      supportsLocal: true,
+      supportsCloud: false,
+    };
+  }
+
+  if (normalized === "windsurf-hybrid") {
+    return {
+      executionMode: "hybrid" as const,
+      requiresLocal: false,
+      supportsLocal: true,
+      supportsCloud: true,
+    };
+  }
+
+  if (normalized === "windsurf") {
+    return {
+      executionMode: "prefer_local" as const,
+      requiresLocal: false,
+      supportsLocal: true,
+      supportsCloud: true,
+    };
+  }
+
+  if (normalized === "codex") {
+    return {
+      executionMode: "cloud_only" as const,
+      requiresLocal: false,
+      supportsLocal: false,
+      supportsCloud: true,
+    };
+  }
+
+  return {
+    executionMode: "prefer_cloud" as const,
+    requiresLocal: false,
+    supportsLocal: false,
+    supportsCloud: true,
+  };
+}
+
 function extractCandidateMatches(modelId: string) {
   const matches: Array<{ provider: string; providerAlias: string; model: string }> = [];
   for (const [providerAlias, models] of Object.entries(PROVIDER_MODELS)) {
@@ -211,6 +264,7 @@ export function getCanonicalModelMetadata(input: {
       canonicalStaticAlias !== (resolved.model || modelId) ? canonicalStaticAlias : null,
       ...(staticSpec?.aliases || []),
     ]),
+    routing: buildRoutingPolicy(provider),
     capabilities: {
       toolCalling: resolved.toolCalling,
       reasoning: resolved.reasoning,

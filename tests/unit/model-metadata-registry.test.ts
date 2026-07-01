@@ -64,6 +64,50 @@ test("canonical model metadata merges static and synced capabilities into one re
   assert.deepEqual(metadata.modalities.input, ["text", "image"]);
   assert.equal(metadata.metadata.family, "gpt-4");
   assert.equal(metadata.metadata.source.syncedCapability, true);
+  assert.deepEqual(metadata.routing, {
+    executionMode: "prefer_cloud",
+    requiresLocal: false,
+    supportsLocal: false,
+    supportsCloud: true,
+  });
+});
+
+test("canonical model metadata includes local routing policy for windsurf variants", () => {
+  const cloud = registry.getCanonicalModelMetadata({
+    provider: "windsurf",
+    model: "claude-sonnet-4.6",
+  });
+  const local = registry.getCanonicalModelMetadata({
+    provider: "windsurf-local",
+    model: "claude-sonnet-4.6",
+  });
+  const hybrid = registry.getCanonicalModelMetadata({
+    provider: "windsurf-hybrid",
+    model: "claude-sonnet-4.6",
+  });
+
+  assert.ok(cloud);
+  assert.ok(local);
+  assert.ok(hybrid);
+
+  assert.deepEqual(cloud.routing, {
+    executionMode: "prefer_local",
+    requiresLocal: false,
+    supportsLocal: true,
+    supportsCloud: true,
+  });
+  assert.deepEqual(local.routing, {
+    executionMode: "local_only",
+    requiresLocal: true,
+    supportsLocal: true,
+    supportsCloud: false,
+  });
+  assert.deepEqual(hybrid.routing, {
+    executionMode: "hybrid",
+    requiresLocal: false,
+    supportsLocal: true,
+    supportsCloud: true,
+  });
 });
 
 test("resolveModelAliasLookup returns stored alias resolution with metadata", async () => {

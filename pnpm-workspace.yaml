@@ -1,0 +1,16 @@
+packages:
+  - 'open-sse'
+  - 'electron'
+
+allowBuilds:
+  '@parcel/watcher': true
+  '@swc/core': true
+  better-sqlite3: false
+  esbuild: false
+  keytar: false
+  koffi: false
+  onnxruntime-node: false
+  protobufjs: false
+  sharp: false
+  tls-client-node: false
+  unrs-resolver: false

@@ -438,7 +438,7 @@ function resolveTerminalConnectionStatus(
   result: { permanent?: boolean; creditsExhausted?: boolean },
   providerErrorType: string | null = null
 ): string | null {
-  if (result.creditsExhausted || status === 402) return "credits_exhausted";
+  if (result.creditsExhausted || status === 402) return null; // Keep active, return null instead of "credits_exhausted"
   if (
     providerErrorType === PROVIDER_ERROR_TYPES.PROJECT_ROUTE_ERROR ||
     providerErrorType === PROVIDER_ERROR_TYPES.OAUTH_INVALID_TOKEN
@@ -2215,7 +2215,7 @@ export async function markAccountUnavailable(
     if ((result as { permanent?: boolean }).permanent) {
       try {
         const settings = await getCachedSettings();
-        const autoDisableEnabled = settings.autoDisableBannedAccounts ?? false;
+        const autoDisableEnabled = false; // Always disabled as requested by the user
         if (autoDisableEnabled) {
           await updateProviderConnection(connectionId, { isActive: false });
           log.info(

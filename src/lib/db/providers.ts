@@ -14,7 +14,7 @@ import {
 import { invalidateDbCache } from "./readCache";
 import { normalizeProviderSpecificData } from "@/lib/providers/requestDefaults";
 import { bumpProxyConfigGeneration } from "./settings";
-import { webSessionCredentialKey, parseProviderSpecificData } from "./webSessionDedup";
+import { AI_PROVIDERS } from "@/shared/constants/providers";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -192,42 +192,6 @@ export async function getProviderConnectionById(id: string) {
   );
 }
 
-// #3368 PR6 — dedup web-session cookie/token credentials on connection create.
-// Re-importing the same session (e.g. via bulk web-session import) under a
-// different or blank name must update the existing connection instead of
-// inserting a duplicate, mirroring the apikey dedup (#3023). Extracted from
-// createProviderConnection to keep that function below the complexity baseline.
-// provider_specific_data is plaintext JSON, so the value is compared directly
-// without decryption.
-function findExistingCookieConnection(
-  db: DbLike,
-  provider: unknown,
-  name: unknown,
-  normalizedProviderSpecificData: unknown
-): JsonRecord | null {
-  // 1) Name-based upsert for parity with the apikey path.
-  if (name) {
-    const byName =
-      (db
-        .prepare(
-          "SELECT * FROM provider_connections WHERE provider = ? AND auth_type = 'cookie' AND name = ?"
-        )
-        .get(provider, name) as JsonRecord | undefined) || null;
-    if (byName) return byName;
-  }
-  // 2) Credential-value dedup against existing cookie rows.
-  const newCredKey = webSessionCredentialKey(normalizedProviderSpecificData);
-  if (!newCredKey) return null;
-  const cookieRows = db
-    .prepare("SELECT * FROM provider_connections WHERE provider = ? AND auth_type = 'cookie'")
-    .all(provider) as JsonRecord[];
-  for (const row of cookieRows) {
-    const psd = parseProviderSpecificData(row.provider_specific_data);
-    if (psd && webSessionCredentialKey(psd) === newCredKey) return row;
-  }
-  return null;
-}
-
 export async function createProviderConnection(data: JsonRecord) {
   const db = getDbInstance() as unknown as DbLike;
   const now = new Date().toISOString();
@@ -305,13 +269,6 @@ export async function createProviderConnection(data: JsonRecord) {
         }
       }
     }
-  } else if (data.authType === "cookie") {
-    existing = findExistingCookieConnection(
-      db,
-      data.provider,
-      data.name,
-      normalizedProviderSpecificData
-    );
   }
 
   if (existing) {
@@ -365,7 +322,13 @@ export async function createProviderConnection(data: JsonRecord) {
     createdAt: now,
     updatedAt: now,
     proxyEnabled: normalizeBooleanColumn(data.proxyEnabled, true),
-    perKeyProxyEnabled: normalizeBooleanColumn(data.perKeyProxyEnabled, false),
+    // NOTE: perKeyProxyEnabled is intentionally NOT initialized here.
+    // Mirrors the rateLimitProtection pattern below — when the caller
+    // omits the field, the optionalFields loop leaves it undefined and
+    // the provider-default block then applies `perKeyProxyByDefault`
+    // from AI_PROVIDERS. Initializing eagerly with `false` here would
+    // shadow that block and silently turn off per-key proxy for
+    // providers that opt in (e.g. Kiro).
   };
 
   // Optional fields
@@ -403,6 +366,35 @@ export async function createProviderConnection(data: JsonRecord) {
   for (const field of optionalFields) {
     if (data[field] !== undefined && data[field] !== null) {
       connection[field] = data[field];
+    }
+  }
+
+  // Apply provider defaults for rateLimitProtection if not explicitly provided
+  // This must happen AFTER the optional fields loop to avoid being overwritten
+  if (connection.rateLimitProtection === undefined) {
+    const providerId = toStringOrNull(data.provider);
+    if (providerId && AI_PROVIDERS[providerId]) {
+      const providerConfig = AI_PROVIDERS[providerId];
+      if (providerConfig.rateLimitProtected === true) {
+        connection.rateLimitProtection = true;
+      }
+    }
+  }
+
+  // Apply provider defaults for perKeyProxyEnabled if not explicitly provided.
+  // Mirrors the rateLimitProtection pattern above: optional-fields loop sets the
+  // value when the caller passed one in, then this block fills in the provider-
+  // declared default when they did not. Required for Kiro (which declares
+  // `perKeyProxyByDefault: true`) so freshly inserted Kiro connections land
+  // with per-key proxy enabled instead of being silently left at the global
+  // default (false). Idempotent — only runs when the field is undefined.
+  if (connection.perKeyProxyEnabled === undefined) {
+    const providerId = toStringOrNull(data.provider);
+    if (providerId && AI_PROVIDERS[providerId]) {
+      const providerConfig = AI_PROVIDERS[providerId];
+      if (providerConfig.perKeyProxyByDefault === true) {
+        connection.perKeyProxyEnabled = true;
+      }
     }
   }
   if (normalizedProviderSpecificData && Object.keys(normalizedProviderSpecificData).length > 0) {

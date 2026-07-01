@@ -3,6 +3,7 @@ export { APP_CONFIG, THEME_CONFIG } from "./appConfig";
 // Provider API endpoints (for display only)
 export const PROVIDER_ENDPOINTS = {
   agentrouter: "https://agentrouter.org/v1/chat/completions",
+  kimchi: "https://llm.kimchi.dev/openai/v1/chat/completions",
   openrouter: "https://openrouter.ai/api/v1/chat/completions",
   dgrid: "https://api.dgrid.ai/v1/chat/completions",
   glm: "https://api.z.ai/api/anthropic/v1/messages",

@@ -330,6 +330,10 @@ export default function ProvidersPage() {
       if (c.provider !== providerId) return false;
       if (authType === "free") return true;
       return c.authType === authType;
+    }).filter((c) => {
+      // For Kiro provider, mask/hide disabled connections (isActive=false)
+      if (providerId === "kiro" && c.isActive === false) return false;
+      return true;
     });
 
     // Helper: check if connection is effectively active (cooldown expired)
@@ -1785,7 +1789,7 @@ export default function ProvidersPage() {
         >
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <div
-            className="relative bg-bg-primary border border-border rounded-xl w-full max-w-[600px] max-h-[80vh] overflow-y-auto shadow-2xl"
+            className="relative bg-bg-primary border border-border rounded-xl w-full max-w-150 max-h-[80vh] overflow-y-auto shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-3 border-b border-border bg-bg-primary/95 backdrop-blur-sm rounded-t-xl">
@@ -1871,7 +1875,7 @@ function ProviderTestResultsView({ results }: { results: ProviderBatchTestResult
       {items.map((r, i) => (
         <div
           key={r.connectionId || i}
-          className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-black/[0.03] dark:bg-white/[0.03]"
+          className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-black/3 dark:bg-white/3"
         >
           <span
             className={`material-symbols-outlined text-[16px] ${

@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### ✨ New Features
+
+- **feat(providers):** add Freebuff (Codebuff Free Tier) provider — opt-in integration that wraps the `freebuff.exe` binary to expose Codebuff-backed models through OmniRoute's standard OpenAI / Anthropic-compatible APIs. Ships a model catalog of 8 entries (mimo v2.5/pro, minimax-m3 on Bedrock, kimi-k2.6, deepseek v4-flash/pro, glm-5.2, minimax-m2.7), a dual-format SSE transformer (OpenAI `chat.completion.chunk` + Anthropic `message_*` events with reasoning and tool-call blocks), 5 meta endpoints under `/api/v1/providers/freebuff/*` (quota, streak, PKCE login start/status, session release), and a dashboard page at `/providers/freebuff` with 30s quota polling. Gated behind `FREEBUFF_ENABLED=1` (default off). **ToS notice:** this is a reverse-engineered integration — users are solely responsible for compliance with Codebuff's Terms of Service. See `docs/providers/freebuff.md` and `docs/providers/freebuff-api.md`.
+
+### 📚 Documentation
+
+- **docs(providers):** add `docs/providers/freebuff.md` (user guide with PKCE + paste-credentials fallback, anti-VPN limitations, troubleshooting matrix).
+- **docs(providers):** add `docs/providers/freebuff-api.md` (developer reference covering the OpenAI / Anthropic wire formats, meta endpoints, custom headers, error codes, model catalog).
+
 ---
 
 ## [3.8.42] — 2026-06-30

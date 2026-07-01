@@ -3759,6 +3759,11 @@
     "batchActivateSelected": "__MISSING__:Activate",
     "batchDeactivateSelected": "__MISSING__:Deactivate",
     "batchRetestSelected": "__MISSING__:Retest",
+    "exportCSV": "Export as CSV",
+    "exportJSON": "Export as JSON",
+    "importAccounts": "Import accounts",
+    "exportProvider": "Export provider",
+    "importProvider": "Import provider",
     "batchActivateSuccess": "__MISSING__:Activated {count} connection(s)",
     "batchDeactivateSuccess": "__MISSING__:Deactivated {count} connection(s)",
     "batchUpdatePartial": "__MISSING__:{count} updated, {skipped} skipped (no longer exist)",
@@ -7602,5 +7607,50 @@
     "enabled": "Enabled",
     "disabled": "Disabled",
     "hooks": "Hooks"
+  },
+  "freebuff": {
+    "name": "[TODO i18n fr] Freebuff",
+    "tagline": "[TODO i18n fr] Routeur OmniRoute vers le Free Tier Codebuff — fournisseur opt-in pour les modèles Codebuff.",
+    "notEnabled": {
+      "title": "[TODO i18n fr] Le fournisseur Freebuff n'est pas activé",
+      "description": "[TODO i18n fr] Définissez FREEBUFF_ENABLED=1 dans votre environnement et redémarrez OmniRoute pour accéder à cette page."
+    },
+    "login": {
+      "title": "[TODO i18n fr] Authentification",
+      "description": "[TODO i18n fr] Connectez-vous à Codebuff via PKCE, ou collez un credentials.json précédemment exporté par `freebuff login`.",
+      "cta": "[TODO i18n fr] Se connecter avec Codebuff",
+      "starting": "[TODO i18n fr] Démarrage…",
+      "waiting": "[TODO i18n fr] En attente de la confirmation du navigateur. Sondage démarré à",
+      "release": "[TODO i18n fr] Se déconnecter",
+      "pasteToggle": "[TODO i18n fr] Coller credentials.json",
+      "pasteLabel": "[TODO i18n fr] contenu de credentials.json",
+      "pasteSubmit": "[TODO i18n fr] Soumettre",
+      "pasteSubmitting": "[TODO i18n fr] Soumission…",
+      "pasteOk": "[TODO i18n fr] Accepté (stockage en attente du Chunk 4)"
+    },
+    "quota": {
+      "title": "[TODO i18n fr] Quota",
+      "refresh": "[TODO i18n fr] Rafraîchir",
+      "loading": "[TODO i18n fr] Chargement…",
+      "sessionsUsed": "[TODO i18n fr] Sessions utilisées aujourd'hui",
+      "sessionsRemaining": "[TODO i18n fr] Sessions restantes",
+      "tier": "[TODO i18n fr] Niveau d'accès",
+      "waitingRoom": "[TODO i18n fr] Position dans la file d'attente",
+      "resetAt": "[TODO i18n fr] Prochain reset"
+    },
+    "streak": {
+      "title": "[TODO i18n fr] Série",
+      "refresh": "[TODO i18n fr] Rafraîchir",
+      "idle": "[TODO i18n fr] Cliquez sur rafraîchir pour récupérer votre série.",
+      "loading": "[TODO i18n fr] Chargement…",
+      "current": "[TODO i18n fr] Actuelle",
+      "longest": "[TODO i18n fr] Plus longue",
+      "lastCheckIn": "[TODO i18n fr] Dernier check-in",
+      "bonus": "[TODO i18n fr] Crédits bonus"
+    },
+    "errors": {
+      "notImplementedTitle": "[TODO i18n fr] Backend du fournisseur pas encore câblé",
+      "genericTitle": "[TODO i18n fr] Erreur"
+    }
   }
 }

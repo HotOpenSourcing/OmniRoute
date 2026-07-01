@@ -1,7 +1,6 @@
 import { request as undiciRequest } from "undici";
 import {
   createProxyDispatcher,
-  isRelayType,
   isSocks5ProxyEnabled,
   proxyConfigToUrl,
   proxyUrlForLogs,
@@ -9,8 +8,7 @@ import {
 import { testProxySchema } from "@/shared/validation/schemas";
 import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 import { createErrorResponse, createErrorResponseFromUnknown } from "@/lib/api/errorResponse";
-import { getProxyById } from "@/lib/localDb";
-import { extractRelayAuth } from "@/lib/db/proxies";
+import { getProxyById } from "@/lib/db/proxies";
 import { requireManagementAuth } from "@/lib/api/requireManagementAuth";
 import { sanitizeErrorMessage } from "@omniroute/open-sse/utils/error";
 
@@ -86,17 +84,18 @@ export async function POST(request: Request) {
 
     const proxyType = String(proxy.type || "http").toLowerCase();
 
-    // Relay proxies (Vercel / Deno / Cloudflare): test by hitting ipify via the
-    // relay headers. All three share the same x-relay-* header contract; the
-    // only difference is the deployed edge target (#5128 — Deno/Cloudflare were
-    // previously rejected here as unsupported proxy types).
-    if (isRelayType(proxyType)) {
+    // Vercel Relay: test by hitting ipify via the relay headers
+    if (proxyType === "vercel") {
       const relayHost = proxy.host;
-      // relayAuth lives in notes JSON, written by the deploy routes as either a
-      // plaintext { relayAuth } or, on installs with STORAGE_ENCRYPTION_KEY, an
-      // encrypted { relayAuthEnc }. extractRelayAuth handles both (#5128 — the
-      // encrypted form was previously ignored, leaving relayAuth empty → 401).
-      let relayAuth = extractRelayAuth(dbProxyNotes) ?? "";
+      // relayAuth lives in notes JSON: { relayAuth } stored by the vercel-deploy route.
+      // proxy.password is empty for relay entries; parse notes instead.
+      let relayAuth = "";
+      if (dbProxyNotes) {
+        try {
+          const parsed = JSON.parse(dbProxyNotes) as { relayAuth?: string };
+          relayAuth = parsed.relayAuth ?? "";
+        } catch {}
+      }
       // Fallback: ad-hoc callers may pass relayAuth in the password field
       if (!relayAuth) relayAuth = proxy.password ?? "";
       const relayUrl = `https://${relayHost}`;

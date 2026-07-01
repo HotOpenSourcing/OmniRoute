@@ -215,4 +215,37 @@ export const OAUTH_PROVIDERS = {
     authHint:
       "Tencent CodeBuddy CN (copilot.tencent.com). Sign in via the official CLI device-code flow, or paste a direct API key (sent as Authorization: Bearer). Catalog: GLM / Kimi / MiniMax / DeepSeek / Hunyuan.",
   },
+  "zai-coding-plan": {
+    id: "zai-coding-plan",
+    alias: "zcp",
+    name: "Z.AI Coding Plan",
+    icon: "code",
+    color: "#2563EB",
+    textIcon: "ZC",
+    website: "https://zcode.z.ai",
+    authHint: "OAuth via ZCode CLI flow - JWT token-based authentication",
+    serviceKinds: ["llm"],
+    subscriptionRisk: true,
+    riskNoticeVariant: "oauth",
+    notice: {
+      text: "Z.AI Coding Plan requires OAuth authentication via ZCode CLI flow. The provider uses JWT tokens for API access.",
+    },
+  },
+  freebuff: {
+    id: "freebuff",
+    alias: "fb",
+    name: "Freebuff (Codebuff Free Tier)",
+    icon: "zap",
+    color: "#F97316",
+    textIcon: "FB",
+    website: "https://codebuff.com",
+    authHint:
+      "Codebuff free tier (codebuff.com). Login via OAuth PKCE, or paste credentials.json from ~/.config/manicode/. Note: the hardware fingerprint may not match between OmniRoute server and your local CLI; paste mode is recommended for remote deployments.",
+    serviceKinds: ["llm"],
+    subscriptionRisk: true,
+    riskNoticeVariant: "oauth",
+    notice: {
+      text: "Freebuff uses a PKCE polling OAuth flow against codebuff.com. If polling fails (fingerprint mismatch, headless server), paste credentials.json exported from the local manicode CLI.",
+    },
+  },
 };

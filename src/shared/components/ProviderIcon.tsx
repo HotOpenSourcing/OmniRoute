@@ -160,7 +160,7 @@ const ProviderIcon = memo(function ProviderIcon({
           alt={providerId}
           width={size}
           height={size}
-          style={{ objectFit: "contain" }}
+          style={{ width: size, height: size, objectFit: "contain" }}
           onError={() => {
             setFailedAssets((current) => ({ ...current, [pngKey]: true }));
           }}
@@ -181,7 +181,7 @@ const ProviderIcon = memo(function ProviderIcon({
           alt={providerId}
           width={size}
           height={size}
-          style={{ objectFit: "contain" }}
+          style={{ width: size, height: size, objectFit: "contain" }}
           onError={() => setFailedAssets((current) => ({ ...current, [svgKey]: true }))}
           unoptimized
         />

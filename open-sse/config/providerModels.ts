@@ -61,7 +61,7 @@ export function getModelStripTypes(aliasOrId: string, modelId: string): string[]
   return Array.isArray(found?.strip) ? [...found.strip] : [];
 }
 
-export function getModelsByProviderId(providerId: string): RegistryModel[] {
+export function getModelsByProviderId(providerId: string): readonly RegistryModel[] {
   const alias = PROVIDER_ID_TO_ALIAS[providerId] || providerId;
   return PROVIDER_MODELS[alias] || [];
 }

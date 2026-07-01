@@ -1,4 +1,5 @@
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { ThemeProvider } from "@/shared/components/ThemeProvider";
 import { NextIntlClientProvider } from "next-intl";
@@ -8,6 +9,56 @@ import { normalizeComplianceEventTypes } from "@/i18n/request";
 import { getSettings } from "@/lib/db/settings";
 import type { Viewport } from "next";
 import { PwaRegister } from "@/shared/components/PwaRegister";
+
+const EXTENSION_ATTR_CLEANUP_SCRIPT = `
+(() => {
+  const attrNames = ["bis_skin_checked"];
+  const selector = attrNames.map((name) => "[" + name + "]").join(",");
+
+  const clean = (root) => {
+    if (!root || typeof root.querySelectorAll !== "function") return;
+
+    if (typeof root.removeAttribute === "function") {
+      for (const attrName of attrNames) {
+        root.removeAttribute(attrName);
+      }
+    }
+
+    for (const element of root.querySelectorAll(selector)) {
+      for (const attrName of attrNames) {
+        element.removeAttribute(attrName);
+      }
+    }
+  };
+
+  clean(document.documentElement);
+
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (
+        mutation.type === "attributes" &&
+        mutation.attributeName &&
+        attrNames.includes(mutation.attributeName) &&
+        mutation.target &&
+        typeof mutation.target.removeAttribute === "function"
+      ) {
+        mutation.target.removeAttribute(mutation.attributeName);
+      }
+
+      for (const node of mutation.addedNodes) {
+        clean(node);
+      }
+    }
+  });
+
+  observer.observe(document.documentElement, {
+    subtree: true,
+    childList: true,
+    attributes: true,
+    attributeFilter: attrNames,
+  });
+})();
+`;
 
 const inter = Inter({
   subsets: ["latin"],
@@ -59,6 +110,9 @@ export default async function RootLayout({ children }) {
   return (
     <html lang={locale} dir={isRtl ? "rtl" : "ltr"} suppressHydrationWarning>
       <head>
+        <Script id="extension-attr-cleanup" strategy="beforeInteractive">
+          {EXTENSION_ATTR_CLEANUP_SCRIPT}
+        </Script>
         {/* Material Symbols icon font is self-hosted via globals.css
             (@import "material-symbols/outlined.css") so icons render even when
             the Google Fonts CDN is unreachable (#3695). */}

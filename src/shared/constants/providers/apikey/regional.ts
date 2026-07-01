@@ -108,6 +108,19 @@ export const APIKEY_PROVIDERS_REGIONAL = {
     website: "https://open.bigmodel.cn",
     apiHint: "API key from https://open.bigmodel.cn/usercenter/apikeys",
   },
+  freebuff: {
+    id: "freebuff",
+    alias: "fb",
+    name: "Freebuff (Codebuff)",
+    icon: "bolt",
+    color: "#F97316",
+    textIcon: "FB",
+    website: "https://codebuff.com",
+    apiHint:
+      "Free tier of codebuff.com (PKCE OAuth or pasted credentials.json). Catalog: mimo / minimax / kimi / deepseek / glm.",
+    subscriptionRisk: true,
+    riskNoticeVariant: "oauth",
+  },
   alibaba: {
     id: "alibaba",
     alias: "ali",

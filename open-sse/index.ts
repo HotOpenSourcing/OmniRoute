@@ -78,7 +78,7 @@ export {
 } from "./utils/streamHandler.ts";
 
 // Executors
-export { getExecutor, hasSpecializedExecutor } from "./executors/index.ts";
+export { hasSpecializedExecutor } from "./executors/index.ts";
 
 // Utils
 export { errorResponse, formatProviderError } from "./utils/error.ts";

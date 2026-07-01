@@ -13,7 +13,10 @@ import {
   GITHUB_COPILOT_CHAT_USER_AGENT,
   GITHUB_COPILOT_EDITOR_VERSION,
 } from "@omniroute/open-sse/config/providerHeaderProfiles.ts";
-import { resolvePublicCred } from "@omniroute/open-sse/utils/publicCreds.ts";
+import {
+  resolvePublicCred,
+  resolvePublicCredMulti,
+} from "@omniroute/open-sse/utils/publicCreds.ts";
 import { buildGitLabOAuthEndpoints, GITLAB_DUO_DEFAULT_BASE_URL } from "../gitlab";
 
 /**
@@ -71,6 +74,28 @@ export const CODEX_CONFIG = {
   },
 };
 
+// Gemini (Google) OAuth Configuration (Standard OAuth2)
+// clientId/clientSecret are public values shipped in the Gemini CLI binary;
+// resolved through resolvePublicCred so they don't appear as literals here.
+export const GEMINI_CONFIG = {
+  clientId: resolvePublicCredMulti("gemini_id", [
+    "GEMINI_CLI_OAUTH_CLIENT_ID",
+    "GEMINI_OAUTH_CLIENT_ID",
+  ]),
+  clientSecret: resolvePublicCredMulti("gemini_alt", [
+    "GEMINI_CLI_OAUTH_CLIENT_SECRET",
+    "GEMINI_OAUTH_CLIENT_SECRET",
+  ]),
+  authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+  tokenUrl: "https://oauth2.googleapis.com/token",
+  userInfoUrl: "https://www.googleapis.com/oauth2/v1/userinfo",
+  scopes: [
+    "https://www.googleapis.com/auth/cloud-platform",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+  ],
+};
+
 // Qwen OAuth Configuration (Device Code Flow with PKCE)
 export const QWEN_CONFIG = {
   clientId: resolvePublicCred("qwen_id", "QWEN_OAUTH_CLIENT_ID"),
@@ -119,13 +144,6 @@ export const CODEBUDDY_CN_CONFIG = {
   pollInterval: 5000,
 };
 
-// Grok Build (xAI) OAuth Configuration (Import-Token Flow with refresh)
-// Public client_id resolved through resolvePublicCred so it is never a literal.
-export const GROK_CLI_CONFIG = {
-  clientId: resolvePublicCred("grok_id", "GROK_OAUTH_CLIENT_ID"),
-  tokenUrl: "https://auth.x.ai/oauth2/token",
-};
-
 // Kimi Coding OAuth Configuration (Device Code Flow)
 export const KIMI_CODING_CONFIG = {
   clientId: resolvePublicCred("kimi_id", "KIMI_CODING_OAUTH_CLIENT_ID"),
@@ -158,10 +176,8 @@ export const ANTIGRAVITY_CONFIG = {
   authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
   tokenUrl: "https://oauth2.googleapis.com/token",
   userInfoUrl: "https://www.googleapis.com/oauth2/v1/userinfo",
-  // No "openid" scope — the working 9router flow requests only the Cloud Code /
-  // userinfo scopes below. "openid" (with PKCE) routed Google into the hanging
-  // `firstparty/nativeapp` consent. Match 9router exactly (antigravity login fix).
   scopes: [
+    "openid",
     "https://www.googleapis.com/auth/cloud-platform",
     "https://www.googleapis.com/auth/userinfo.email",
     "https://www.googleapis.com/auth/userinfo.profile",
@@ -387,7 +403,7 @@ export const TRAE_CONFIG = {
 //
 //   Phase 2 will reintroduce browser login via Firebase OAuth + RegisterUser
 //   (ported from fendoushaonian/WindSurf-gRPC-API).
-//   Spec: _tasks/superpowers/specs/2026-05-29-windsurf-login-fix-design.md.
+//   Spec: docs/superpowers/specs/2026-05-29-windsurf-login-fix-design.md.
 //
 // Active fields:
 //   - inferenceUrl       → used by WindsurfExecutor (open-sse/executors/windsurf.ts)
@@ -396,6 +412,37 @@ export const TRAE_CONFIG = {
 //                          with an IDE-supplied ?state= param (see field below)
 //   - firebaseApiKey     → reserved for Phase 2
 //   - ideName            → sent in extension headers
+// Z.AI Coding Plan OAuth Configuration
+//
+// Extracted from ZCode app.asar.
+// IMPORTANT: The authorize redirect returns a `code-...` value that IS the
+// Bearer token directly — no token exchange POST is needed. The tokenUrl
+// is used for token REFRESH only, not initial exchange.
+//
+// Flow:
+//   1. GET authorizeUrl → user authorizes → redirect with `code=code-<hex>`
+//   2. Use `code-<hex>` directly as `Authorization: Bearer code-<hex>`
+//   3. (Optional) POST tokenUrl with `refresh_token` for token refresh
+//   4. GET userinfoUrl for user profile (optional)
+//
+// Client ID is public (extracted from ZCode binary, PKCE).
+export const ZAI_CODING_PLAN_CONFIG = {
+  clientId: resolvePublicCred("zai_coding_plan_id", "ZAI_CODING_PLAN_CLIENT_ID"),
+  authorizeUrl: "https://chat.z.ai/api/oauth/authorize",
+  // Token URL is used for REFRESH only (grant_type: refresh_token).
+  // The initial code does NOT need exchange — it IS the bearer token.
+  tokenUrl: "https://zcode.z.ai/api/v1/oauth/token",
+  userinfoUrl: "https://chat.z.ai/api/oauth/userinfo",
+  businessLoginUrl: "https://api.z.ai/api/auth/z/login",
+  modelsUrl: "https://api.z.ai/api/coding/paas/v4",
+  apiBaseUrl: "https://zcode.z.ai/api/v1/zcode-plan/anthropic",
+  // ZCode native redirect URI scheme (used by the ZCode desktop client).
+  // OmniRoute overrides this with http://localhost:<port>/callback when
+  // initiating the flow server-side.
+  redirectUri: "zcode://zai-auth/callback",
+  scopes: [],
+};
+
 export const WINDSURF_CONFIG = {
   // RETIRED 2026-05-29 — endpoint returns 404 post-rebrand. Phase 2 will replace.
   authorizeUrl: "https://app.devin.ai/editor/signin",
@@ -432,11 +479,39 @@ export const WINDSURF_CONFIG = {
 // OAuth timeout (5 minutes)
 export const OAUTH_TIMEOUT = 300000;
 
+// Freebuff (Codebuff free tier) OAuth Configuration
+//
+// PKCE polling flow against codebuff.com — no client_id/secret is required;
+// the upstream accepts an unauthenticated POST /api/auth/cli/code with the
+// hardware-derived fingerprintId.
+//
+// Flow (implemented in Chunk 2 of the freebuff integration):
+//   1. POST {codeUrl} body={ fingerprintId } → { loginUrl, fingerprintHash,
+//      expiresAt, flowId }
+//   2. User opens loginUrl in browser → completes OAuth at codebuff.com
+//   3. GET {statusUrl}?fingerprintId=...&fingerprintHash=...&expiresAt=...
+//      → { authToken, userId, email } (polls until status === "success")
+//   4. (Optional) POST {sessionUrl} to mint a per-session instanceId.
+//
+// Note: the fingerprintId is derived from server-side hardware and may not
+// match the user's local CLI fingerprint. If PKCE polling returns status
+// "mismatch" or auth fails, surface the "paste credentials.json" fallback
+// in the UI.
+export const FREEBUFF_OAUTH_CONFIG = {
+  codeUrl: "https://codebuff.com/api/auth/cli/code",
+  statusUrl: "https://codebuff.com/api/auth/cli/status",
+  logoutUrl: "https://codebuff.com/api/auth/cli/logout",
+  sessionUrl: "https://codebuff.com/api/v1/freebuff/session",
+  meUrl: "https://codebuff.com/api/v1/me",
+  pollIntervalMs: 2000,
+  pollTimeoutMs: 300000,
+};
+
 // Provider list
 export const PROVIDERS = {
   CLAUDE: "claude",
   CODEX: "codex",
-  GEMINI: "gemini",
+  GEMINI: "gemini-cli",
   QWEN: "qwen",
   QODER: "qoder",
   ANTIGRAVITY: "antigravity",
@@ -454,5 +529,5 @@ export const PROVIDERS = {
   DEVIN_CLI: "devin-cli",
   TRAE: "trae",
   CODEBUDDY_CN: "codebuddy-cn",
-  GROK_CLI: "grok-cli",
+  FREEBUFF: "freebuff",
 };

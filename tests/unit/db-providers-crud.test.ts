@@ -142,6 +142,74 @@ test("codex workspace uniqueness uses workspaceId alongside email", async () => 
   ]);
 });
 
+test("windsurf stored oauth connections stay distinct when apiServerUrl differs", async () => {
+  const first = await providersDb.createProviderConnection({
+    provider: "windsurf",
+    authType: "oauth",
+    accessToken: "windsurf-token-a",
+    apiKey: "windsurf-key-a",
+    providerSpecificData: {
+      authFlow: "windsurf-oauth-pkce",
+      apiServerUrl: "https://server.codeium.com",
+    },
+  });
+
+  const second = await providersDb.createProviderConnection({
+    provider: "windsurf",
+    authType: "oauth",
+    accessToken: "windsurf-token-b",
+    apiKey: "windsurf-key-b",
+    providerSpecificData: {
+      authFlow: "windsurf-oauth-pkce",
+      apiServerUrl: "https://eu.windsurf.com/_route/api_server",
+    },
+  });
+
+  const rows = await providersDb.getProviderConnections({ provider: "windsurf" });
+
+  assert.notEqual(second.id, first.id);
+  assert.equal(rows.length, 2);
+  assert.deepEqual(rows.map((row) => row.providerSpecificData.apiServerUrl).sort(), [
+    "https://eu.windsurf.com/_route/api_server",
+    "https://server.codeium.com",
+  ]);
+});
+
+test("windsurf stored oauth connections without email remain distinct in generic DB CRUD", async () => {
+  const first = await providersDb.createProviderConnection({
+    provider: "windsurf",
+    authType: "oauth",
+    accessToken: "windsurf-token-a",
+    apiKey: "windsurf-key-a",
+    providerSpecificData: {
+      authFlow: "windsurf-oauth-pkce",
+      apiServerUrl: "https://server.codeium.com",
+    },
+  });
+
+  const second = await providersDb.createProviderConnection({
+    provider: "windsurf",
+    authType: "oauth",
+    accessToken: "windsurf-token-b",
+    apiKey: "windsurf-key-b",
+    providerSpecificData: {
+      authFlow: "windsurf-oauth-pkce",
+      apiServerUrl: "https://server.codeium.com",
+    },
+    testStatus: "active",
+  });
+
+  const rows = await providersDb.getProviderConnections({ provider: "windsurf" });
+
+  assert.notEqual(second.id, first.id);
+  assert.equal(rows.length, 2);
+  assert.deepEqual(rows.map((row) => row.apiKey).sort(), ["windsurf-key-a", "windsurf-key-b"]);
+  assert.ok(rows.every((row) => row.providerSpecificData.authFlow === "windsurf-oauth-pkce"));
+  assert.ok(
+    rows.every((row) => row.providerSpecificData.apiServerUrl === "https://server.codeium.com")
+  );
+});
+
 test("updateProviderConnection reorders priorities and returns decrypted payloads", async () => {
   const first = await providersDb.createProviderConnection({
     provider: "openai",

@@ -63,6 +63,12 @@ test.after(() => {
   }
 });
 
+test("apiAuth imports settings from the specific db module instead of the localDb barrel", () => {
+  const source = fs.readFileSync(path.resolve("src/shared/utils/apiAuth.ts"), "utf8");
+  assert.equal(source.includes('from "@/lib/localDb"'), false);
+  assert.match(source, /from "@\/lib\/db\/settings"/);
+});
+
 test("isPublicRoute recognizes allowed API prefixes", () => {
   assert.equal(apiAuth.isPublicRoute("/api/auth/login"), true);
   assert.equal(apiAuth.isPublicRoute("/api/v1/chat/completions"), true);

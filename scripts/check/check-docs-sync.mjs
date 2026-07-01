@@ -67,7 +67,6 @@ function normalizeMirrorBody(content) {
 }
 
 function isSemver(value) {
-  // Accept X.Y.Z and X.Y.Z-prerelease.N (e.g. 3.0.0-rc.1, 3.0.0-beta.2)
   return /^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$/.test(value);
 }
 

@@ -544,11 +544,17 @@ export default function ProviderLimits({
 
   const filteredConnections = useMemo(
     () =>
-      connections.filter(
-        (conn) =>
-          USAGE_SUPPORTED_PROVIDERS.includes(conn.provider) &&
-          (conn.authType === "oauth" || conn.authType === "apikey")
-      ),
+      connections
+        .filter(
+          (conn) =>
+            USAGE_SUPPORTED_PROVIDERS.includes(conn.provider) &&
+            (conn.authType === "oauth" || conn.authType === "apikey")
+        )
+        .filter((conn) => {
+          // For Kiro provider, mask/hide disabled connections (isActive=false)
+          if (conn.provider === "kiro" && conn.isActive === false) return false;
+          return true;
+        }),
     [connections]
   );
 

@@ -182,6 +182,11 @@ const EMBEDDED_DEFAULTS = {
     13, 92, 15, 89, 66, 91, 76, 70, 72, 29, 71, 70, 3, 65, 93, 84, 72, 23, 28, 87, 92, 88, 15, 95,
     91, 22, 71, 87, 20, 66, 67, 86, 13, 81, 81, 21,
   ],
+  // Z.AI Coding Plan — oauth client id (extracted from ZCode binary)
+  zai_coding_plan_id: [
+    12, 1, 7, 12, 28, 27, 42, 36, 93, 117, 69, 54, 47, 59, 4, 15, 76, 36, 126, 86, 10, 23, 38, 95,
+    36, 38, 5, 17, 74,
+  ],
 } as const;
 
 export type EmbeddedDefaultKey = keyof typeof EMBEDDED_DEFAULTS;
