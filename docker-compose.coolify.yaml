@@ -100,7 +100,7 @@ services:
 
       # Connection pooling & resilience
       CREDENTIAL_HEALTH_CHECK_INTERVAL: ${CREDENTIAL_HEALTH_CHECK_INTERVAL:-300000}
-      
+
       # Disable expensive operations in production if not needed
       OMNIROUTE_SKIP_DB_HEALTHCHECK: ${OMNIROUTE_SKIP_DB_HEALTHCHECK:-0}
       OMNIROUTE_DB_HEALTHCHECK_INTERVAL_MS: ${OMNIROUTE_DB_HEALTHCHECK_INTERVAL_MS:-21600000}

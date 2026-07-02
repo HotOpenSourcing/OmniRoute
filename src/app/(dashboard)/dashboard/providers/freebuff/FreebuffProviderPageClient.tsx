@@ -1,58 +1,62 @@
 "use client";
 
 /**
- * Freebuff provider client UI.
+ * Freebuff provider client UI — single-file orchestrator.
  *
- * Renders three sections:
- *   1. Authentication — either start a PKCE flow (redirects the user to
- *      the Codebuff login URL) or paste a `credentials.json` previously
- *      exported by `freebuff login` on the user's machine.
- *   2. Quota — polls `/api/v1/providers/freebuff/quota` every 30s and
- *      renders sessions used, remaining, waiting-room position, and
- *      reset time.
- *   3. Streak — polls `/api/v1/providers/freebuff/streak` on demand and
- *      renders the gamification state.
+ * Layout mirrors the rest of the dashboard:
+ *   ┌────────────────────────────────────────────────────────────┐
+ *   │ Breadcrumb                                               │
+ *   ├────────────────────────────────────────────────────────────┤
+ *   │ Provider header card  (icon · Freebuff · tagline · badge) │
+ *   ├────────────────────────────────────────────────────────────┤
+ *   │ Subscription-risk notice  (dismissible)                   │
+ *   ├────────────────────────────────────────────────────────────┤
+ *   │ Tabs: Connections · Available Models · Playground         │
+ *   ├────────────────────────────────────────────────────────────┤
+ *   │ <Active section>                                          │
+ *   │   connections  → Login · Quota · Streak cards             │
+ *   │   models       → Search + filterable model list           │
+ *   │   playground   → Prompt textarea + Send button            │
+ *   └────────────────────────────────────────────────────────────┘
  *
- * All network calls go through `fetchFreebuff()` which normalises errors
- * and surfaces the 501 "Chunk 4 pending" state cleanly so the dashboard
- * does not show a stack trace when the backend is not yet wired.
+ * State (login / quota / streak) is owned here so the header
+ * card can derive `connectionState` from it. Until the Chunk 4
+ * backend lands every API call returns 501; the sections surface
+ * that as a single inline notice using the `isPending` flag.
  *
- * Until Chunk 4 lands the API returns 501 for every call — the UI
- * handles that case with a single inline notice.
+ * Shared components only — no local Freebuff* subcomponents.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Badge, Button, Card } from "@/shared/components";
-import { FREEBUFF_MODELS, type FreebuffModel } from "@/lib/providers/freebuff/models";
+import {
+  Badge,
+  Breadcrumbs,
+  Button,
+  Card,
+  Input,
+  ProviderIcon,
+  SegmentedControl,
+} from "@/shared/components";
 
 // ---------------------------------------------------------------------------
-// Types — mirror `src/lib/providers/freebuff/metaService.ts`.
-// We re-declare them here rather than importing so the client bundle
-// stays small (no zod dependency on the client).
+// Tab strip.
 // ---------------------------------------------------------------------------
 
-interface FreebuffQuotaState {
-  sessionsUsedToday: number;
-  sessionsRemainingToday: number;
-  waitingRoomPosition: number | null;
-  resetAt: string | null;
-  accessTier: "full" | "limited";
-}
+type FreebuffTab = "connections" | "models" | "playground";
 
-interface FreebuffStreak {
-  currentStreak: number;
-  longestStreak: number;
-  lastCheckInAt: string | null;
-  bonusCredits?: number;
-}
+const TABS: Array<{ value: FreebuffTab; labelKey: string; icon: string }> = [
+  { value: "connections", labelKey: "tabs.connections", icon: "cable" },
+  { value: "models", labelKey: "tabs.models", icon: "model_training" },
+  { value: "playground", labelKey: "tabs.playground", icon: "science" },
+];
 
-interface FreebuffLoginStart {
-  flowId: string;
-  loginUrl: string;
-  expiresAt: string;
-}
+const QUOTA_POLL_MS = 30_000;
+
+// ---------------------------------------------------------------------------
+// API types + shared state models.
+// ---------------------------------------------------------------------------
 
 interface FreebuffApiError {
   status: number;
@@ -60,26 +64,107 @@ interface FreebuffApiError {
   code?: string;
 }
 
-type QuotaState =
+interface FreebuffLoginStart {
+  loginUrl: string;
+  pollUrl: string;
+  deviceCode: string;
+  expiresAt: number;
+}
+
+interface FreebuffQuotaState {
+  tier: "lite" | "standard" | "pro";
+  sessionsUsed: number;
+  sessionsRemaining: number;
+  waitingRoomPosition: number | null;
+  resetAt: string;
+}
+
+interface FreebuffStreak {
+  current: number;
+  longest: number;
+  lastCheckIn: string | null;
+  bonusCredits: number;
+}
+
+type FreebuffLoginStateModel =
+  | { kind: "idle" }
+  | { kind: "starting" }
+  | { kind: "waiting"; flow: FreebuffLoginStart; startedAt: number }
+  | { kind: "error"; error: FreebuffApiError };
+
+type FreebuffQuotaStateModel =
   | { kind: "loading" }
   | { kind: "ok"; quota: FreebuffQuotaState }
   | { kind: "error"; error: FreebuffApiError };
 
-type StreakState =
+type FreebuffStreakStateModel =
   | { kind: "idle" }
   | { kind: "loading" }
   | { kind: "ok"; streak: FreebuffStreak }
   | { kind: "error"; error: FreebuffApiError };
 
-type LoginState =
-  | { kind: "idle" }
-  | { kind: "starting" }
-  | { kind: "waiting"; flow: FreebuffLoginStart; startedAt: number }
-  | { kind: "completed" }
-  | { kind: "error"; error: FreebuffApiError };
+type FreebuffConnectionState = "connected" | "pending" | "disconnected";
 
 // ---------------------------------------------------------------------------
-// Helpers.
+// Static model catalog (mirrors what Freebuff exposes per Codebuff tier).
+// ---------------------------------------------------------------------------
+
+interface FreebuffModel {
+  id: string;
+  label: string;
+  tier: FreebuffQuotaState["tier"];
+  context: number;
+  maxOutput: number;
+  modalities: string;
+  source: string;
+  premium?: boolean;
+  referral?: boolean;
+}
+
+const MODEL_CATALOG: FreebuffModel[] = [
+  {
+    id: "codebuff-lite",
+    label: "Codebuff Lite",
+    tier: "lite",
+    context: 32_000,
+    maxOutput: 4_096,
+    modalities: "text",
+    source: "Codebuff Free Tier",
+  },
+  {
+    id: "codebuff-standard",
+    label: "Codebuff Standard",
+    tier: "standard",
+    context: 64_000,
+    maxOutput: 8_192,
+    modalities: "text",
+    source: "Codebuff Free Tier",
+  },
+  {
+    id: "codebuff-pro",
+    label: "Codebuff Pro",
+    tier: "pro",
+    context: 128_000,
+    maxOutput: 16_384,
+    modalities: "text + image",
+    source: "Codebuff Free Tier",
+    premium: true,
+  },
+  {
+    id: "codebuff-pro-referral",
+    label: "Codebuff Pro (referral)",
+    tier: "pro",
+    context: 128_000,
+    maxOutput: 16_384,
+    modalities: "text + image",
+    source: "Codebuff Free Tier",
+    premium: true,
+    referral: true,
+  },
+];
+
+// ---------------------------------------------------------------------------
+// API helper.
 // ---------------------------------------------------------------------------
 
 async function fetchFreebuff<T>(path: string, init?: RequestInit): Promise<T> {
@@ -95,39 +180,40 @@ async function fetchFreebuff<T>(path: string, init?: RequestInit): Promise<T> {
     const message =
       body?.error?.message ?? `Request failed with HTTP ${res.status}`;
     const code = body?.error?.code;
-    const error: FreebuffApiError = { status: res.status, message, code };
-    throw error;
+    throw { status: res.status, message, code } satisfies FreebuffApiError;
   }
   return body as T;
-}
-
-function formatResetAt(iso: string | null): string {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
 }
 
 // ---------------------------------------------------------------------------
 // Component.
 // ---------------------------------------------------------------------------
 
-const QUOTA_POLL_MS = 30_000;
-
 export default function FreebuffProviderPageClient() {
   const t = useTranslations("freebuff");
 
-  const [quota, setQuota] = useState<QuotaState>({ kind: "loading" });
-  const [streak, setStreak] = useState<StreakState>({ kind: "idle" });
-  const [login, setLogin] = useState<LoginState>({ kind: "idle" });
+  const [activeTab, setActiveTab] = useState<FreebuffTab>("connections");
+
+  const [quota, setQuota] = useState<FreebuffQuotaStateModel>({ kind: "loading" });
+  const [streak, setStreak] = useState<FreebuffStreakStateModel>({ kind: "idle" });
+  const [login, setLogin] = useState<FreebuffLoginStateModel>({ kind: "idle" });
   const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState("");
+  const [pasteSubmitting, setPasteSubmitting] = useState(false);
+  const [pasteResult, setPasteResult] = useState<string | null>(null);
+
+  const [noticeDismissed, setNoticeDismissed] = useState(false);
+
+  const [modelFilter, setModelFilter] = useState("");
+
+  const [playgroundPrompt, setPlaygroundPrompt] = useState("");
+  const [playgroundOutput, setPlaygroundOutput] = useState<string | null>(null);
+  const [playgroundSending, setPlaygroundSending] = useState(false);
 
   const quotaAbortRef = useRef<AbortController | null>(null);
   const loginAbortRef = useRef<AbortController | null>(null);
 
-  // --- Quota polling -------------------------------------------------------
+  // ── Quota polling ────────────────────────────────────────────────────────
 
   const refreshQuota = useCallback(async () => {
     quotaAbortRef.current?.abort();
@@ -154,7 +240,7 @@ export default function FreebuffProviderPageClient() {
     };
   }, [refreshQuota]);
 
-  // --- Streak (on-demand) --------------------------------------------------
+  // ── Streak (on-demand) ───────────────────────────────────────────────────
 
   const refreshStreak = useCallback(async () => {
     setStreak({ kind: "loading" });
@@ -169,7 +255,7 @@ export default function FreebuffProviderPageClient() {
     }
   }, []);
 
-  // --- Login flow ----------------------------------------------------------
+  // ── Login flow ───────────────────────────────────────────────────────────
 
   const startLogin = useCallback(async () => {
     setLogin({ kind: "starting" });
@@ -181,11 +267,7 @@ export default function FreebuffProviderPageClient() {
         "/api/v1/providers/freebuff/login/start",
         { method: "POST", signal: controller.signal },
       );
-      setLogin({
-        kind: "waiting",
-        flow: data.login,
-        startedAt: Date.now(),
-      });
+      setLogin({ kind: "waiting", flow: data.login, startedAt: Date.now() });
       // Open the PKCE URL in a new tab so the user can complete the flow
       // without losing the dashboard context.
       window.open(data.login.loginUrl, "_blank", "noopener,noreferrer");
@@ -195,7 +277,23 @@ export default function FreebuffProviderPageClient() {
     }
   }, []);
 
-  // --- Logout (release session) -------------------------------------------
+  // ── Paste credentials.json fallback ──────────────────────────────────────
+
+  const submitPaste = useCallback(async () => {
+    if (!pasteText.trim()) return;
+    setPasteSubmitting(true);
+    setPasteResult(null);
+    try {
+      // Chunk 4 wires storage; for now we just acknowledge receipt.
+      await new Promise((r) => setTimeout(r, 300));
+      setPasteResult(t("login.pasteOk"));
+      setPasteText("");
+    } finally {
+      setPasteSubmitting(false);
+    }
+  }, [pasteText, t]);
+
+  // ── Logout (release session) ─────────────────────────────────────────────
 
   const releaseSession = useCallback(async () => {
     try {
@@ -203,369 +301,604 @@ export default function FreebuffProviderPageClient() {
         method: "DELETE",
       });
       setQuota({ kind: "loading" });
+      setStreak({ kind: "idle" });
+      setLogin({ kind: "idle" });
       refreshQuota();
     } catch (err) {
-      // Surface as a quota error so the user sees the failure.
       setQuota({ kind: "error", error: err as FreebuffApiError });
     }
   }, [refreshQuota]);
 
-  // --- Render --------------------------------------------------------------
+  // ── Playground (UI shell only until Chunk 4) ────────────────────────────
+
+  const sendPlayground = useCallback(async () => {
+    if (!playgroundPrompt.trim()) return;
+    setPlaygroundSending(true);
+    setPlaygroundOutput(null);
+    try {
+      // Backend lands in Chunk 4 — surface the not-implemented path
+      // explicitly so the UI doesn't appear to silently swallow input.
+      throw {
+        status: 501,
+        message: t("playground.comingSoon"),
+        code: "NOT_IMPLEMENTED",
+      } satisfies FreebuffApiError;
+    } catch (err) {
+      setPlaygroundOutput((err as FreebuffApiError).message);
+    } finally {
+      setPlaygroundSending(false);
+    }
+  }, [playgroundPrompt, t]);
+
+  // ── Derived: header connection state ─────────────────────────────────────
+
+  const connectionState: FreebuffConnectionState = useMemo(() => {
+    if (login.kind === "waiting" || login.kind === "starting") return "pending";
+    if (quota.kind === "ok") return "connected";
+    return "disconnected";
+  }, [login.kind, quota.kind]);
+
+  // The backend is not yet wired (Chunk 4) — every endpoint returns 501.
+  // We surface a single inline notice so the user knows the UI is wired
+  // but upstream calls will not return data yet.
+  const isPending = quota.kind === "loading" && login.kind === "idle";
+
+  const connectionBadge = useMemo(() => {
+    if (connectionState === "connected") {
+      return { variant: "success" as const, label: t("header.connected"), icon: "check_circle" };
+    }
+    if (connectionState === "pending") {
+      return { variant: "warning" as const, label: t("header.pending"), icon: "hourglass_top" };
+    }
+    return { variant: "default" as const, label: t("header.disconnected"), icon: "link_off" };
+  }, [connectionState, t]);
+
+  // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Page header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1">
-          <Link
-            href="/dashboard/providers"
-            className="inline-flex items-center gap-1 text-xs text-text-muted hover:text-text-main"
-          >
-            <span className="material-symbols-outlined text-[16px]">arrow_back</span>
-            {t("back", { defaultValue: "Back to providers" })}
-          </Link>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold text-text-main">
-              {t("name", { defaultValue: "Freebuff" })}
-            </h1>
-            <Badge variant="info" size="sm" dot>
-              {t("badge", { defaultValue: "Codebuff Free Tier" })}
-            </Badge>
+    <div className="flex flex-col gap-6">
+      <Breadcrumbs />
+
+      <Card padding="lg">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="rounded-card border border-border bg-bg p-3">
+              <ProviderIcon providerId="freebuff" size={40} type="color" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-semibold text-text-main">{t("name")}</h1>
+                <Badge variant="info" size="sm" icon="workspace_premium">
+                  {t("header.codebuffBadge")}
+                </Badge>
+                <Badge variant="warning" size="sm" icon="credit_card">
+                  {t("header.subscriptionBadge")}
+                </Badge>
+              </div>
+              <p className="text-sm text-text-muted">{t("tagline")}</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Badge variant={connectionBadge.variant} dot icon={connectionBadge.icon}>
+                  {connectionBadge.label}
+                </Badge>
+                <Link
+                  href="https://www.codebuff.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-[14px]" aria-hidden="true">
+                    open_in_new
+                  </span>
+                  {t("header.viewWebsite")}
+                </Link>
+              </div>
+            </div>
           </div>
-          <p className="text-sm text-text-muted">
-            {t("tagline", {
-              defaultValue:
-                "Route OmniRoute through the Codebuff Free Tier (Codebuff-backed models).",
-            })}
-          </p>
         </div>
-      </div>
-
-      {/* Authentication card */}
-      <Card
-        title={t("login.title", { defaultValue: "Authentication" })}
-        subtitle={t("login.description", {
-          defaultValue:
-            "Sign in with Codebuff to bind your account, or paste a credentials.json previously exported by `freebuff login`.",
-        })}
-        icon="key"
-      >
-        <div className="flex flex-wrap gap-3">
-          <Button
-            onClick={startLogin}
-            loading={login.kind === "starting"}
-            disabled={login.kind === "waiting"}
-            icon="login"
-          >
-            {login.kind === "starting"
-              ? t("login.starting", { defaultValue: "Starting…" })
-              : t("login.cta", { defaultValue: "Login with Codebuff" })}
-          </Button>
-
-          <Button
-            variant="secondary"
-            onClick={() => setPasteOpen((v) => !v)}
-            icon="content_paste"
-          >
-            {t("login.pasteToggle", {
-              defaultValue: "Paste credentials.json",
-            })}
-          </Button>
-
-          <Button
-            variant="outline"
-            className="ml-auto"
-            onClick={releaseSession}
-            icon="logout"
-          >
-            {t("login.release", { defaultValue: "Sign out" })}
-          </Button>
-        </div>
-
-        {login.kind === "waiting" && (
-          <div className="mt-4 flex items-center gap-2 text-xs text-text-muted">
-            <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
-            {t("login.waiting", {
-              defaultValue: "Waiting for browser confirmation. Poll started at ",
-            })}
-            {new Date(login.startedAt).toLocaleTimeString()}
-          </div>
-        )}
-
-        {login.kind === "error" && <ErrorBanner error={login.error} t={t} />}
-
-        {pasteOpen && <PasteCredentialsForm t={t} />}
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Quota card */}
-        <Card
-          title={t("quota.title", { defaultValue: "Quota" })}
-          subtitle={t("quota.subtitle", {
-            defaultValue: "Live usage limits from your Codebuff account.",
-          })}
-          icon="speed"
-          action={
-            <Button variant="ghost" size="sm" onClick={refreshQuota} icon="refresh">
-              {t("quota.refresh", { defaultValue: "Refresh" })}
-            </Button>
-          }
-        >
-          {quota.kind === "loading" && (
-            <p className="text-sm text-text-muted">
-              {t("quota.loading", { defaultValue: "Loading…" })}
-            </p>
-          )}
-
-          {quota.kind === "ok" && (
-            <dl className="grid grid-cols-2 gap-4 text-sm">
-              <Stat
-                label={t("quota.sessionsUsed", {
-                  defaultValue: "Sessions used today",
-                })}
-                value={quota.quota.sessionsUsedToday}
-              />
-              <Stat
-                label={t("quota.sessionsRemaining", {
-                  defaultValue: "Sessions remaining",
-                })}
-                value={quota.quota.sessionsRemainingToday}
-              />
-              <Stat
-                label={t("quota.tier", { defaultValue: "Access tier" })}
-                value={quota.quota.accessTier}
-              />
-              <Stat
-                label={t("quota.waitingRoom", {
-                  defaultValue: "Waiting room position",
-                })}
-                value={
-                  quota.quota.waitingRoomPosition === null
-                    ? "—"
-                    : `#${quota.quota.waitingRoomPosition}`
-                }
-              />
-              <Stat
-                label={t("quota.resetAt", { defaultValue: "Next reset" })}
-                value={formatResetAt(quota.quota.resetAt)}
-              />
-            </dl>
-          )}
-
-          {quota.kind === "error" && <ErrorBanner error={quota.error} t={t} />}
-        </Card>
-
-          {/* Streak card */}
-        <Card
-          title={t("streak.title", { defaultValue: "Streak" })}
-          subtitle={t("streak.subtitle", {
-            defaultValue: "Daily check-in gamification state.",
-          })}
-          icon="local_fire_department"
-          action={
+      {isPending && !noticeDismissed && (
+        <Card padding="md">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <span
+                className="material-symbols-outlined text-yellow-600 dark:text-yellow-400 text-[22px]"
+                aria-hidden="true"
+              >
+                info
+              </span>
+              <div>
+                <h2 className="text-sm font-semibold text-text-main">{t("notice.title")}</h2>
+                <p className="mt-1 text-sm text-text-muted">{t("notice.description")}</p>
+                <p className="mt-2 text-xs text-text-muted">
+                  {t("errors.notImplementedTitle")}
+                </p>
+              </div>
+            </div>
             <Button
               variant="ghost"
               size="sm"
-              onClick={refreshStreak}
-              loading={streak.kind === "loading"}
-              icon="refresh"
+              icon="close"
+              aria-label={t("notice.dismiss")}
+              onClick={() => setNoticeDismissed(true)}
             >
-              {t("streak.refresh", { defaultValue: "Refresh" })}
+              {t("notice.dismiss")}
             </Button>
-          }
-        >
-          {streak.kind === "idle" && (
-            <p className="text-sm text-text-muted">
-              {t("streak.idle", {
-                defaultValue: "Click refresh to fetch your streak.",
-              })}
-            </p>
-          )}
-          {streak.kind === "loading" && (
-            <p className="text-sm text-text-muted">
-              {t("streak.loading", { defaultValue: "Loading…" })}
-            </p>
-          )}
-          {streak.kind === "ok" && (
-            <dl className="grid grid-cols-2 gap-4 text-sm">
-              <Stat
-                label={t("streak.current", { defaultValue: "Current" })}
-                value={`${streak.streak.currentStreak} days`}
-              />
-              <Stat
-                label={t("streak.longest", { defaultValue: "Longest" })}
-                value={`${streak.streak.longestStreak} days`}
-              />
-              <Stat
-                label={t("streak.lastCheckIn", {
-                  defaultValue: "Last check-in",
-                })}
-                value={formatResetAt(streak.streak.lastCheckInAt)}
-              />
-              {streak.streak.bonusCredits !== undefined && (
-                <Stat
-                  label={t("streak.bonus", { defaultValue: "Bonus credits" })}
-                  value={streak.streak.bonusCredits}
-                />
-              )}
-            </dl>
-          )}
-          {streak.kind === "error" && <ErrorBanner error={streak.error} t={t} />}
+          </div>
         </Card>
-      </div>
+      )}
 
-      {/* Available models */}
-      <Card
-        title={t("models.title", { defaultValue: "Available models" })}
-        subtitle={t("models.subtitle", {
-          defaultValue: "Models exposed through the Codebuff Free Tier.",
-        })}
-        icon="model_training"
-      >
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-border text-text-muted">
-                <th className="pb-2 pr-4 font-medium">{t("models.model", { defaultValue: "Model" })}</th>
-                <th className="pb-2 pr-4 font-medium">{t("models.tier", { defaultValue: "Tier" })}</th>
-                <th className="pb-2 pr-4 font-medium">{t("models.context", { defaultValue: "Context" })}</th>
-                <th className="pb-2 pr-4 font-medium">{t("models.modalities", { defaultValue: "Modalities" })}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {FREEBUFF_MODELS.map((model) => (
-                <tr key={model.id} className="text-text-main">
-                  <td className="py-3 pr-4">
-                    <div className="font-medium">{model.displayName}</div>
-                    <div className="text-xs text-text-muted font-mono">{model.id}</div>
-                  </td>
-                  <td className="py-3 pr-4">
-                    <Badge
-                      variant={model.tier === "lite" ? "success" : model.tier === "pro" ? "error" : "info"}
-                      size="sm"
-                    >
-                      {model.tier}
-                    </Badge>
-                  </td>
-                  <td className="py-3 pr-4 whitespace-nowrap">{model.contextWindow.toLocaleString()} tokens</td>
-                  <td className="py-3 pr-4">{model.modalities.join(", ")}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <SegmentedControl
+        options={TABS.map((tab) => ({
+          value: tab.value,
+          label: t(tab.labelKey),
+          icon: tab.icon,
+        }))}
+        value={activeTab}
+        onChange={(value) => setActiveTab(value as FreebuffTab)}
+        aria-label={t("tabs.ariaLabel")}
+        className="w-fit"
+      />
+
+      {activeTab === "connections" && (
+        <div className="flex flex-col gap-4">
+          <LoginCard
+            login={login}
+            pasteOpen={pasteOpen}
+            pasteText={pasteText}
+            pasteSubmitting={pasteSubmitting}
+            pasteResult={pasteResult}
+            onTogglePaste={() => setPasteOpen((v) => !v)}
+            onPasteChange={setPasteText}
+            onPasteSubmit={submitPaste}
+            onStartLogin={startLogin}
+            onReleaseSession={releaseSession}
+          />
+          <QuotaCard
+            quota={quota}
+            onRefresh={refreshQuota}
+            onReleaseSession={releaseSession}
+          />
+          <StreakCard streak={streak} onRefresh={refreshStreak} />
         </div>
-      </Card>
-    </div>
-  );
-}
+      )}
 
-// ---------------------------------------------------------------------------
-// Sub-components.
-// ---------------------------------------------------------------------------
+      {activeTab === "models" && (
+        <ModelsCard filter={modelFilter} onFilterChange={setModelFilter} />
+      )}
 
-function Stat({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div>
-      <dt className="text-xs uppercase tracking-wide text-text-muted">
-        {label}
-      </dt>
-      <dd className="mt-1 font-mono text-base text-text-main">
-        {value}
-      </dd>
-    </div>
-  );
-}
-
-function ErrorBanner({
-  error,
-  t,
-}: {
-  error: FreebuffApiError;
-  t: ReturnType<typeof useTranslations>;
-}) {
-  const isPending = error.status === 501;
-  return (
-    <div
-      className={`mt-3 rounded-lg border p-3 text-sm ${
-        isPending
-          ? "border-warning bg-warning/10 text-warning"
-          : "border-error bg-error/10 text-error"
-      }`}
-    >
-      <p className="font-medium">
-        {isPending
-          ? t("errors.notImplementedTitle", {
-              defaultValue: "Provider backend not yet wired",
-            })
-          : t("errors.genericTitle", { defaultValue: "Error" })}
-      </p>
-      <p className="mt-1 opacity-90">{error.message}</p>
-      {error.code && (
-        <p className="mt-1 font-mono text-xs opacity-75">{error.code}</p>
+      {activeTab === "playground" && (
+        <PlaygroundCard
+          prompt={playgroundPrompt}
+          onPromptChange={setPlaygroundPrompt}
+          output={playgroundOutput}
+          sending={playgroundSending}
+          onSend={sendPlayground}
+        />
       )}
     </div>
   );
 }
 
-function PasteCredentialsForm({
-  t,
-}: {
-  t: ReturnType<typeof useTranslations>;
-}) {
-  const [value, setValue] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+// ---------------------------------------------------------------------------
+// Section subcomponents — pure presentational, no business state of their own.
+// They only consume the props the orchestrator hands them.
+// ---------------------------------------------------------------------------
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      // Chunk 4 will provide a POST /api/v1/providers/freebuff/credentials
-      // endpoint that accepts the pasted JSON. Until then we simply
-      // validate that the value is JSON and inform the user.
-      JSON.parse(value);
-      setSubmitted(true);
-    } catch {
-      setSubmitted(false);
-    } finally {
-      setSubmitting(false);
-    }
-  };
+interface LoginCardProps {
+  login: FreebuffLoginStateModel;
+  pasteOpen: boolean;
+  pasteText: string;
+  pasteSubmitting: boolean;
+  pasteResult: string | null;
+  onTogglePaste: () => void;
+  onPasteChange: (value: string) => void;
+  onPasteSubmit: () => void;
+  onStartLogin: () => void;
+  onReleaseSession: () => void;
+}
+
+function LoginCard({
+  login,
+  pasteOpen,
+  pasteText,
+  pasteSubmitting,
+  pasteResult,
+  onTogglePaste,
+  onPasteChange,
+  onPasteSubmit,
+  onStartLogin,
+  onReleaseSession,
+}: LoginCardProps) {
+  const t = useTranslations("freebuff");
+  const isStarting = login.kind === "starting";
+  const isWaiting = login.kind === "waiting";
+  const isError = login.kind === "error";
 
   return (
-    <form onSubmit={onSubmit} className="mt-4 space-y-3">
-      <label className="block text-xs font-medium text-text-secondary">
-        {t("login.pasteLabel", {
-          defaultValue: "credentials.json contents",
-        })}
-      </label>
-      <textarea
-        value={value}
-        onChange={(e) => {
-          setValue(e.target.value);
-          setSubmitted(false);
-        }}
-        rows={6}
-        className="w-full rounded-lg border border-border bg-surface-secondary p-3 font-mono text-xs text-text-main focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-        placeholder='{"authToken":"…","fingerprintId":"enhanced-…"}'
-      />
-      <div className="flex items-center gap-3">
+    <Card
+      title={t("login.title")}
+      subtitle={t("login.description")}
+      icon="login"
+      action={
         <Button
-          type="submit"
-          size="sm"
-          loading={submitting}
-          disabled={value.length === 0}
+          variant={isWaiting ? "danger" : "primary"}
+          icon={isWaiting ? "logout" : "open_in_new"}
+          onClick={isWaiting ? onReleaseSession : onStartLogin}
+          loading={isStarting}
+          disabled={isStarting}
         >
-          {submitting
-            ? t("login.pasteSubmitting", { defaultValue: "Submitting…" })
-            : t("login.pasteSubmit", { defaultValue: "Submit" })}
+          {isWaiting ? t("login.release") : t("login.cta")}
         </Button>
-        {submitted && (
-          <span className="text-xs text-success">
-            {t("login.pasteOk", { defaultValue: "Accepted (storage pending)" })}
-          </span>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        {isWaiting && login.kind === "waiting" && (
+          <Card.Section>
+            <div className="flex items-start gap-3">
+              <span
+                className="material-symbols-outlined text-yellow-600 dark:text-yellow-400 text-[20px] animate-spin"
+                aria-hidden="true"
+              >
+                progress_activity
+              </span>
+              <div className="text-sm text-text-muted">
+                {t("login.waiting")}{" "}
+                {new Date(login.startedAt).toLocaleTimeString()}
+                <div className="mt-1 break-all text-xs text-text-muted">
+                  {login.flow.pollUrl}
+                </div>
+              </div>
+            </div>
+          </Card.Section>
+        )}
+
+        {isError && login.kind === "error" && (
+          <Card.Section>
+            <div className="flex items-start gap-2 text-sm text-red-600 dark:text-red-400">
+              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+                error
+              </span>
+              <span>
+                {t("errors.genericTitle")} — {login.error.message}
+              </span>
+            </div>
+          </Card.Section>
+        )}
+
+        <div className="flex items-center justify-between">
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={pasteOpen ? "expand_less" : "expand_more"}
+            onClick={onTogglePaste}
+          >
+            {t("login.pasteToggle")}
+          </Button>
+        </div>
+
+        {pasteOpen && (
+          <div className="flex flex-col gap-3">
+            <Input
+              type="text"
+              label={t("login.pasteLabel")}
+              placeholder='{"access_token":"…"}'
+              value={pasteText}
+              onChange={(e) => onPasteChange(e.target.value)}
+              hint={pasteResult ?? undefined}
+              icon="content_paste"
+            />
+            <div className="flex justify-end">
+              <Button
+                variant="primary"
+                size="sm"
+                icon="send"
+                onClick={onPasteSubmit}
+                loading={pasteSubmitting}
+                disabled={pasteSubmitting || !pasteText.trim()}
+              >
+                {pasteSubmitting ? t("login.pasteSubmitting") : t("login.pasteSubmit")}
+              </Button>
+            </div>
+          </div>
         )}
       </div>
-    </form>
+    </Card>
+  );
+}
+
+interface QuotaCardProps {
+  quota: FreebuffQuotaStateModel;
+  onRefresh: () => void;
+  onReleaseSession: () => void;
+}
+
+function QuotaCard({ quota, onRefresh, onReleaseSession }: QuotaCardProps) {
+  const t = useTranslations("freebuff");
+  return (
+    <Card
+      title={t("quota.title")}
+      icon="speed"
+      action={
+        <Button variant="secondary" size="sm" icon="refresh" onClick={onRefresh}>
+          {t("quota.refresh")}
+        </Button>
+      }
+    >
+      {quota.kind === "loading" && (
+        <p className="text-sm text-text-muted">{t("quota.loading")}</p>
+      )}
+
+      {quota.kind === "error" && (
+        <div className="flex flex-col gap-2 text-sm text-red-600 dark:text-red-400">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+              error
+            </span>
+            <span>
+              {t("errors.notImplementedTitle")} — {quota.error.message}
+            </span>
+          </div>
+          <p className="text-xs text-text-muted">
+            Status {quota.error.status}
+            {quota.error.code ? ` · ${quota.error.code}` : ""}
+          </p>
+        </div>
+      )}
+
+      {quota.kind === "ok" && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Stat
+            icon="check_circle"
+            label={t("quota.sessionsUsed")}
+            value={`${quota.quota.sessionsUsed}`}
+          />
+          <Stat
+            icon="pending_actions"
+            label={t("quota.sessionsRemaining")}
+            value={`${quota.quota.sessionsRemaining}`}
+          />
+          <Stat icon="workspace_premium" label={t("quota.tier")} value={quota.quota.tier} />
+          <Stat
+            icon="schedule"
+            label={t("quota.resetAt")}
+            value={new Date(quota.quota.resetAt).toLocaleString()}
+          />
+          {quota.quota.waitingRoomPosition !== null && (
+            <Stat
+              icon="groups"
+              label={t("quota.waitingRoom")}
+              value={`#${quota.quota.waitingRoomPosition}`}
+            />
+          )}
+          <div className="sm:col-span-2">
+            <Button variant="danger" size="sm" icon="logout" onClick={onReleaseSession}>
+              {t("login.release")}
+            </Button>
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+interface StreakCardProps {
+  streak: FreebuffStreakStateModel;
+  onRefresh: () => void;
+}
+
+function StreakCard({ streak, onRefresh }: StreakCardProps) {
+  const t = useTranslations("freebuff");
+  return (
+    <Card
+      title={t("streak.title")}
+      icon="local_fire_department"
+      action={
+        <Button variant="secondary" size="sm" icon="refresh" onClick={onRefresh}>
+          {t("streak.refresh")}
+        </Button>
+      }
+    >
+      {streak.kind === "idle" && (
+        <p className="text-sm text-text-muted">{t("streak.idle")}</p>
+      )}
+
+      {streak.kind === "loading" && (
+        <p className="text-sm text-text-muted">{t("streak.loading")}</p>
+      )}
+
+      {streak.kind === "error" && (
+        <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
+          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+            error
+          </span>
+          <span>
+            {t("errors.notImplementedTitle")} — {streak.error.message}
+          </span>
+        </div>
+      )}
+
+      {streak.kind === "ok" && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Stat
+            icon="local_fire_department"
+            label={t("streak.current")}
+            value={`${streak.streak.current}`}
+          />
+          <Stat
+            icon="military_tech"
+            label={t("streak.longest")}
+            value={`${streak.streak.longest}`}
+          />
+          <Stat
+            icon="event"
+            label={t("streak.lastCheckIn")}
+            value={
+              streak.streak.lastCheckIn
+                ? new Date(streak.streak.lastCheckIn).toLocaleString()
+                : "—"
+            }
+          />
+          <Stat
+            icon="redeem"
+            label={t("streak.bonus")}
+            value={`${streak.streak.bonusCredits}`}
+          />
+        </div>
+      )}
+    </Card>
+  );
+}
+
+interface ModelsCardProps {
+  filter: string;
+  onFilterChange: (value: string) => void;
+}
+
+function ModelsCard({ filter, onFilterChange }: ModelsCardProps) {
+  const t = useTranslations("freebuff");
+  const filtered = useMemo(() => {
+    const needle = filter.trim().toLowerCase();
+    if (!needle) return MODEL_CATALOG;
+    return MODEL_CATALOG.filter(
+      (m) =>
+        m.id.toLowerCase().includes(needle) ||
+        m.label.toLowerCase().includes(needle) ||
+        m.tier.includes(needle),
+    );
+  }, [filter]);
+
+  return (
+    <Card
+      title={t("models.title")}
+      subtitle={t("models.subtitle")}
+      icon="model_training"
+      action={
+        <Input
+          type="search"
+          placeholder={t("models.search")}
+          value={filter}
+          onChange={(e) => onFilterChange(e.target.value)}
+          icon="search"
+        />
+      }
+    >
+      {filtered.length === 0 ? (
+        <p className="text-sm text-text-muted">{t("models.empty")}</p>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {filtered.map((model) => (
+            <Card.Section key={model.id}>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-text-main">{model.label}</span>
+                    <Badge variant="primary" size="sm">
+                      {t(`models.tiers.${model.tier}` as const)}
+                    </Badge>
+                    {model.premium && (
+                      <Badge variant="warning" size="sm" icon="workspace_premium">
+                        {t("models.premiumTag")}
+                      </Badge>
+                    )}
+                    {model.referral && (
+                      <Badge variant="info" size="sm" icon="redeem">
+                        {t("models.referralTag")}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-text-muted">
+                    {t("models.columns.context")}: {model.context.toLocaleString()} ·{" "}
+                    {t("models.columns.maxOutput")}: {model.maxOutput.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-text-muted">
+                    {t("models.columns.modalities")}: {model.modalities} ·{" "}
+                    {t("models.columns.source")}: {model.source}
+                  </p>
+                </div>
+              </div>
+            </Card.Section>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+interface PlaygroundCardProps {
+  prompt: string;
+  onPromptChange: (value: string) => void;
+  output: string | null;
+  sending: boolean;
+  onSend: () => void;
+}
+
+function PlaygroundCard({
+  prompt,
+  onPromptChange,
+  output,
+  sending,
+  onSend,
+}: PlaygroundCardProps) {
+  const t = useTranslations("freebuff");
+  return (
+    <Card title={t("playground.title")} subtitle={t("playground.subtitle")} icon="science">
+      <div className="flex flex-col gap-3">
+        <textarea
+          value={prompt}
+          onChange={(e) => onPromptChange(e.target.value)}
+          rows={6}
+          placeholder="Ask Codebuff anything…"
+          className="w-full resize-y rounded-control border border-border bg-bg p-3 text-sm text-text-main focus:border-primary focus:outline-none"
+        />
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-text-muted">{t("playground.comingSoon")}</p>
+          <Button
+            variant="primary"
+            icon="send"
+            onClick={onSend}
+            loading={sending}
+            disabled={sending || !prompt.trim()}
+          >
+            Send
+          </Button>
+        </div>
+        {output && (
+          <Card.Section>
+            <div className="flex items-start gap-2 text-sm text-text-main">
+              <span
+                className="material-symbols-outlined text-[18px] text-yellow-600 dark:text-yellow-400"
+                aria-hidden="true"
+              >
+                info
+              </span>
+              <span>{output}</span>
+            </div>
+          </Card.Section>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+interface StatProps {
+  icon: string;
+  label: string;
+  value: string;
+}
+
+function Stat({ icon, label, value }: StatProps) {
+  return (
+    <Card.Section>
+      <div className="flex items-start gap-3">
+        <span className="material-symbols-outlined text-[20px] text-text-muted" aria-hidden="true">
+          {icon}
+        </span>
+        <div>
+          <p className="text-xs uppercase tracking-wide text-text-muted">{label}</p>
+          <p className="text-sm font-semibold text-text-main">{value}</p>
+        </div>
+      </div>
+    </Card.Section>
   );
 }

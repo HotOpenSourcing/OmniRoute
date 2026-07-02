@@ -9027,6 +9027,52 @@
       "lastCheckIn": "Last check-in",
       "bonus": "Bonus credits"
     },
+    "header": {
+      "backToProviders": "Back to providers",
+      "codebuffBadge": "Codebuff Free Tier",
+      "subscriptionBadge": "Subscription account",
+      "viewWebsite": "Open Codebuff",
+      "connected": "Connected",
+      "pending": "Pending sign-in",
+      "disconnected": "Not connected"
+    },
+    "notice": {
+      "title": "Heads up about Codebuff",
+      "description": "Freebuff uses a PKCE polling OAuth flow against www.codebuff.com. If polling fails (fingerprint mismatch, headless server), paste credentials.json exported from the local manicode CLI.",
+      "dismiss": "Dismiss notice"
+    },
+    "tabs": {
+      "connections": "Connections",
+      "models": "Available Models",
+      "playground": "Playground",
+      "ariaLabel": "Freebuff sections"
+    },
+    "models": {
+      "title": "Available models",
+      "subtitle": "Models exposed through the Codebuff Free Tier.",
+      "search": "Filter models",
+      "empty": "No models match the current filter.",
+      "columns": {
+        "model": "Model",
+        "tier": "Tier",
+        "context": "Context",
+        "maxOutput": "Max output",
+        "modalities": "Modalities",
+        "source": "Source"
+      },
+      "tiers": {
+        "lite": "Lite",
+        "standard": "Standard",
+        "pro": "Pro"
+      },
+      "premiumTag": "Premium",
+      "referralTag": "Referral required"
+    },
+    "playground": {
+      "title": "Playground",
+      "subtitle": "Test the Codebuff-backed models exposed through Freebuff.",
+      "comingSoon": "Provider backend not yet wired — Playground will go live in Chunk 4."
+    },
     "errors": {
       "notImplementedTitle": "Provider backend not yet wired",
       "genericTitle": "Error"

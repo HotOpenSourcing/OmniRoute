@@ -7609,8 +7609,8 @@
     "hooks": "Hooks"
   },
   "freebuff": {
-    "name": "Freebuff",
-    "tagline": "Routeur OmniRoute vers le Free Tier Codebuff — fournisseur opt-in pour les modèles Codebuff.",
+    "name": "TODO i18n fr — Freebuff",
+    "tagline": "TODO i18n fr — Routeur OmniRoute vers le Free Tier Codebuff — fournisseur opt-in pour les modèles Codebuff.",
     "notEnabled": {
       "title": "Le fournisseur Freebuff n'est pas activé",
       "description": "Définissez FREEBUFF_ENABLED=1 dans votre environnement et redémarrez OmniRoute pour accéder à cette page."
@@ -7647,6 +7647,52 @@
       "longest": "Plus longue",
       "lastCheckIn": "Dernier check-in",
       "bonus": "Crédits bonus"
+    },
+    "header": {
+      "backToProviders": "Retour aux fournisseurs",
+      "codebuffBadge": "Codebuff Free Tier",
+      "subscriptionBadge": "Compte d'abonnement",
+      "viewWebsite": "Ouvrir Codebuff",
+      "connected": "Connecté",
+      "pending": "Connexion en attente",
+      "disconnected": "Non connecté"
+    },
+    "notice": {
+      "title": "À savoir sur Codebuff",
+      "description": "Freebuff utilise un flux OAuth PKCE avec polling contre www.codebuff.com. Si le polling échoue (empreinte matérielle, serveur headless), collez le credentials.json exporté depuis la CLI manicode locale.",
+      "dismiss": "Ignorer l'avertissement"
+    },
+    "tabs": {
+      "connections": "Connexions",
+      "models": "Modèles disponibles",
+      "playground": "Playground",
+      "ariaLabel": "Sections Freebuff"
+    },
+    "models": {
+      "title": "Modèles disponibles",
+      "subtitle": "Modèles exposés via le Free Tier Codebuff.",
+      "search": "Filtrer les modèles",
+      "empty": "Aucun modèle ne correspond au filtre actuel.",
+      "columns": {
+        "model": "Modèle",
+        "tier": "Niveau",
+        "context": "Contexte",
+        "maxOutput": "Sortie max",
+        "modalities": "Modalités",
+        "source": "Source"
+      },
+      "tiers": {
+        "lite": "Lite",
+        "standard": "Standard",
+        "pro": "Pro"
+      },
+      "premiumTag": "Premium",
+      "referralTag": "Code parrainage requis"
+    },
+    "playground": {
+      "title": "Playground",
+      "subtitle": "Testez les modèles Codebuff exposés via Freebuff.",
+      "comingSoon": "Backend du fournisseur pas encore câblé — le Playground sera actif au Chunk 4."
     },
     "errors": {
       "notImplementedTitle": "Backend du fournisseur pas encore câblé",
