@@ -1,9 +1,8 @@
 /**
  * Freebuff (Codebuff) provider base constants and configuration.
  *
- * The provider targets https://codebuff.com (paid tier) or
- * https://freebuff.com (free tier with queue). Most users will use the
- * free tier — the waiting room + quotas are enforced server-side.
+ * The provider targets https://www.codebuff.com for both the paid tier and
+ * the free tier. The free waiting room + quotas are enforced server-side.
  *
  * @module lib/providers/freebuff/base
  */
@@ -11,10 +10,11 @@
 import { homedir } from "node:os";
 
 /** Codebuff (paid) base URL. */
-export const FREEBUFF_CODEBUFF_BASE_URL = "https://codebuff.com";
+export const FREEBUFF_CODEBUFF_BASE_URL = "https://www.codebuff.com";
 
-/** Freebuff (free) base URL. Use this for the public free tier. */
-export const FREEBUFF_FREEBUFF_BASE_URL = "https://freebuff.com";
+/** Freebuff (free) base URL. The free-tier API is served from the Codebuff
+ *  domain; freebuff.com is the marketing site and does not expose the API. */
+export const FREEBUFF_FREEBUFF_BASE_URL = "https://www.codebuff.com";
 
 /** Env var to switch between free and paid tier (default: free). */
 export const FREEBUFF_TIER_ENV = "FREEBUFF_TIER";
@@ -29,17 +29,27 @@ export const FREEBUFF_CREDENTIALS_PATH_ENV = "FREEBUFF_CREDENTIALS_PATH";
 export const FREEBUFF_DEFAULT_CREDENTIALS_PATH =
   "~/.config/manicode/credentials.json";
 
-/** Default Anthropic-compat base URL suffix used by Codebuff (set in Chunk 5/7). */
-export const FREEBUFF_ANTHROPIC_PATH = "/api/v1/anthropic/v1/messages";
+/** Anthropic-compatible endpoint is not exposed separately by Codebuff.
+ *  The chat-completions endpoint handles both OpenAI and Anthropic-shaped
+ *  requests, so this path is kept as an alias for backwards compatibility. */
+export const FREEBUFF_ANTHROPIC_PATH = "/api/v1/chat/completions";
 
-/** Default OpenAI-compat base URL suffix used by Codebuff. */
-export const FREEBUFF_OPENAI_PATH = "/api/v1/openai/v1/chat/completions";
+/** OpenAI-compatible chat-completions path exposed by Codebuff/Freebuff. */
+export const FREEBUFF_OPENAI_PATH = "/api/v1/chat/completions";
+
+/** Default API base URL for Freebuff/Codebuff requests. Overridable via
+ *  the `FREEBUFF_API_BASE` env var. */
+export const FREEBUFF_DEFAULT_API_BASE = "https://www.codebuff.com";
+
+/** Default path to the credentials.json that holds the Freebuff authToken. */
+export const FREEBUFF_DEFAULT_CREDENTIALS_PATH_VALUE =
+  "~/.config/manicode/credentials.json";
 
 /**
  * Resolve the API base URL based on FREEBUFF_TIER env var.
  *
- *   "free" (default)  → https://freebuff.com
- *   "codebuff"        → https://codebuff.com
+ *   "free" (default)  → https://www.codebuff.com
+ *   "codebuff"        → https://www.codebuff.com
  */
 export function resolveFreebuffBaseUrl(): string {
   const tier = process.env[FREEBUFF_TIER_ENV];
@@ -63,7 +73,7 @@ export function isFreebuffEnabled(): boolean {
 export function resolveFreebuffCredentialsPath(): string {
   const raw =
     process.env[FREEBUFF_CREDENTIALS_PATH_ENV] ??
-    FREEBUFF_DEFAULT_CREDENTIALS_PATH;
+    FREEBUFF_DEFAULT_CREDENTIALS_PATH_VALUE;
   if (raw === "~") return homedir();
   if (raw.startsWith("~/")) {
     return homedir() + raw.slice(1);

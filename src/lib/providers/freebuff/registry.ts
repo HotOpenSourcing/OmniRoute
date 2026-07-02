@@ -31,8 +31,13 @@ export interface FreebuffProviderConfig {
   anthropicMessagesPath: string;
 }
 
-export const FREEBUFF_OPENAI_CHAT_PATH = "/api/v1/openai/v1/chat/completions";
-export const FREEBUFF_ANTHROPIC_MESSAGES_PATH = "/api/v1/anthropic/v1/messages";
+/** Codebuff/Freebuff chat-completions endpoint (OpenAI-compatible). */
+export const FREEBUFF_OPENAI_CHAT_PATH = "/api/v1/chat/completions";
+
+/** Codebuff does not expose a separate Anthropic endpoint. Requests shaped
+ *  for Anthropic should be translated and sent to the same chat-completions
+ *  endpoint by the caller; this constant is kept as an alias for API symmetry. */
+export const FREEBUFF_ANTHROPIC_MESSAGES_PATH = "/api/v1/chat/completions";
 
 /**
  * Resolve the current provider configuration. Returns null when the

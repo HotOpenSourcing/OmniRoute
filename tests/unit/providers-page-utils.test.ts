@@ -8,6 +8,17 @@ const providerPageStorage =
 const providers = await import("../../src/shared/constants/providers.ts");
 const providerCatalog = await import("../../src/lib/providers/catalog.ts");
 
+test("OAuth provider catalog includes Freebuff", () => {
+  const entries = providerPageUtils.buildStaticProviderEntries("oauth", () => ({
+    total: 0,
+  }));
+  const freebuffEntry = entries.find((entry) => entry.providerId === "freebuff");
+  assert.ok(freebuffEntry, "Freebuff should appear in the OAuth provider catalog");
+  assert.equal(freebuffEntry.provider.id, "freebuff");
+  assert.equal(freebuffEntry.displayAuthType, "oauth");
+  assert.equal(freebuffEntry.toggleAuthType, "oauth");
+});
+
 test("merged OAuth providers keep free-tier providers in the OAuth section", () => {
   const statsCalls = [];
   const getProviderStats = (providerId, authType) => {

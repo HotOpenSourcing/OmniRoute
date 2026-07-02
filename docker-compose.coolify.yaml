@@ -35,8 +35,20 @@ services:
       DATA_DIR: /app/data
 
       # Public URLs (important for OAuth callbacks and dashboard links)
+      #
+      # OMNIROUTE_PUBLIC_BASE_URL is the server-side origin allow-list read by
+      # src/server/origin/publicOrigin.ts and enforced by the authz pipeline
+      # in src/server/authz/pipeline.ts. When the dashboard is reached over a
+      # custom host or HTTPS proxy (e.g. https://omni.ty-dev.site) and this
+      # var does not match the browser's Origin header, every mutating route
+      # — including POST /api/providers/validate — returns 403 INVALID_ORIGIN.
+      # Direct loopback/LAN-IP access works without it (see directLocalHostOrigin).
+      #
+      # Defaults to BASE_URL so configuring one is normally enough; override it
+      # here only when the public-facing URL differs from BASE_URL.
       BASE_URL: ${BASE_URL:-http://localhost:${PORT:-20128}}
       NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-http://localhost:${PORT:-20128}}
+      OMNIROUTE_PUBLIC_BASE_URL: ${OMNIROUTE_PUBLIC_BASE_URL:-${BASE_URL:-http://localhost:${PORT:-20128}}}
 
       # Security defaults for reverse-proxy deployments
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}

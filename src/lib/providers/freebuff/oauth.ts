@@ -18,8 +18,8 @@
  *      fingerprintHash, userId, userEmail } }`.
  *
  * The endpoints are env-overridable via `FREEBUFF_OAUTH_BASE_URL` (default
- * `https://codebuff.com`); for the free tier, set
- * `FREEBUFF_OAUTH_BASE_URL=https://freebuff.com`.
+ * `https://www.codebuff.com`); for the free tier, use the same domain —
+ * Freebuff's API is served from the Codebuff domain.
  *
  * Module conventions:
  * - Bearer auth happens at the call sites (Phase 5), not here.
@@ -49,7 +49,7 @@ export interface FreebuffOAuthEndpoints {
 
 export function getFreebuffOAuthEndpoints(): FreebuffOAuthEndpoints {
   const base = (
-    process.env.FREEBUFF_OAUTH_BASE_URL ?? "https://codebuff.com"
+    process.env.FREEBUFF_OAUTH_BASE_URL ?? "https://www.codebuff.com"
   ).replace(/\/+$/, "");
   return {
     code: `${base}/api/auth/cli/code`,

@@ -115,9 +115,9 @@ export const APIKEY_PROVIDERS_REGIONAL = {
     icon: "bolt",
     color: "#F97316",
     textIcon: "FB",
-    website: "https://codebuff.com",
+    website: "https://www.codebuff.com",
     apiHint:
-      "Free tier of codebuff.com (PKCE OAuth or pasted credentials.json). Catalog: mimo / minimax / kimi / deepseek / glm.",
+      "Free tier of www.codebuff.com (PKCE OAuth or pasted credentials.json). Catalog: mimo / minimax / kimi / deepseek / glm.",
     subscriptionRisk: true,
     riskNoticeVariant: "oauth",
   },

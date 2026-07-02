@@ -488,7 +488,7 @@ export const OAUTH_TIMEOUT = 300000;
 // Flow (implemented in Chunk 2 of the freebuff integration):
 //   1. POST {codeUrl} body={ fingerprintId } → { loginUrl, fingerprintHash,
 //      expiresAt, flowId }
-//   2. User opens loginUrl in browser → completes OAuth at codebuff.com
+//   2. User opens loginUrl in browser → completes OAuth at www.codebuff.com
 //   3. GET {statusUrl}?fingerprintId=...&fingerprintHash=...&expiresAt=...
 //      → { authToken, userId, email } (polls until status === "success")
 //   4. (Optional) POST {sessionUrl} to mint a per-session instanceId.
@@ -498,11 +498,11 @@ export const OAUTH_TIMEOUT = 300000;
 // "mismatch" or auth fails, surface the "paste credentials.json" fallback
 // in the UI.
 export const FREEBUFF_OAUTH_CONFIG = {
-  codeUrl: "https://codebuff.com/api/auth/cli/code",
-  statusUrl: "https://codebuff.com/api/auth/cli/status",
-  logoutUrl: "https://codebuff.com/api/auth/cli/logout",
-  sessionUrl: "https://codebuff.com/api/v1/freebuff/session",
-  meUrl: "https://codebuff.com/api/v1/me",
+  codeUrl: "https://www.codebuff.com/api/auth/cli/code",
+  statusUrl: "https://www.codebuff.com/api/auth/cli/status",
+  logoutUrl: "https://www.codebuff.com/api/auth/cli/logout",
+  sessionUrl: "https://www.codebuff.com/api/v1/freebuff/session",
+  meUrl: "https://www.codebuff.com/api/v1/me",
   pollIntervalMs: 2000,
   pollTimeoutMs: 300000,
 };

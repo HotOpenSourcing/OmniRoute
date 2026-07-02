@@ -29,6 +29,13 @@ import {
 // Public schemas round-trip the documented shapes.
 // ---------------------------------------------------------------------------
 
+test("metaService module loads without duplicate export errors", () => {
+  assert.ok(freebuffLoginStartSchema, "login start schema should be exported");
+  assert.ok(freebuffLoginStatusSchema, "login status schema should be exported");
+  assert.equal(typeof freebuffLoginStartSchema.parse, "function");
+  assert.equal(typeof freebuffLoginStatusSchema.parse, "function");
+});
+
 describe("freebuff metaService schemas", () => {
   test("freebuffQuotaStateSchema accepts a documented payload", () => {
     const parsed = freebuffQuotaStateSchema.parse({
@@ -63,34 +70,47 @@ describe("freebuff metaService schemas", () => {
     assert.equal(parsed.currentStreak, 5);
   });
 
-  test("freebuffLoginStartSchema accepts a documented payload", () => {
+  test("freebuffLoginStartSchema accepts the oauth wire payload", () => {
     const parsed = freebuffLoginStartSchema.parse({
-      flowId: "11111111-2222-3333-4444-555555555555",
       loginUrl: "https://codebuff.com/oauth/authorize?...",
+      fingerprintHash: "a".repeat(64),
       expiresAt: "2026-07-01T00:00:00.000Z",
     });
     assert.ok(parsed.loginUrl.startsWith("https://"));
+    assert.equal(parsed.fingerprintHash, "a".repeat(64));
   });
 
-  test("freebuffLoginStatusSchema accepts a completed payload with optional fields", () => {
+  test("freebuffLoginStatusSchema accepts a completed payload", () => {
     const parsed = freebuffLoginStatusSchema.parse({
-      flowId: "11111111-2222-3333-4444-555555555555",
       status: "completed",
-      authToken: "11111111-2222-3333-4444-555555555555",
-      fingerprintId: "enhanced-abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG",
-      userId: "11111111-2222-3333-4444-555555555555",
-      userEmail: "user@example.com",
+      user: {
+        authToken: "11111111-2222-3333-4444-555555555555",
+        fingerprintId: "fingerprint-id-1",
+        fingerprintHash: "a".repeat(64),
+        userId: "11111111-2222-3333-4444-555555555555",
+        userEmail: "user@example.com",
+      },
     });
     assert.equal(parsed.status, "completed");
+    assert.equal(parsed.user.userEmail, "user@example.com");
   });
 
-  test("freebuffLoginStatusSchema accepts a minimal pending payload", () => {
-    const parsed = freebuffLoginStatusSchema.parse({
-      flowId: "11111111-2222-3333-4444-555555555555",
-      status: "pending",
-    });
-    assert.equal(parsed.status, "pending");
-    assert.equal(parsed.authToken, undefined);
+  test("freebuffLoginStatusSchema accepts minimal pending and expired payloads", () => {
+    const pending = freebuffLoginStatusSchema.parse({ status: "pending" });
+    assert.equal(pending.status, "pending");
+
+    const expired = freebuffLoginStatusSchema.parse({ status: "expired" });
+    assert.equal(expired.status, "expired");
+  });
+
+  test("freebuffLoginStatusSchema rejects the legacy flat shape", () => {
+    assert.throws(() =>
+      freebuffLoginStatusSchema.parse({
+        flowId: "11111111-2222-3333-4444-555555555555",
+        status: "completed",
+        authToken: "11111111-2222-3333-4444-555555555555",
+      }),
+    );
   });
 });
 

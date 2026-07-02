@@ -63,3 +63,17 @@ export {
   getFreebuffAnthropicEndpoint,
   type FreebuffProviderConfig,
 } from "./registry";
+
+// ─── chat orchestrator ─────────────────────────────────────────────
+export {
+  sendFreebuffChat,
+  sendFreebuffChatOnce,
+  FreebuffChatRequestError,
+  type FreebuffChatRequest,
+} from "./chat";
+
+// ─── pass-through transformer ──────────────────────────────────────
+export {
+  createPassthroughTransformer,
+  type PassThroughOptions,
+} from "./stream/passthroughTransformer";

@@ -66,6 +66,8 @@ import {
 
 import { createTransformer } from "./stream/index.ts";
 import type { TransformerFormat } from "./stream/index.ts";
+import { createPassthroughTransformer } from "./stream/passthroughTransformer.ts";
+import { sendFreebuffChat } from "./chat.ts";
 
 // ---------------------------------------------------------------------------
 // Paths and configuration.
@@ -80,7 +82,7 @@ export const FREEBUFF_LOCK_PATH =
   join(homedir(), ".config", "manicode", "freebuff.lock");
 
 export const FREEBUFF_API_BASE =
-  process.env.FREEBUFF_API_BASE ?? "https://codebuff.com";
+  process.env.FREEBUFF_API_BASE ?? "https://www.codebuff.com";
 
 // ---------------------------------------------------------------------------
 // Errors.
@@ -305,9 +307,18 @@ export function listModels(state: ProviderState): FreebuffModel[] {
 }
 
 /**
- * Dispatches a chat request to the Codebuff API. Returns a
- * `Response` whose body is the transformed SSE stream — pass it
- * straight back to the OmniRoute client.
+ * Dispatches a chat request to the Freebuff API. The orchestrator lives
+ * in `./chat.ts` — it acquires a waiting-room slot, streams the chat
+ * via `/api/v1/chat/completions` with the correct `freebuff_instance_id`,
+ * and releases the slot when the stream completes.
+ *
+ * `format` selects the wire format the caller expects:
+ *   - "openai": relay the upstream SSE verbatim (pass-through).
+ *   - "anthropic": re-frame the upstream OpenAI SSE into Anthropic events
+ *     using the existing transformer factory (kept for the legacy path).
+ *
+ * @param body.signal AbortSignal that, when triggered, cancels the upstream
+ *                    stream and triggers the slot release.
  */
 export async function sendChatRequest(
   state: ProviderState,
@@ -333,64 +344,49 @@ export async function sendChatRequest(
     }
   }
 
-  const fingerprint = state.fingerprint.fingerprintId;
-  const url = `${FREEBUFF_API_BASE}/api/v1/agent-runs`;
-
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${state.connection.authToken}`,
-    "Content-Type": "application/json",
-    Accept: "text/event-stream",
-    "x-codebuff-fingerprint": fingerprint,
-    "x-codebuff-client": "omniroute-freebuff",
-    "x-omniroute-include-subagent-output":
-      body.include_subagent_output === true ? "1" : "0",
-  };
-
   let upstream: Response;
   try {
-    upstream = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        action: "START",
-        agentId: "base-chat",
-        model: body.model,
-        messages: body.messages,
-        stream: body.stream ?? true,
-      }),
-      signal: body.signal as AbortSignal | undefined,
+    upstream = await sendFreebuffChat({
+      model: body.model,
+      messages: body.messages.map((m) => ({
+        role: m.role,
+        content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
+      })),
+      stream: body.stream ?? true,
+      max_tokens: body.max_tokens as number | undefined,
+      temperature: body.temperature as number | undefined,
+      top_p: body.top_p as number | undefined,
     });
   } catch (err) {
+    if (err instanceof FreebuffProviderError) throw err;
     throw new FreebuffProviderError(
-      `Network error contacting Codebuff: ${(err as Error).message}`,
+      `Freebuff chat request failed: ${(err as Error).message}`,
       503,
       "network_error",
     );
   }
 
-  if (!upstream.ok || !upstream.body) {
-    const errBody = await upstream.text().catch(() => "");
-    throw new FreebuffProviderError(
-      `Codebuff upstream returned HTTP ${upstream.status}: ${errBody.slice(0, 200)}`,
-      upstream.status,
-      "upstream_error",
-    );
-  }
+  // Pick the right transformer:
+  //   - openai: pass-through (upstream is already OpenAI SSE).
+  //   - anthropic: re-frame using the legacy event-based transformer
+  //     (the upstream may have switched to plain OpenAI SSE, in which
+  //     case consumers will receive raw `data: {...}\n\n` chunks —
+  //     acceptable until a dedicated Anthropic framer lands).
+  const transformer =
+    format === "openai"
+      ? createPassthroughTransformer({ model: body.model })
+      : createTransformer(format, { model: body.model });
 
-  const transformer = createTransformer(format, {
-    model: body.model,
-    includeSubagentOutput: body.include_subagent_output === true,
-  });
-
-  const transformed = upstream.body.pipeThrough(transformer);
+  const transformed = upstream.body!.pipeThrough(transformer);
   return new Response(transformed, {
-    status: 200,
+    status: upstream.status,
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
-      "x-omniroute-subagent-trace": body.include_subagent_output === true ? "on" : "off",
-      "x-codebuff-fingerprint": fingerprint,
+      "x-omniroute-freebuff-instance": upstream.headers.get(
+        "x-omniroute-freebuff-instance",
+      ) ?? "",
     },
   });
 }

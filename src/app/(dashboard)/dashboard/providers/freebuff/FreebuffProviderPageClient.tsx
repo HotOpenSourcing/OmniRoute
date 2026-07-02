@@ -22,7 +22,10 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
+import { Badge, Button, Card } from "@/shared/components";
+import { FREEBUFF_MODELS, type FreebuffModel } from "@/lib/providers/freebuff/models";
 
 // ---------------------------------------------------------------------------
 // Types — mirror `src/lib/providers/freebuff/metaService.ts`.
@@ -210,97 +213,106 @@ export default function FreebuffProviderPageClient() {
   // --- Render --------------------------------------------------------------
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8 p-8">
-      <header>
-        <h1 className="text-2xl font-semibold text-stone-900 dark:text-stone-100">
-          {t("name", { defaultValue: "Freebuff" })}
-        </h1>
-        <p className="mt-1 text-sm text-stone-600 dark:text-stone-400">
-          {t("tagline", {
-            defaultValue:
-              "Route OmniRoute through the Codebuff Free Tier (Codebuff-backed models).",
-          })}
-        </p>
-      </header>
+    <div className="space-y-6 p-6">
+      {/* Page header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-1">
+          <Link
+            href="/dashboard/providers"
+            className="inline-flex items-center gap-1 text-xs text-text-muted hover:text-text-main"
+          >
+            <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+            {t("back", { defaultValue: "Back to providers" })}
+          </Link>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-semibold text-text-main">
+              {t("name", { defaultValue: "Freebuff" })}
+            </h1>
+            <Badge variant="info" size="sm" dot>
+              {t("badge", { defaultValue: "Codebuff Free Tier" })}
+            </Badge>
+          </div>
+          <p className="text-sm text-text-muted">
+            {t("tagline", {
+              defaultValue:
+                "Route OmniRoute through the Codebuff Free Tier (Codebuff-backed models).",
+            })}
+          </p>
+        </div>
+      </div>
 
       {/* Authentication card */}
-      <section className="rounded-lg border border-stone-200 bg-white p-6 shadow-sm dark:border-stone-700 dark:bg-stone-900">
-        <h2 className="text-lg font-medium">
-          {t("login.title", { defaultValue: "Authentication" })}
-        </h2>
-        <p className="mt-1 text-sm text-stone-600 dark:text-stone-400">
-          {t("login.description", {
-            defaultValue:
-              "Sign in with Codebuff to bind your account, or paste a credentials.json previously exported by `freebuff login`.",
-          })}
-        </p>
-
-        <div className="mt-4 flex flex-wrap gap-3">
-          <button
-            type="button"
+      <Card
+        title={t("login.title", { defaultValue: "Authentication" })}
+        subtitle={t("login.description", {
+          defaultValue:
+            "Sign in with Codebuff to bind your account, or paste a credentials.json previously exported by `freebuff login`.",
+        })}
+        icon="key"
+      >
+        <div className="flex flex-wrap gap-3">
+          <Button
             onClick={startLogin}
-            disabled={login.kind === "starting" || login.kind === "waiting"}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            loading={login.kind === "starting"}
+            disabled={login.kind === "waiting"}
+            icon="login"
           >
             {login.kind === "starting"
               ? t("login.starting", { defaultValue: "Starting…" })
               : t("login.cta", { defaultValue: "Login with Codebuff" })}
-          </button>
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={() => setPasteOpen((v) => !v)}
-            className="rounded-md border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 dark:border-stone-600 dark:text-stone-200"
+            icon="content_paste"
           >
             {t("login.pasteToggle", {
               defaultValue: "Paste credentials.json",
             })}
-          </button>
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            className="ml-auto"
             onClick={releaseSession}
-            className="ml-auto rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300"
+            icon="logout"
           >
             {t("login.release", { defaultValue: "Sign out" })}
-          </button>
+          </Button>
         </div>
 
         {login.kind === "waiting" && (
-          <p className="mt-3 text-xs text-stone-500">
+          <div className="mt-4 flex items-center gap-2 text-xs text-text-muted">
+            <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
             {t("login.waiting", {
-              defaultValue:
-                "Waiting for browser confirmation. Poll started at ",
+              defaultValue: "Waiting for browser confirmation. Poll started at ",
             })}
             {new Date(login.startedAt).toLocaleTimeString()}
-          </p>
+          </div>
         )}
 
-        {login.kind === "error" && (
-          <ErrorBanner error={login.error} t={t} />
-        )}
+        {login.kind === "error" && <ErrorBanner error={login.error} t={t} />}
 
         {pasteOpen && <PasteCredentialsForm t={t} />}
-      </section>
+      </Card>
 
-      {/* Quota card */}
-      <section className="rounded-lg border border-stone-200 bg-white p-6 shadow-sm dark:border-stone-700 dark:bg-stone-900">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-medium">
-            {t("quota.title", { defaultValue: "Quota" })}
-          </h2>
-          <button
-            type="button"
-            onClick={refreshQuota}
-            className="text-xs text-blue-600 hover:underline"
-          >
-            {t("quota.refresh", { defaultValue: "Refresh" })}
-          </button>
-        </div>
-
-        <div className="mt-4">
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Quota card */}
+        <Card
+          title={t("quota.title", { defaultValue: "Quota" })}
+          subtitle={t("quota.subtitle", {
+            defaultValue: "Live usage limits from your Codebuff account.",
+          })}
+          icon="speed"
+          action={
+            <Button variant="ghost" size="sm" onClick={refreshQuota} icon="refresh">
+              {t("quota.refresh", { defaultValue: "Refresh" })}
+            </Button>
+          }
+        >
           {quota.kind === "loading" && (
-            <p className="text-sm text-stone-500">
+            <p className="text-sm text-text-muted">
               {t("quota.loading", { defaultValue: "Loading…" })}
             </p>
           )}
@@ -341,35 +353,36 @@ export default function FreebuffProviderPageClient() {
           )}
 
           {quota.kind === "error" && <ErrorBanner error={quota.error} t={t} />}
-        </div>
-      </section>
+        </Card>
 
-      {/* Streak card */}
-      <section className="rounded-lg border border-stone-200 bg-white p-6 shadow-sm dark:border-stone-700 dark:bg-stone-900">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-medium">
-            {t("streak.title", { defaultValue: "Streak" })}
-          </h2>
-          <button
-            type="button"
-            onClick={refreshStreak}
-            disabled={streak.kind === "loading"}
-            className="text-xs text-blue-600 hover:underline disabled:opacity-50"
-          >
-            {t("streak.refresh", { defaultValue: "Refresh" })}
-          </button>
-        </div>
-
-        <div className="mt-4">
+          {/* Streak card */}
+        <Card
+          title={t("streak.title", { defaultValue: "Streak" })}
+          subtitle={t("streak.subtitle", {
+            defaultValue: "Daily check-in gamification state.",
+          })}
+          icon="local_fire_department"
+          action={
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={refreshStreak}
+              loading={streak.kind === "loading"}
+              icon="refresh"
+            >
+              {t("streak.refresh", { defaultValue: "Refresh" })}
+            </Button>
+          }
+        >
           {streak.kind === "idle" && (
-            <p className="text-sm text-stone-500">
+            <p className="text-sm text-text-muted">
               {t("streak.idle", {
                 defaultValue: "Click refresh to fetch your streak.",
               })}
             </p>
           )}
           {streak.kind === "loading" && (
-            <p className="text-sm text-stone-500">
+            <p className="text-sm text-text-muted">
               {t("streak.loading", { defaultValue: "Loading…" })}
             </p>
           )}
@@ -398,8 +411,50 @@ export default function FreebuffProviderPageClient() {
             </dl>
           )}
           {streak.kind === "error" && <ErrorBanner error={streak.error} t={t} />}
+        </Card>
+      </div>
+
+      {/* Available models */}
+      <Card
+        title={t("models.title", { defaultValue: "Available models" })}
+        subtitle={t("models.subtitle", {
+          defaultValue: "Models exposed through the Codebuff Free Tier.",
+        })}
+        icon="model_training"
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-border text-text-muted">
+                <th className="pb-2 pr-4 font-medium">{t("models.model", { defaultValue: "Model" })}</th>
+                <th className="pb-2 pr-4 font-medium">{t("models.tier", { defaultValue: "Tier" })}</th>
+                <th className="pb-2 pr-4 font-medium">{t("models.context", { defaultValue: "Context" })}</th>
+                <th className="pb-2 pr-4 font-medium">{t("models.modalities", { defaultValue: "Modalities" })}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {FREEBUFF_MODELS.map((model) => (
+                <tr key={model.id} className="text-text-main">
+                  <td className="py-3 pr-4">
+                    <div className="font-medium">{model.displayName}</div>
+                    <div className="text-xs text-text-muted font-mono">{model.id}</div>
+                  </td>
+                  <td className="py-3 pr-4">
+                    <Badge
+                      variant={model.tier === "lite" ? "success" : model.tier === "pro" ? "error" : "info"}
+                      size="sm"
+                    >
+                      {model.tier}
+                    </Badge>
+                  </td>
+                  <td className="py-3 pr-4 whitespace-nowrap">{model.contextWindow.toLocaleString()} tokens</td>
+                  <td className="py-3 pr-4">{model.modalities.join(", ")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      </section>
+      </Card>
     </div>
   );
 }
@@ -411,10 +466,10 @@ export default function FreebuffProviderPageClient() {
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div>
-      <dt className="text-xs uppercase tracking-wide text-stone-500">
+      <dt className="text-xs uppercase tracking-wide text-text-muted">
         {label}
       </dt>
-      <dd className="mt-1 font-mono text-base text-stone-900 dark:text-stone-100">
+      <dd className="mt-1 font-mono text-base text-text-main">
         {value}
       </dd>
     </div>
@@ -431,10 +486,10 @@ function ErrorBanner({
   const isPending = error.status === 501;
   return (
     <div
-      className={`mt-3 rounded-md border p-3 text-sm ${
+      className={`mt-3 rounded-lg border p-3 text-sm ${
         isPending
-          ? "border-amber-300 bg-amber-50 text-amber-900"
-          : "border-red-300 bg-red-50 text-red-900"
+          ? "border-warning bg-warning/10 text-warning"
+          : "border-error bg-error/10 text-error"
       }`}
     >
       <p className="font-medium">
@@ -444,7 +499,7 @@ function ErrorBanner({
             })
           : t("errors.genericTitle", { defaultValue: "Error" })}
       </p>
-      <p className="mt-1">{error.message}</p>
+      <p className="mt-1 opacity-90">{error.message}</p>
       {error.code && (
         <p className="mt-1 font-mono text-xs opacity-75">{error.code}</p>
       )}
@@ -479,7 +534,7 @@ function PasteCredentialsForm({
 
   return (
     <form onSubmit={onSubmit} className="mt-4 space-y-3">
-      <label className="block text-xs font-medium text-stone-700 dark:text-stone-300">
+      <label className="block text-xs font-medium text-text-secondary">
         {t("login.pasteLabel", {
           defaultValue: "credentials.json contents",
         })}
@@ -491,21 +546,22 @@ function PasteCredentialsForm({
           setSubmitted(false);
         }}
         rows={6}
-        className="w-full rounded-md border border-stone-300 bg-stone-50 p-2 font-mono text-xs dark:border-stone-600 dark:bg-stone-800"
+        className="w-full rounded-lg border border-border bg-surface-secondary p-3 font-mono text-xs text-text-main focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         placeholder='{"authToken":"…","fingerprintId":"enhanced-…"}'
       />
       <div className="flex items-center gap-3">
-        <button
+        <Button
           type="submit"
-          disabled={submitting || value.length === 0}
-          className="rounded-md bg-stone-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-stone-900 disabled:opacity-50"
+          size="sm"
+          loading={submitting}
+          disabled={value.length === 0}
         >
           {submitting
             ? t("login.pasteSubmitting", { defaultValue: "Submitting…" })
             : t("login.pasteSubmit", { defaultValue: "Submit" })}
-        </button>
+        </Button>
         {submitted && (
-          <span className="text-xs text-green-700">
+          <span className="text-xs text-success">
             {t("login.pasteOk", { defaultValue: "Accepted (storage pending)" })}
           </span>
         )}
