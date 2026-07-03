@@ -40,6 +40,15 @@ type OAuthModalProps = {
   onClose: () => void;
   idcConfig?: unknown;
   reauthConnection?: null | { id?: string };
+  /**
+   * Initial tab when both "Browser Login" and "Paste API Key" are available.
+   *   - "paste" (default for paste-token providers) → starts on the paste form.
+   *   - "browser" → starts on the browser flow and auto-runs the device-code
+   *     request. Used by `FreebuffOAuthWrapper` after the user picks the
+   *     browser method in the method selector.
+   * Only honored for providers that support paste-token. Ignored otherwise.
+   */
+  defaultTab?: "browser" | "paste";
 };
 
 /**
@@ -55,6 +64,7 @@ export default function OAuthModal({
   onClose,
   idcConfig,
   reauthConnection,
+  defaultTab,
 }: OAuthModalProps) {
   const t = useTranslations("oauthModal");
   const [step, setStep] = useState("waiting"); // waiting | input | success | error
@@ -74,7 +84,9 @@ export default function OAuthModal({
     provider === "grok-cli" ||
     provider === "freebuff";
 
-  const [showPasteToken, setShowPasteToken] = useState(supportsTokenPaste);
+  const [showPasteToken, setShowPasteToken] = useState(
+    defaultTab === "browser" ? false : supportsTokenPaste,
+  );
   const [pasteToken, setPasteToken] = useState("");
   const [savingToken, setSavingToken] = useState(false);
 
@@ -277,7 +289,7 @@ export default function OAuthModal({
     try {
       setError(null);
 
-      // Device code flow (GitHub, Qwen, Kiro, Kimi Coding, KiloCode)
+      // Device code flow (GitHub, Qwen, Kiro, Kimi Coding, KiloCode, Freebuff)
       if (
         provider === "github" ||
         provider === "qwen" ||
@@ -285,7 +297,8 @@ export default function OAuthModal({
         provider === "amazon-q" ||
         provider === "kimi-coding" ||
         provider === "kilocode" ||
-        provider === "codebuddy-cn"
+        provider === "codebuddy-cn" ||
+        provider === "freebuff"
       ) {
         setIsDeviceCode(true);
         setStep("waiting");
@@ -499,6 +512,12 @@ export default function OAuthModal({
     if (isOpen && provider) {
       if (flowStartedRef.current) return; // Already started, prevent duplicate
       flowStartedRef.current = true;
+      // When the paste-token tab is the initial mode, do NOT auto-start the
+      // browser flow — the user may choose to paste instead. The wrapper-driven
+      // browser flow (defaultTab="browser") skips this guard.
+      if (showPasteToken && defaultTab !== "browser") {
+        return;
+      }
       setAuthData(null);
       setCallbackUrl("");
       setError(null);
@@ -508,7 +527,7 @@ export default function OAuthModal({
       // Auto start OAuth
       startOAuthFlow();
     }
-  }, [isOpen, provider, startOAuthFlow]);
+  }, [isOpen, provider, showPasteToken, defaultTab, startOAuthFlow]);
 
   // Listen for OAuth callback via multiple methods
   useEffect(() => {

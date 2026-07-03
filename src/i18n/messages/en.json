@@ -9007,6 +9007,19 @@
       "pasteSubmitting": "Submitting…",
       "pasteOk": "Accepted (storage pending Chunk 4)"
     },
+    "methods": {
+      "browser": {
+        "title": "Sign in via browser",
+        "description": "Open a Codebuff login page in your browser. OmniRoute polls for completion and saves the session automatically. The PKCE fingerprint is derived from this server's hardware — if it does not match your local CLI fingerprint, paste credentials.json instead."
+      },
+      "paste": {
+        "title": "Paste credentials.json",
+        "description": "Paste the contents of credentials.json from ~/.config/manicode/credentials.json (or a bare authToken UUID). Recommended for remote OmniRoute deployments where the server-side hardware fingerprint rarely matches your local CLI fingerprint."
+      }
+    },
+    "paste": {
+      "help": "Paste the contents of credentials.json from ~/.config/manicode/credentials.json (a JSON object with authToken, userId, email fields), or paste just the bare authToken UUID if you only have the token."
+    },
     "quota": {
       "title": "Quota",
       "refresh": "Refresh",

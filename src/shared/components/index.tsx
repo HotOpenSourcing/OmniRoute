@@ -27,6 +27,7 @@ export { default as ProxyLogger } from "./ProxyLogger";
 export { default as KiroAuthModal } from "./KiroAuthModal";
 export { default as KiroOAuthWrapper } from "./KiroOAuthWrapper";
 export { default as KiroSocialOAuthModal } from "./KiroSocialOAuthModal";
+export { default as FreebuffOAuthWrapper } from "./FreebuffOAuthWrapper";
 export { default as CursorAuthModal } from "./CursorAuthModal";
 export { default as TraeAuthModal } from "./TraeAuthModal";
 export { default as SegmentedControl } from "./SegmentedControl";

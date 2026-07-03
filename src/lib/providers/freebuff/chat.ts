@@ -16,6 +16,8 @@
  */
 
 import { acquireFreebuffSlot, releaseFreebuffSlot, type FreebuffSessionStatus } from "./quota.ts";
+import { getFreebuffRootAgentIdForModel } from "./models.ts";
+import { freebuffSessionManager } from "./sessionManager.ts";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import * as fs from "node:fs";
@@ -119,10 +121,20 @@ function uuid(): string {
 }
 
 /**
- * Read the credentials.json and return the `default.authToken`.
- * Throws if no token is found.
+ * Read credentials.json and return the full credential triple.
+ * Throws `FreebuffChatRequestError` if no usable authToken is found.
+ *
+ * Note: fingerprintId/fingerprintHash are optional — when absent, the
+ * `x-codebuff-fingerprint[-hash]` headers are simply not sent. The
+ * upstream does not require them (validated by Mission 1 case 5).
  */
-async function readAuthToken(): Promise<string> {
+interface FreebuffCredentials {
+  authToken: string;
+  fingerprintId?: string;
+  fingerprintHash?: string;
+}
+
+async function readCredentials(): Promise<FreebuffCredentials> {
   const fs = await import("node:fs/promises");
   let raw: string;
   try {
@@ -143,16 +155,20 @@ async function readAuthToken(): Promise<string> {
       500,
     );
   }
-  const token = (parsed as { default?: { authToken?: string } })?.default
-    ?.authToken;
-  if (!token) {
+  const def = (parsed as { default?: { authToken?: string; fingerprintId?: string; fingerprintHash?: string } })?.default;
+  const token = def?.authToken;
+  if (!token || token === "REFRESH_NEEDED" || token === "not-a-uuid") {
     throw new FreebuffChatRequestError(
-      `No default.authToken found in ${FREEBUFF_CREDENTIALS_PATH}`,
+      `No usable default.authToken found in ${FREEBUFF_CREDENTIALS_PATH} (got: ${token ? `"${token}"` : "missing"})`,
       401,
       "no_connection",
     );
   }
-  return token;
+  return {
+    authToken: token,
+    fingerprintId: def?.fingerprintId || undefined,
+    fingerprintHash: def?.fingerprintHash || undefined,
+  };
 }
 
 /**
@@ -171,7 +187,8 @@ async function readAuthToken(): Promise<string> {
 export async function sendFreebuffChat(
   request: FreebuffChatRequest,
 ): Promise<Response> {
-  const authToken = await readAuthToken();
+  const credentials = await readCredentials();
+  const { authToken } = credentials;
 
   // Step 1 — acquire a slot.
   const slot = await acquireFreebuffSlot(authToken, request.model);
@@ -192,28 +209,36 @@ export async function sendFreebuffChat(
   }
 
   // Step 2 — dispatch the chat completion.
+  //
+  // Body envelope (post v3.8.43, validated against www.codebuff.com):
+  //   runId, provider, codebuff_metadata MUST be at the TOP LEVEL — the
+  //   upstream returns 400 "No runId found in request body" when they are
+  //   nested under a `codebuff.*` wrapper. (See `chatIntegration.ts` and
+  //   `validation-scripts/final-validations.md` finding C3.)
   const runId = uuid();
   const clientId = uuid();
+  const userInputId = uuid();
   const providerName = providerNameFor(request.model);
 
   const body = {
+    runId,
     model: request.model,
     messages: request.messages,
     stream: request.stream ?? true,
     max_tokens: request.max_tokens ?? 1024,
     ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
     ...(request.top_p !== undefined ? { top_p: request.top_p } : {}),
-    codebuff: {
-      codebuff_metadata: {
-        run_id: runId,
-        client_id: clientId,
-        cost_mode: "free",
-        freebuff_instance_id: instanceId,
-      },
-      provider: {
-        order: [providerName],
-        allow_fallbacks: false,
-      },
+    provider: {
+      order: [providerName],
+      allow_fallbacks: false,
+      sort: "price",
+    },
+    codebuff_metadata: {
+      fingerprint_id: credentials.fingerprintId ?? "unknown",
+      client_id: clientId,
+      cost_mode: "free",
+      user_input_id: userInputId,
+      freebuff_instance_id: instanceId,
     },
   };
 
@@ -225,6 +250,14 @@ export async function sendFreebuffChat(
         Authorization: `Bearer ${authToken}`,
         "Content-Type": "application/json",
         Accept: request.stream === false ? "application/json" : "text/event-stream",
+        "x-freebuff-instance-id": instanceId,
+        "x-freebuff-model": request.model,
+        ...(credentials.fingerprintId
+          ? { "x-codebuff-fingerprint": credentials.fingerprintId }
+          : {}),
+        ...(credentials.fingerprintHash
+          ? { "x-codebuff-fingerprint-hash": credentials.fingerprintHash }
+          : {}),
       },
       body: JSON.stringify(body),
     });

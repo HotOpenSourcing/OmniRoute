@@ -294,9 +294,12 @@ export async function GET(
         provider === "amazon-q" ||
         provider === "kimi-coding" ||
         provider === "kilocode" ||
-        provider === "codebuddy-cn"
+        provider === "codebuddy-cn" ||
+        provider === "freebuff"
       ) {
-        // GitHub, Kiro/Amazon Q, Kimi Coding, and KiloCode don't use PKCE for device code
+        // GitHub, Kiro/Amazon Q, Kimi Coding, KiloCode, and Freebuff don't use
+        // PKCE for device code. Freebuff derives its own server-side
+        // hardware fingerprintId internally (no client-side PKCE challenge).
         if ((provider === "kiro" || provider === "amazon-q") && startUrl) {
           const providerOverrideConfig = {
             ...providerData.config,
@@ -690,9 +693,13 @@ export async function POST(
         provider === "github" ||
         provider === "kimi-coding" ||
         provider === "kilocode" ||
-        provider === "codebuddy-cn"
+        provider === "codebuddy-cn" ||
+        provider === "freebuff"
       ) {
-        // For providers that don't use PKCE (GitHub, Kimi Coding, KiloCode), don't pass codeVerifier
+        // For providers that don't use PKCE (GitHub, Kimi Coding, KiloCode,
+        // Freebuff), don't pass codeVerifier. Freebuff's deviceCode already
+        // encodes its polling parameters (fingerprintId + fingerprintHash +
+        // expiresAt) and the upstream poll runs without a code verifier.
         result = await runWithProxyContextOrDirect(proxy, () =>
           (pollForToken as any)(provider, deviceCode)
         );

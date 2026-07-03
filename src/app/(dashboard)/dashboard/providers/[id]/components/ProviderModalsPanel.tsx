@@ -6,6 +6,7 @@ import {
   ConfirmModal,
   OAuthModal,
   KiroOAuthWrapper,
+  FreebuffOAuthWrapper,
   CursorAuthModal,
   TraeAuthModal,
   ProxyConfigModal,
@@ -228,6 +229,14 @@ export default function ProviderModalsPanel({
       {!isUpstreamProxyProvider &&
         (providerId === "kiro" || providerId === "amazon-q" ? (
           <KiroOAuthWrapper
+            isOpen={showOAuthModal}
+            reauthConnection={reauthConnection}
+            providerInfo={{ ...providerInfo, id: providerId }}
+            onSuccess={handleOAuthSuccess}
+            onClose={() => setShowOAuthModal(false)}
+          />
+        ) : providerId === "freebuff" ? (
+          <FreebuffOAuthWrapper
             isOpen={showOAuthModal}
             reauthConnection={reauthConnection}
             providerInfo={{ ...providerInfo, id: providerId }}

@@ -54,6 +54,15 @@ export {
   type FreebuffLockRecord,
 } from "./lock";
 
+// ─── seat cache (1-hour session cache for chat-completions) ───────
+export {
+  ensureFreebuffSeat,
+  invalidateFreebuffSeat,
+  getFreebuffSeatCacheSize,
+  type FreebuffSeat,
+  type EnsureFreebuffSeatOptions,
+} from "./seatCache";
+
 // ─── registry ──────────────────────────────────────────────────────
 export {
   FREEBUFF_OPENAI_CHAT_PATH,
