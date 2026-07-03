@@ -19,8 +19,18 @@ const PKCE_CALLBACK_SERVER_PROVIDERS = new Set(["codex"]);
  * Their PKCE flow targeting app.devin.ai/editor/signin returned 404 post-rebrand.
  * Phase 2 will reintroduce browser login via Firebase OAuth + RegisterUser.
  * Spec: _tasks/superpowers/specs/2026-05-29-windsurf-login-fix-design.md.
+ *
+ * Freebuff: PKCE polling requires a server-side hardware fingerprint that
+ * rarely matches the user's local CLI fingerprint on remote OmniRoute
+ * deployments, so the modal exposes paste-token only (either a bare auth
+ * token or a full credentials.json object).
  */
-const IMPORT_TOKEN_ONLY_PROVIDERS = new Set(["windsurf", "devin-cli", "grok-cli"]);
+const IMPORT_TOKEN_ONLY_PROVIDERS = new Set([
+  "windsurf",
+  "devin-cli",
+  "grok-cli",
+  "freebuff",
+]);
 
 type OAuthModalProps = {
   isOpen: boolean;
@@ -54,18 +64,23 @@ export default function OAuthModal({
   const [isDeviceCode, setIsDeviceCode] = useState(false);
   const [deviceData, setDeviceData] = useState(null);
   const [polling, setPolling] = useState(false);
-  // API-key paste mode: for providers that accept a token directly (windsurf, devin-cli)
-  const [showPasteToken, setShowPasteToken] = useState(
-    provider === "windsurf" || provider === "devin-cli" || provider === "grok-cli"
-  );
+  // Providers that accept a pasted token directly (no browser OAuth):
+  // windsurf, devin-cli, grok-cli, freebuff. The OAuthModal renders the
+  // paste-token form for any of these and (if listed in
+  // IMPORT_TOKEN_ONLY_PROVIDERS) hides the "Browser Login" tab entirely.
+  const supportsTokenPaste =
+    provider === "windsurf" ||
+    provider === "devin-cli" ||
+    provider === "grok-cli" ||
+    provider === "freebuff";
+
+  const [showPasteToken, setShowPasteToken] = useState(supportsTokenPaste);
   const [pasteToken, setPasteToken] = useState("");
   const [savingToken, setSavingToken] = useState(false);
 
-  const supportsTokenPaste =
-    provider === "windsurf" || provider === "devin-cli" || provider === "grok-cli";
   // Phase 1 hotfix (2026-05-29): windsurf/devin-cli are import-token-only.
   // Hide the "Browser Login" tab — Phase 2 will restore it via Firebase OAuth.
-  const importTokenOnly = IMPORT_TOKEN_ONLY_PROVIDERS.has(provider);
+  const importTokenOnly = IMPORT_TOKEN_ONLY_PROVIDERS.has(provider ?? "");
   const popupRef = useRef(null);
   const { copied, copy } = useCopyToClipboard();
   const deviceVerificationUrl =
@@ -728,7 +743,7 @@ export default function OAuthModal({
           </div>
         )}
 
-        {/* Paste-token form (Windsurf / Devin CLI) */}
+        {/* Paste-token form (Windsurf / Devin CLI / Grok CLI / Freebuff) */}
         {supportsTokenPaste && showPasteToken && step !== "success" && (
           <div className="flex flex-col gap-3">
             <p className="text-sm text-text-muted">
@@ -736,15 +751,28 @@ export default function OAuthModal({
                 ? 'In the Windsurf / VS Code IDE, run the "Windsurf: Provide Auth Token" command from the command palette (or click the Jupyter "Get Windsurf Authentication Token" button), then copy the shown token and paste it below. Opening windsurf.com/show-auth-token directly only shows a "Redirecting" page — the IDE must initiate the flow.'
                 : provider === "grok-cli"
                   ? 'Paste your Grok Build JWT token from ~/.grok/auth.json (the "key" field value). You can get it by running `grok login` in your terminal.'
-                  : 'Provide your WINDSURF_API_KEY (obtained via `devin auth login`, or via the Windsurf IDE "Windsurf: Provide Auth Token" command).'}
+                  : provider === "freebuff"
+                    ? 'Paste the contents of credentials.json from ~/.config/manicode/credentials.json (a JSON object with "authToken", "userId", "email" fields), or paste just the bare "authToken" UUID if you only have the token. PKCE polling is disabled because the server-side hardware fingerprint rarely matches your local CLI fingerprint on remote OmniRoute deployments.'
+                    : 'Provide your WINDSURF_API_KEY (obtained via `devin auth login`, or via the Windsurf IDE "Windsurf: Provide Auth Token" command).'}
             </p>
-            <Input
-              value={pasteToken}
-              onChange={(e) => setPasteToken(e.target.value)}
-              placeholder={provider === "grok-cli" ? "eyJ..." : "ws-..."}
-              type="password"
-              label={provider === "grok-cli" ? "JWT Token" : "API Key / Token"}
-            />
+            {provider === "freebuff" ? (
+              <textarea
+                value={pasteToken}
+                onChange={(e) => setPasteToken(e.target.value)}
+                placeholder={'{"authToken":"...","userId":"...","email":"..."}'}
+                rows={5}
+                spellCheck={false}
+                className="w-full rounded border border-border bg-bg p-2 font-mono text-sm text-text-main focus:border-primary focus:outline-none"
+              />
+            ) : (
+              <Input
+                value={pasteToken}
+                onChange={(e) => setPasteToken(e.target.value)}
+                placeholder={provider === "grok-cli" ? "eyJ..." : "ws-..."}
+                type="password"
+                label={provider === "grok-cli" ? "JWT Token" : "API Key / Token"}
+              />
+            )}
             {error && <p className="text-sm text-red-500">{error}</p>}
             <div className="flex gap-2">
               <Button

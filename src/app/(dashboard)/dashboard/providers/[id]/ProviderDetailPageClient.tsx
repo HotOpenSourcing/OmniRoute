@@ -52,8 +52,6 @@ import EmptyConnectionsPlaceholder from "./components/EmptyConnectionsPlaceholde
 import UpstreamProxyCard from "./components/UpstreamProxyCard";
 import SearchProviderCard from "./components/SearchProviderCard";
 import NoAuthProviderControls from "./components/NoAuthProviderControls";
-import { FreebuffAuthCard } from "./components/FreebuffAuthCard";
-import { FreebuffMetaCards } from "./components/FreebuffMetaCards";
 // providerText used by UpstreamProxyCard (Phase 1t.7)
 
 export default function ProviderDetailPageClient() {
@@ -487,13 +485,7 @@ export default function ProviderDetailPageClient() {
           providerName={providerInfo?.name || providerId}
         />
       )}
-      {providerId === "freebuff" ? (
-        <>
-          <FreebuffAuthCard providerId={providerId} />
-          <FreebuffMetaCards providerId={providerId} />
-        </>
-      ) : (
-        !isUpstreamProxyProvider && !isFreeNoAuth && (
+      {!isUpstreamProxyProvider && !isFreeNoAuth && (
         <Card>
           <ConnectionsHeaderToolbar
             providerId={providerId}
@@ -619,7 +611,6 @@ export default function ProviderDetailPageClient() {
             />
           )}
         </Card>
-        )
       )}
       {isUpstreamProxyProvider && <UpstreamProxyCard t={t} />}
 

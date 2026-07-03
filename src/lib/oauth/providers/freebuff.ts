@@ -123,7 +123,15 @@ function defaultSleepFn(ms: number): Promise<void> {
 
 export const freebuff = {
   config: FREEBUFF_OAUTH_CONFIG,
-  flowType: "pkce_polling" as const,
+  /**
+   * The shared OAuthModal drives Freebuff through `import_token` only —
+   * browser PKCE polling was intentionally removed because the upstream
+   * server-side hardware fingerprint rarely matches the user's local CLI
+   * fingerprint (see https://www.codebuff.com PKCE docs).
+   * `requestDeviceCode` / `pollToken` are kept on the provider object for
+   * any future headless / CLI path but are no longer wired into the UI.
+   */
+  flowType: "import_token" as const,
 
   /**
    * Not supported: freebuff uses PKCE polling (requestDeviceCode + pollToken),
@@ -293,10 +301,44 @@ export const freebuff = {
     return { status: "expired", error: "Poll timeout exceeded" };
   },
 
-  mapTokens: (raw: FreebuffToken) => ({
-    access_token: raw.authToken,
-    token_type: "Bearer" as const,
-    user_id: raw.userId,
-    email: raw.email,
-  }),
+  /**
+   * Map a pasted import token onto the connection record.
+   *
+   * The shared `/api/oauth/[provider]/import-token` route calls every
+   * provider's `mapTokens` with `{ accessToken: <pasted text> }`. Freebuff's
+   * upstream credentials come from `manicode credentials.json` whose shape is
+   * `{ authToken, userId?, email? }`. To stay on the shared route, this
+   * implementation accepts that envelope and tries three interpretations of
+   * the pasted string, in order:
+   *
+   *   1. JSON object → validated against `freebuffTokenSchema` (the
+   *      credentials.json path: full userId + email when present).
+   *   2. Bare UUID → wrapped as `{ authToken }` (simplest paste fallback).
+   *   3. Anything else → wrapped as `{ authToken }` (best-effort).
+   *
+   * Returning the same `access_token` / `token_type` shape as before keeps
+   * downstream connection upsert logic unchanged.
+   */
+  mapTokens: (input: { accessToken: string }) => {
+    const pasted = input.accessToken?.trim() ?? "";
+
+    let parsed: FreebuffToken | null = null;
+    if (pasted.startsWith("{")) {
+      try {
+        const obj = JSON.parse(pasted);
+        const result = freebuffTokenSchema.safeParse(obj);
+        if (result.success) parsed = result.data;
+      } catch {
+        // Fall through to bare-token path.
+      }
+    }
+    if (!parsed) parsed = { authToken: pasted };
+
+    return {
+      access_token: parsed.authToken,
+      token_type: "Bearer" as const,
+      user_id: parsed.userId,
+      email: parsed.email,
+    };
+  },
 };

@@ -62,8 +62,16 @@ const BROWSER_DEVICE_FLOW_PROVIDERS = new Set(["codex"]);
  */
 const RETIRED_PKCE_PROVIDERS = new Set(["windsurf", "devin-cli"]);
 
-/** Providers that allow direct import of a raw API token (no OAuth exchange). */
-const IMPORT_TOKEN_PROVIDERS = new Set(["windsurf", "devin-cli"]);
+/**
+ * Providers that allow direct import of a raw API token (no OAuth exchange).
+ *
+ * - windsurf / devin-cli: retired browser PKCE — import-token only (Phase 1
+ *   hotfix 2026-05-29; Phase 2 will reintroduce Firebase OAuth).
+ * - freebuff: upstream PKCE polling requires a hardware fingerprint that
+ *   rarely matches the user's local CLI fingerprint on remote OmniRoute
+ *   deployments. The shared OAuthModal exposes paste-token only.
+ */
+const IMPORT_TOKEN_PROVIDERS = new Set(["windsurf", "devin-cli", "freebuff"]);
 
 /**
  * Constant-time string comparison to prevent timing-oracle attacks (CWE-208).

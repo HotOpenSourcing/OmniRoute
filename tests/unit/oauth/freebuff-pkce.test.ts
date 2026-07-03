@@ -376,24 +376,46 @@ describe("freebuff.pollToken", () => {
 });
 
 describe("freebuff.mapTokens", () => {
-  it("maps a full FreebuffToken to access_token Bearer shape", () => {
-    const mapped = freebuff.mapTokens({
+  it("maps a credentials.json paste to access_token Bearer shape", () => {
+    // The shared /api/oauth/[provider]/import-token route invokes
+    // mapTokens({ accessToken: <pasted text> }). Freebuff's implementation
+    // accepts either a credentials.json object or a bare authToken UUID.
+    const pastedJson = JSON.stringify({
       authToken: VALID_AUTH_TOKEN,
       userId: VALID_USER_ID,
       email: "u@example.com",
     });
+    const mapped = freebuff.mapTokens({ accessToken: pastedJson });
     assert.equal(mapped.access_token, VALID_AUTH_TOKEN);
     assert.equal(mapped.token_type, "Bearer");
     assert.equal(mapped.user_id, VALID_USER_ID);
     assert.equal(mapped.email, "u@example.com");
   });
 
-  it("works with only authToken", () => {
-    const mapped = freebuff.mapTokens({ authToken: VALID_AUTH_TOKEN });
+  it("maps a bare authToken paste to access_token Bearer shape", () => {
+    const mapped = freebuff.mapTokens({ accessToken: VALID_AUTH_TOKEN });
     assert.equal(mapped.access_token, VALID_AUTH_TOKEN);
     assert.equal(mapped.token_type, "Bearer");
     assert.equal(mapped.user_id, undefined);
     assert.equal(mapped.email, undefined);
+  });
+
+  it("treats malformed JSON as a bare token (no crash, no leak)", () => {
+    const mapped = freebuff.mapTokens({ accessToken: "{ not valid json" });
+    assert.equal(mapped.access_token, "{ not valid json");
+    assert.equal(mapped.token_type, "Bearer");
+  });
+
+  it("ignores extra credentials.json fields not declared in schema", () => {
+    const pastedJson = JSON.stringify({
+      authToken: VALID_AUTH_TOKEN,
+      userId: VALID_USER_ID,
+      email: "u@example.com",
+      unknownField: "ignored",
+    });
+    const mapped = freebuff.mapTokens({ accessToken: pastedJson });
+    assert.equal(mapped.access_token, VALID_AUTH_TOKEN);
+    assert.equal(mapped.user_id, VALID_USER_ID);
   });
 });
 
