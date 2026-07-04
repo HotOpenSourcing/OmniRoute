@@ -7613,7 +7613,7 @@
     "tagline": "TODO i18n fr — Routeur OmniRoute vers le Free Tier Codebuff — fournisseur opt-in pour les modèles Codebuff.",
     "notEnabled": {
       "title": "Le fournisseur Freebuff n'est pas activé",
-      "description": "Définissez FREEBUFF_ENABLED=1 dans votre environnement et redémarrez OmniRoute pour accéder à cette page."
+      "description": "Supprimez FREEBUFF_ENABLED=0 de votre environnement et redémarrez OmniRoute pour accéder à cette page. Le fournisseur est activé par défaut."
     },
     "login": {
       "title": "Authentification",

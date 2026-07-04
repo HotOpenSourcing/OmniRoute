@@ -8992,7 +8992,7 @@
     "tagline": "Route OmniRoute through the Codebuff Free Tier — opt-in provider for Codebuff-backed models.",
     "notEnabled": {
       "title": "Freebuff provider is not enabled",
-      "description": "Set FREEBUFF_ENABLED=1 in your environment and restart OmniRoute to access this page."
+      "description": "Remove FREEBUFF_ENABLED=0 from your environment and restart OmniRoute to access this page. The provider is ON by default."
     },
     "login": {
       "title": "Authentication",

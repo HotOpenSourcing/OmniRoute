@@ -39,16 +39,17 @@ If you are not comfortable with the above, do not enable this provider.
 
 ## Enable the provider
 
-Freebuff is **off by default**. Set the environment variable and restart
+Freebuff is **on by default**. The provider card is exposed under
+`/providers/freebuff` immediately after a fresh install. No environment
+variable is required.
+
+To disable the provider, set the following in `.env` and restart
 OmniRoute:
 
 ```bash
 # .env
-FREEBUFF_ENABLED=1
+FREEBUFF_ENABLED=0
 ```
-
-The provider card will appear under `/providers/freebuff` in the
-dashboard once the server is restarted with this variable set.
 
 ## Authentication
 
@@ -125,7 +126,7 @@ is fetched on demand — click **Refresh**.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `FREEBUFF_ENABLED=1` set, but page says "not enabled" | Server not restarted | Restart OmniRoute |
+| `FREEBUFF_ENABLED=0` set, page says "not enabled" | Provider explicitly disabled | Unset / remove `FREEBUFF_ENABLED` and restart OmniRoute |
 | `country_blocked` errors | Datacenter IP blocked by Codebuff | Route through residential proxy |
 | `fingerprint mismatch` on first PKCE attempt | Running OmniRoute in Docker / cloud | Use **Path B** instead |
 | `409 Conflict` on first request | Another `freebuff` instance is running | Sign out or kill the other instance |
@@ -135,7 +136,7 @@ is fetched on demand — click **Refresh**.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `FREEBUFF_ENABLED` | `0` | Master switch. Set to `1` to enable the provider. |
+| `FREEBUFF_ENABLED` | `1` (on) | Master switch. Set to `0` to disable the provider. |
 | `FREEBUFF_USE_FREE_TIER` | `1` | Restrict the model catalog to free-tier models when set to `1`. |
 | `FREEBUFF_OAUTH_CLIENT_ID` | (unset) | OAuth client id registered with Codebuff. Defaults to the bundled id when unset. |
 | `FREEBUFF_OAUTH_TIMEOUT_MS` | `300000` | Timeout (ms) for the OAuth PKCE round-trip. |

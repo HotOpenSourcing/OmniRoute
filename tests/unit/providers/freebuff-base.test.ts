@@ -18,13 +18,23 @@ describe("isFreebuffEnabled", () => {
     else process.env.FREEBUFF_ENABLED = ORIGINAL;
   });
 
-  it("returns false when env var is unset", () => {
+  it("returns true when env var is unset (default ON)", () => {
     delete process.env.FREEBUFF_ENABLED;
+    assert.equal(isFreebuffEnabled(), true);
+  });
+
+  it("returns true when env var is empty string", () => {
+    process.env.FREEBUFF_ENABLED = "";
+    assert.equal(isFreebuffEnabled(), true);
+  });
+
+  it("returns false when env var is '0' (explicit disable)", () => {
+    process.env.FREEBUFF_ENABLED = "0";
     assert.equal(isFreebuffEnabled(), false);
   });
 
-  it("returns false when env var is '0'", () => {
-    process.env.FREEBUFF_ENABLED = "0";
+  it("returns false when env var is 'false' (explicit disable)", () => {
+    process.env.FREEBUFF_ENABLED = "false";
     assert.equal(isFreebuffEnabled(), false);
   });
 

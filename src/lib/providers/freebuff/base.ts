@@ -69,12 +69,16 @@ export function resolveFreebuffBaseUrl(): string {
 }
 
 /**
- * Returns true only if the provider is explicitly opted-in.
- * Default is OFF — freebuff is opt-in per plan constraint C4.
+ * Returns whether the Freebuff (Codebuff) provider is enabled.
+ *
+ * Provider is ON by default — no opt-in required. Set
+ * `FREEBUFF_ENABLED=0` (or `=false`) to explicitly disable it
+ * (e.g. on hosts where Codebuff's ToS is not acceptable).
  */
 export function isFreebuffEnabled(): boolean {
   const v = process.env[FREEBUFF_ENABLED_ENV];
-  return v === "1" || v === "true";
+  if (v === undefined || v === "") return true;
+  return v !== "0" && v.toLowerCase() !== "false";
 }
 
 /**
