@@ -500,9 +500,21 @@ export const freebuff = {
       expiresIn: null,
       name: email ?? null,
       email: email ?? null,
+      /**
+       * Freebuff tokens have a hard 1-hour TTL (C6 in
+       * `validation-scripts/final-validations.md`). The upstream has no
+       * refresh endpoint, so we stamp the expiry here and let the
+       * dashboard warn the user ~5 min before it elapses. Stored both
+       * at the top level (consumed by `freebuffConnectionSchema`) and
+       * inside `providerSpecificData` (consumed by the generic
+       * `createProviderConnection` spread) so it survives whichever
+       * storage path the route takes.
+       */
+      tokenExpiresAt: Date.now() + 60 * 60 * 1000,
       providerSpecificData: {
         ...(userId ? { userId } : {}),
         authMethod,
+        tokenExpiresAt: Date.now() + 60 * 60 * 1000,
       },
     };
   },

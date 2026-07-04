@@ -31,7 +31,11 @@ import {
   type TransformerFormat,
 } from "./stream/index.ts";
 import { resolveFreebuffBaseUrl } from "./base.ts";
-import { ensureFreebuffSeat, invalidateFreebuffSeat } from "./seatCache.ts";
+import {
+  ensureFreebuffSeat,
+  invalidateFreebuffSeat,
+  withFreebuffChatLock,
+} from "./seatCache.ts";
 import {
   buildFreebuffHeaders,
   finishAgentRun,
@@ -417,34 +421,45 @@ export async function routeFreebuffChat(
     );
   }
 
-  // ── Seat acquisition (C5/C8: 1-hour TTL, no grace period on superseded) ──
+  // Per-token lock scope (C8: serialise the entire chat flow per token —
+  // multiple OmniRoute processes sharing the same token would otherwise
+  // race the upstream `POST /api/v1/freebuff/session` against each other
+  // and trip the no-grace-period `superseded` transition). Computed
+  // before the lock so we have it for the wrapper below.
   const seatScope = options.connectionId ?? options.userId;
-  let seat;
-  try {
-    seat = await ensureFreebuffSeat({
-      connectionId: seatScope,
-      modelId: parsed.data.model,
-      authToken: credentials.authToken,
-      fetcher: options.fetchImpl,
-      signal: options.signal,
-    });
-  } catch (err) {
-    return new Response(
-      JSON.stringify({
-        error: {
-          message:
-            err instanceof Error
-              ? `Freebuff session acquisition failed: ${err.message}`
-              : "Freebuff session acquisition failed",
-          type: "session_error",
+
+  // ── Everything upstream-touching runs under the per-token lock so the
+  // Codebuff backend never sees two simultaneous writes for the same
+  // `authToken`. Different connections (= different tokens) are
+  // unaffected and run in parallel.
+  return withFreebuffChatLock(seatScope, async () => {
+    // ── Seat acquisition (C5/C8: 1-hour TTL, no grace period on superseded) ──
+    let seat;
+    try {
+      seat = await ensureFreebuffSeat({
+        connectionId: seatScope,
+        modelId: parsed.data.model,
+        authToken: credentials.authToken,
+        fetcher: options.fetchImpl,
+        signal: options.signal,
+      });
+    } catch (err) {
+      return new Response(
+        JSON.stringify({
+          error: {
+            message:
+              err instanceof Error
+                ? `Freebuff session acquisition failed: ${err.message}`
+                : "Freebuff session acquisition failed",
+            type: "session_error",
+          },
+        }),
+        {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
         },
-      }),
-      {
-        status: 503,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
-  }
+      );
+    }
 
   // ── 1) Resolve the upstream agentId for this model ──────────────────
   const agentId = getFreebuffAgentId(parsed.data.model);
@@ -580,6 +595,7 @@ export async function routeFreebuffChat(
   }
 
   return finalizeChat(upstream, parsed.data, format, credentials, resolvedRunId);
+  });
 }
 
 // ---------------------------------------------------------------------------

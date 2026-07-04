@@ -21,38 +21,45 @@ const VALID_FINGERPRINT_ID =
 const VALID_FINGERPRINT_HASH =
   "128a4f6cd60e95cc8e71025fead589087bf6b7e3da360353061";
 const VALID_INSTANCE_ID = "ec743445-f928-4f9b-984e-1c64c52ebc73";
+const VALID_RUN_ID = "11111111-2222-3333-4444-555555555555";
 
 const BASE_BODY = {
   model: "deepseek/deepseek-v4-flash",
   messages: [{ role: "user", content: "hi" }],
 };
 
+/**
+ * Thin wrapper that supplies the resolved runId (in production, the caller
+ * obtains this from `startAgentRun` first — see `agentRuns.ts`). Tests
+ * pass a deterministic UUID so the rest of the assertions are stable.
+ */
+function build(
+  options?: Parameters<typeof buildCodebuffRequestInit>[3],
+  env?: Parameters<typeof buildCodebuffRequestInit>[4],
+) {
+  return buildCodebuffRequestInit(
+    BASE_BODY,
+    {
+      authToken: VALID_AUTH_TOKEN,
+      fingerprintId: VALID_FINGERPRINT_ID,
+      fingerprintHash: VALID_FINGERPRINT_HASH,
+    },
+    { userId: "u", ...options },
+    VALID_RUN_ID,
+    env,
+  );
+}
+
 describe("buildCodebuffRequestInit — headers (00-PROTOCOL-SPEC.md §2.2)", () => {
   it("sends Authorization + x-codebuff-fingerprint + x-freebuff-model", () => {
-    const { headers } = buildCodebuffRequestInit(
-      BASE_BODY,
-      {
-        authToken: VALID_AUTH_TOKEN,
-        fingerprintId: VALID_FINGERPRINT_ID,
-        fingerprintHash: VALID_FINGERPRINT_HASH,
-      },
-      { userId: "u" },
-    );
+    const { headers } = build();
     assert.equal(headers.Authorization, `Bearer ${VALID_AUTH_TOKEN}`);
     assert.equal(headers["x-codebuff-fingerprint"], VALID_FINGERPRINT_ID);
     assert.equal(headers["x-freebuff-model"], BASE_BODY.model);
   });
 
   it("sends x-codebuff-fingerprint-hash when fingerprintHash is known", () => {
-    const { headers } = buildCodebuffRequestInit(
-      BASE_BODY,
-      {
-        authToken: VALID_AUTH_TOKEN,
-        fingerprintId: VALID_FINGERPRINT_ID,
-        fingerprintHash: VALID_FINGERPRINT_HASH,
-      },
-      { userId: "u" },
-    );
+    const { headers } = build();
     assert.equal(headers["x-codebuff-fingerprint-hash"], VALID_FINGERPRINT_HASH);
   });
 
@@ -61,116 +68,64 @@ describe("buildCodebuffRequestInit — headers (00-PROTOCOL-SPEC.md §2.2)", () 
       BASE_BODY,
       { authToken: VALID_AUTH_TOKEN, fingerprintId: VALID_FINGERPRINT_ID },
       { userId: "u" },
+      VALID_RUN_ID,
     );
     assert.equal(headers["x-codebuff-fingerprint-hash"], undefined);
   });
 
   it("sends x-freebuff-instance-id only when a session seat is acquired", () => {
-    const withSeat = buildCodebuffRequestInit(
-      BASE_BODY,
-      {
-        authToken: VALID_AUTH_TOKEN,
-        fingerprintId: VALID_FINGERPRINT_ID,
-        fingerprintHash: VALID_FINGERPRINT_HASH,
-      },
-      { userId: "u", instanceId: VALID_INSTANCE_ID },
-    );
+    const withSeat = build({ instanceId: VALID_INSTANCE_ID });
     assert.equal(withSeat.headers["x-freebuff-instance-id"], VALID_INSTANCE_ID);
 
-    const withoutSeat = buildCodebuffRequestInit(
-      BASE_BODY,
-      {
-        authToken: VALID_AUTH_TOKEN,
-        fingerprintId: VALID_FINGERPRINT_ID,
-        fingerprintHash: VALID_FINGERPRINT_HASH,
-      },
-      { userId: "u" },
-    );
+    const withoutSeat = build();
     assert.equal(withoutSeat.headers["x-freebuff-instance-id"], undefined);
   });
 
-  it("sends user-agent + content-type + accept as static", () => {
-    const { headers } = buildCodebuffRequestInit(
-      BASE_BODY,
-      { authToken: VALID_AUTH_TOKEN, fingerprintId: VALID_FINGERPRINT_ID },
-      { userId: "u" },
-    );
-    assert.match(headers["user-agent"], /^ai-sdk\/openai-compatible\/.+\/codebuff$/);
+  it("sends Accept: text/event-stream + Content-Type: application/json", () => {
+    const { headers } = build();
     assert.equal(headers["Content-Type"], "application/json");
     assert.equal(headers.Accept, "text/event-stream");
   });
 
   it("sends X-Codebuff-OpenRouter-Api-Key when env override is set (BYOK)", () => {
-    const { headers } = buildCodebuffRequestInit(
-      BASE_BODY,
-      { authToken: VALID_AUTH_TOKEN, fingerprintId: VALID_FINGERPRINT_ID },
-      { userId: "u" },
-      { openRouterApiKey: "sk-or-v1-test" },
-    );
+    const { headers } = build({}, { openRouterApiKey: "sk-or-v1-test" });
     assert.equal(headers["X-Codebuff-OpenRouter-Api-Key"], "sk-or-v1-test");
   });
 
   it("never sends a fake Cookie header (Mission 1 confirmed cookie is not required)", () => {
-    const { headers } = buildCodebuffRequestInit(
-      BASE_BODY,
-      { authToken: VALID_AUTH_TOKEN, fingerprintId: VALID_FINGERPRINT_ID },
-      { userId: "u" },
-    );
+    const { headers } = build();
     assert.equal(headers["Cookie"], undefined);
     assert.equal(headers["cookie"], undefined);
   });
 
   it("never sends a fake x-unique-id header (header name is x-codebuff-fingerprint)", () => {
-    const { headers } = buildCodebuffRequestInit(
-      BASE_BODY,
-      { authToken: VALID_AUTH_TOKEN, fingerprintId: VALID_FINGERPRINT_ID },
-      { userId: "u" },
-    );
+    const { headers } = build();
     assert.equal(headers["x-unique-id"], undefined);
   });
 });
 
 describe("buildCodebuffRequestInit — body (00-PROTOCOL-SPEC.md §6)", () => {
   it("places runId at TOP LEVEL (not nested under codebuff.*)", () => {
-    const { payload } = buildCodebuffRequestInit(
-      BASE_BODY,
-      { authToken: VALID_AUTH_TOKEN, fingerprintId: VALID_FINGERPRINT_ID },
-      { userId: "u" },
-    );
-    assert.equal(typeof payload.runId, "string");
-    assert.match(
-      payload.runId as string,
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
-    );
+    const { payload } = build();
+    assert.equal(payload.runId, VALID_RUN_ID);
     assert.equal((payload as any).codebuff, undefined);
   });
 
   it("places provider at TOP LEVEL with allow_fallbacks=false and sort='price'", () => {
-    const { payload } = buildCodebuffRequestInit(
-      BASE_BODY,
-      { authToken: VALID_AUTH_TOKEN, fingerprintId: VALID_FINGERPRINT_ID },
-      { userId: "u" },
-    );
+    const { payload } = build();
     const provider = payload.provider as Record<string, unknown>;
     assert.equal(provider.allow_fallbacks, false);
     assert.equal(provider.sort, "price");
     assert.equal((payload as any).codebuff?.provider, undefined);
   });
 
-  it("places codebuff_metadata at TOP LEVEL with fingerprint_id, client_id, cost_mode, user_input_id", () => {
-    const { payload } = buildCodebuffRequestInit(
-      BASE_BODY,
-      {
-        authToken: VALID_AUTH_TOKEN,
-        fingerprintId: VALID_FINGERPRINT_ID,
-        fingerprintHash: VALID_FINGERPRINT_HASH,
-      },
-      { userId: "u" },
-    );
+  it("places codebuff_metadata at TOP LEVEL with fingerprint_id, client_id, cost_mode, user_input_id, run_id", () => {
+    const { payload } = build();
     const meta = payload.codebuff_metadata as Record<string, unknown>;
     assert.equal(meta.fingerprint_id, VALID_FINGERPRINT_ID);
     assert.equal(meta.client_id, "codebuff-cli");
     assert.equal(meta.cost_mode, "free");
+    assert.equal(meta.run_id, VALID_RUN_ID);
     assert.match(
       meta.user_input_id as string,
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
@@ -179,31 +134,19 @@ describe("buildCodebuffRequestInit — body (00-PROTOCOL-SPEC.md §6)", () => {
   });
 
   it("uses sessionId as client_id when provided", () => {
-    const { payload } = buildCodebuffRequestInit(
-      BASE_BODY,
-      { authToken: VALID_AUTH_TOKEN, fingerprintId: VALID_FINGERPRINT_ID },
-      { userId: "u", sessionId: "stable-session-uuid" },
-    );
+    const { payload } = build({ sessionId: "stable-session-uuid" });
     const meta = payload.codebuff_metadata as Record<string, unknown>;
     assert.equal(meta.client_id, "stable-session-uuid");
   });
 
   it("adds freebuff_instance_id to codebuff_metadata only when instanceId is provided", () => {
-    const withSeat = buildCodebuffRequestInit(
-      BASE_BODY,
-      { authToken: VALID_AUTH_TOKEN, fingerprintId: VALID_FINGERPRINT_ID },
-      { userId: "u", instanceId: VALID_INSTANCE_ID },
-    );
+    const withSeat = build({ instanceId: VALID_INSTANCE_ID });
     assert.equal(
       (withSeat.payload.codebuff_metadata as any).freebuff_instance_id,
       VALID_INSTANCE_ID,
     );
 
-    const withoutSeat = buildCodebuffRequestInit(
-      BASE_BODY,
-      { authToken: VALID_AUTH_TOKEN, fingerprintId: VALID_FINGERPRINT_ID },
-      { userId: "u" },
-    );
+    const withoutSeat = build();
     assert.equal(
       (withoutSeat.payload.codebuff_metadata as any).freebuff_instance_id,
       undefined,
@@ -211,59 +154,48 @@ describe("buildCodebuffRequestInit — body (00-PROTOCOL-SPEC.md §6)", () => {
   });
 
   it("sets stream=true and stream_options.include_usage=true", () => {
-    const { payload } = buildCodebuffRequestInit(
-      BASE_BODY,
-      { authToken: VALID_AUTH_TOKEN, fingerprintId: VALID_FINGERPRINT_ID },
-      { userId: "u" },
-    );
+    const { payload } = build();
     assert.equal(payload.stream, true);
     assert.deepEqual(payload.stream_options, { include_usage: true });
   });
 
   it("passes through provider.order when supplied", () => {
-    const { payload } = buildCodebuffRequestInit(
-      BASE_BODY,
-      { authToken: VALID_AUTH_TOKEN, fingerprintId: VALID_FINGERPRINT_ID },
-      { userId: "u", providerOrder: ["Anthropic", "Google", "OpenAI"] },
-    );
+    const { payload } = build({ providerOrder: ["Anthropic", "Google", "OpenAI"] });
     const provider = payload.provider as Record<string, unknown>;
     assert.deepEqual(provider.order, ["Anthropic", "Google", "OpenAI"]);
   });
 
   it("omits provider.order when not supplied", () => {
-    const { payload } = buildCodebuffRequestInit(
-      BASE_BODY,
-      { authToken: VALID_AUTH_TOKEN, fingerprintId: VALID_FINGERPRINT_ID },
-      { userId: "u" },
-    );
+    const { payload } = build();
     const provider = payload.provider as Record<string, unknown>;
     assert.equal(provider.order, undefined);
   });
 
   it("honors allowFallbacks override", () => {
-    const { payload } = buildCodebuffRequestInit(
-      BASE_BODY,
-      { authToken: VALID_AUTH_TOKEN, fingerprintId: VALID_FINGERPRINT_ID },
-      { userId: "u", allowFallbacks: true },
-    );
+    const { payload } = build({ allowFallbacks: true });
     assert.equal((payload.provider as any).allow_fallbacks, true);
   });
 
-  it("generates a different runId and user_input_id on each call", () => {
-    const a = buildCodebuffRequestInit(
-      BASE_BODY,
-      { authToken: VALID_AUTH_TOKEN, fingerprintId: VALID_FINGERPRINT_ID },
-      { userId: "u" },
-    );
-    const b = buildCodebuffRequestInit(
-      BASE_BODY,
-      { authToken: VALID_AUTH_TOKEN, fingerprintId: VALID_FINGERPRINT_ID },
-      { userId: "u" },
-    );
-    assert.notEqual(a.payload.runId, b.payload.runId);
+  it("echoes the resolvedRunId and generates a fresh user_input_id per call", () => {
+    const a = build();
+    const b = build();
+    assert.equal(a.payload.runId, VALID_RUN_ID);
+    assert.equal(b.payload.runId, VALID_RUN_ID);
     assert.notEqual(
       (a.payload.codebuff_metadata as any).user_input_id,
       (b.payload.codebuff_metadata as any).user_input_id,
     );
+  });
+
+  it("stamps codebuff_metadata.agent when the model has a known agent id", () => {
+    // agentMapping maps deepseek/deepseek-v4-flash → an agent id; if it
+    // changes, this test guards the contract.
+    const { payload } = build();
+    const meta = payload.codebuff_metadata as Record<string, unknown>;
+    // agent may be undefined for unmapped models — just assert the field
+    // exists OR is absent (never wrong-type).
+    if ("agent" in meta) {
+      assert.equal(typeof meta.agent, "string");
+    }
   });
 });

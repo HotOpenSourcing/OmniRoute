@@ -167,6 +167,87 @@ export function __resetFreebuffSeatCacheForTests(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Per-connection chat mutex (C8: serialise the full chat flow)
+//
+// The seat-claim mutex (`SEAT_LOCKS`) above only coalesces concurrent
+// `POST /api/v1/freebuff/session` calls. It does NOT prevent two chat
+// requests from racing through the claim + chat-completions window.
+//
+// Captured in `validation-scripts/final-validations.md` Mission 2 C8:
+//   "When B arrives while A is active (same token, same model), A
+//    transitions immediately to status: superseded. No grace period."
+//
+// In-process consequence: if T1 is mid-claim and T2 arrives for the
+// same connection, T2's claim either (a) coalesces on T1's seat (same
+// instanceId — safe) or (b) races and forces a re-claim (T1 sees
+// `superseded` and re-claims — also safe via the retry loop in
+// `routeFreebuffChat`).
+//
+// This second mutex (`CHAT_LOCKS`) is the broader belt-and-braces
+// guarantee: serialise the ENTIRE chat flow per `connectionId` so the
+// upstream never sees two simultaneous writes for the same token.
+// Other connections (different tokens) are unaffected.
+//
+// Lock granularity: per `connectionId` (= per token). NOT per
+// `(connectionId, modelId)` — per the protocol spec the upstream's
+// mutex is per token (different models for the same token can also
+// conflict via `model_locked`).
+// ---------------------------------------------------------------------------
+
+const CHAT_LOCKS = new Map<string, Promise<void>>();
+
+/**
+ * Serialise the execution of `fn` against other callers targeting the
+ * same `connectionId`. Returns whatever `fn` returns (or rethrows its
+ * rejection). Lock is FIFO — concurrent callers wait in arrival order.
+ *
+ * Usage from `routeFreebuffChat`:
+ *
+ *   return withFreebuffChatLock(connectionId, async () => {
+ *     const seat = await ensureFreebuffSeat({...});
+ *     return tryChat(...);
+ *   });
+ */
+export async function withFreebuffChatLock<T>(
+  connectionId: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const previous = CHAT_LOCKS.get(connectionId) ?? Promise.resolve();
+  let release!: () => void;
+  const next = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  // Chain `previous -> next` and store the chained promise so we can
+  // compare identity in the GC step (each `.then` call produces a new
+  // promise, so we must keep a reference).
+  const chained = previous.then(() => next);
+  CHAT_LOCKS.set(connectionId, chained);
+  try {
+    await previous;
+    return await fn();
+  } finally {
+    release();
+    // Garbage-collect the lock if no one is waiting. Use a microtask so
+    // we don't delete the entry while another caller is still chaining.
+    queueMicrotask(() => {
+      if (CHAT_LOCKS.get(connectionId) === chained) {
+        CHAT_LOCKS.delete(connectionId);
+      }
+    });
+  }
+}
+
+/** Diagnostic — number of held chat locks (for tests + observability). */
+export function getFreebuffChatLockCount(): number {
+  return CHAT_LOCKS.size;
+}
+
+/** Test-only — wipe the chat-mutex state. Never call from production. */
+export function __resetFreebuffChatLocksForTests(): void {
+  CHAT_LOCKS.clear();
+}
+
+// ---------------------------------------------------------------------------
 // Internal: claim from upstream
 // ---------------------------------------------------------------------------
 

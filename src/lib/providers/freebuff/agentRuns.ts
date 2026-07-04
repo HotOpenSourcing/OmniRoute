@@ -82,6 +82,14 @@ export class FreebuffProviderError extends Error {
  * Build the standard Freebuff request headers (excluding the
  * `Content-Type` and `Content-Length` which are set by the fetch call).
  *
+ * Aligned with `00-PROTOCOL-SPEC.md` §2.2 and validated by
+ * `validation-scripts/test-headers.ts` Mission 1 (all 5 cases returned
+ * 200 regardless of UA / fingerprint / cookie — only `Authorization`
+ * is strictly required). The legacy `x-unique-id` header name and the
+ * fabricated `Cookie: __session=...` from the original protocol draft
+ * were removed in v3.8.43 — the spec header name is
+ * `x-codebuff-fingerprint` and the cookie is not part of the wire.
+ *
  * Exported for unit testing so the header set stays in one place.
  */
 export function buildFreebuffHeaders(
@@ -91,11 +99,7 @@ export function buildFreebuffHeaders(
     Authorization: `Bearer ${credentials.authToken}`,
     "Content-Type": "application/json",
     Accept: "application/json",
-    "x-unique-id": credentials.fingerprintId,
     "x-codebuff-fingerprint": credentials.fingerprintId,
-    Cookie: `__session=eyJhbGciOiJIUzI1NiJ9.fake.${credentials.authToken.split("-")[0] ?? ""}`,
-    "User-Agent":
-      `codebuff-cli/1.0.0 (win32-x64; node/${process.versions.node})`,
   };
   if (credentials.fingerprintHash) {
     headers["x-codebuff-fingerprint-hash"] = credentials.fingerprintHash;
