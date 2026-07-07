@@ -803,6 +803,15 @@ export async function POST(
         error: result.error,
         errorDescription: result.errorDescription,
         pending: isPending,
+        // Forward structured signals from providers that classify the
+        // failure (e.g. freebuff `fingerprint_mismatch` →
+        // `recommendedAction: "use_import_token"`). The OAuthModal
+        // uses these to render a provider-specific remediation CTA
+        // instead of the generic "try again" button.
+        ...(result.errorCode ? { errorCode: result.errorCode } : {}),
+        ...(result.recommendedAction
+          ? { recommendedAction: result.recommendedAction }
+          : {}),
       });
     }
 

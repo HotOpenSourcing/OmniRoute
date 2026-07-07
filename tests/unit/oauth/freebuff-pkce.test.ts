@@ -7,6 +7,8 @@ import {
   freebuffTokenSchema,
   freebuffPollResponseSchema,
   parseFreebuffPastedCredentials,
+  sanitizeFreebuffAccessToken,
+  repairFreebuffConnectionRow,
 } from "@/lib/oauth/providers/freebuff";
 
 const VALID_AUTH_TOKEN = "bab4a848-134b-465e-bc56-d1b795f03c9a";
@@ -386,6 +388,57 @@ describe("freebuff.pollToken (standard OAuth v2 surface)", () => {
     assert.equal(result.data.error_description, "aborted");
   });
 
+  it("classifies HTTP 401 as fingerprint_mismatch and recommends paste-token", async () => {
+    // When the upstream /api/auth/cli/status returns 401 (which happens
+    // when the OmniRoute server-side hardware fingerprint does not match
+    // the user's local Codebuff CLI fingerprint), pollToken must surface
+    // the failure as `error_code: "fingerprint_mismatch"` plus
+    // `recommended_action: "use_import_token"` so the OAuthModal can
+    // render a "Switch to paste" CTA. The translated OAuth error stays
+    // `access_denied` so the standard error step still renders.
+    const { fetchImpl } = makeFetchMock([
+      new Response(null, { status: 401 }),
+    ]);
+    const result = await freebuff.pollToken(
+      FREEBUFF_OAUTH_CONFIG,
+      deviceCode,
+      null,
+      null,
+      { fetchImpl, sleepFn: async () => {} },
+    );
+    assert.equal(result.ok, true);
+    assert.equal(result.data.error, "access_denied");
+    assert.equal(result.data.error_code, "fingerprint_mismatch");
+    assert.equal(result.data.recommended_action, "use_import_token");
+    assert.match(
+      result.data.error_description ?? "",
+      /fingerprint/i,
+      "description should mention fingerprint so the modal can explain the failure",
+    );
+  });
+
+  it("classifies HTTP 403 as generic access_denied (no fingerprint_mismatch signal)", async () => {
+    // 403 is not a fingerprint-mismatch signal — it can mean a banned
+    // account, geo-block, or rate limit. Surface it as a generic
+    // access_denied so the user sees the upstream message verbatim and
+    // the modal does not push them toward paste mode unnecessarily.
+    const { fetchImpl } = makeFetchMock([
+      new Response(null, { status: 403 }),
+    ]);
+    const result = await freebuff.pollToken(
+      FREEBUFF_OAUTH_CONFIG,
+      deviceCode,
+      null,
+      null,
+      { fetchImpl, sleepFn: async () => {} },
+    );
+    assert.equal(result.ok, true);
+    assert.equal(result.data.error, "access_denied");
+    assert.equal(result.data.error_code, undefined);
+    assert.equal(result.data.recommended_action, undefined);
+    assert.match(result.data.error_description ?? "", /HTTP 403/);
+  });
+
   it("rejects a deviceCode that is not a Freebuff-issued payload", async () => {
     const { fetchImpl } = makeFetchMock([]);
     await assert.rejects(
@@ -452,6 +505,31 @@ describe("freebuff.mapTokens", () => {
     assert.equal(mapped.providerSpecificData.userId, VALID_USER_ID);
   });
 
+  it("propagates fingerprintId/fingerprintHash from a legacy CLI credentials.json paste", () => {
+    // Regression test for the v3.8.40 Bearer-header bug: when the user
+    // pastes the legacy Freebuff CLI credentials.json, mapTokens must
+    // surface the fingerprint triple into providerSpecificData so the
+    // chat dispatcher can stamp x-codebuff-fingerprint[-hash] headers.
+    const pastedJson = JSON.stringify({
+      authToken: "not-a-uuid",
+      default: {
+        id: VALID_USER_ID,
+        name: "Twi Ti",
+        email: "amine.twiti17@gmail.com",
+        authToken: VALID_AUTH_TOKEN,
+        fingerprintId: FINGERPRINT_ID,
+        fingerprintHash: FINGERPRINT_HASH,
+      },
+    });
+    const mapped = freebuff.mapTokens({ accessToken: pastedJson });
+    assert.equal(mapped.accessToken, VALID_AUTH_TOKEN);
+    assert.equal(mapped.email, "amine.twiti17@gmail.com");
+    assert.equal(mapped.providerSpecificData.userId, VALID_USER_ID);
+    assert.equal(mapped.providerSpecificData.fingerprintId, FINGERPRINT_ID);
+    assert.equal(mapped.providerSpecificData.fingerprintHash, FINGERPRINT_HASH);
+    assert.equal(mapped.providerSpecificData.authMethod, "freebuff-import");
+  });
+
   it("maps a device-code poll success bundle (freebuff-oauth path)", () => {
     const mapped = freebuff.mapTokens({
       access_token: VALID_AUTH_TOKEN,
@@ -494,6 +572,76 @@ describe("parseFreebuffPastedCredentials", () => {
     const parsed = parseFreebuffPastedCredentials("{ broken");
     assert.deepEqual(parsed, { authToken: "{ broken" });
   });
+
+  it("parses the legacy Freebuff CLI credentials.json (default.authToken + fingerprint)", () => {
+    // The Freebuff CLI on disk stores credentials as:
+    //   { authToken: "not-a-uuid" (placeholder),
+    //     default: { id, name, email, authToken, fingerprintId, fingerprintHash } }
+    // The real token + fingerprint triple live under `default`. The current
+    // parser rejects this shape (top-level authToken is the placeholder)
+    // and falls back to wrapping the entire JSON as `authToken`, which
+    // produces the malformed `Authorization: Bearer <json>` header.
+    const legacyCredentialsJson = JSON.stringify({
+      authToken: "not-a-uuid",
+      default: {
+        id: "3007ab39-7390-4812-a4e3-0f71087ed9ea",
+        name: "Twi Ti",
+        email: "amine.twiti17@gmail.com",
+        authToken: VALID_AUTH_TOKEN,
+        fingerprintId: FINGERPRINT_ID,
+        fingerprintHash: FINGERPRINT_HASH,
+      },
+    });
+    const parsed = parseFreebuffPastedCredentials(legacyCredentialsJson);
+    assert.equal(parsed.authToken, VALID_AUTH_TOKEN);
+    assert.equal(parsed.userId, "3007ab39-7390-4812-a4e3-0f71087ed9ea");
+    assert.equal(parsed.email, "amine.twiti17@gmail.com");
+    assert.equal(parsed.fingerprintId, FINGERPRINT_ID);
+    assert.equal(parsed.fingerprintHash, FINGERPRINT_HASH);
+  });
+
+  it("parses legacy credentials.json even when fingerprintId is missing", () => {
+    const legacyCredentialsJson = JSON.stringify({
+      authToken: "not-a-uuid",
+      default: {
+        id: VALID_USER_ID,
+        authToken: VALID_AUTH_TOKEN,
+      },
+    });
+    const parsed = parseFreebuffPastedCredentials(legacyCredentialsJson);
+    assert.equal(parsed.authToken, VALID_AUTH_TOKEN);
+    assert.equal(parsed.userId, VALID_USER_ID);
+    assert.equal(parsed.email, undefined);
+    assert.equal(parsed.fingerprintId, undefined);
+    assert.equal(parsed.fingerprintHash, undefined);
+  });
+
+  it("falls back to bare-token when JSON has no default.authToken UUID", () => {
+    // Stub credentials left behind by a fresh Freebuff install —
+    // `{"authToken":"not-a-uuid"}`. Top-level fails the schema, the
+    // legacy `default` branch finds no real authToken either, so we
+    // fall through to the bare-token path.
+    const parsed = parseFreebuffPastedCredentials(
+      JSON.stringify({ authToken: "not-a-uuid" }),
+    );
+    // Whatever the implementation does, the result MUST NOT contain the
+    // stub literal "not-a-uuid" as the authToken (otherwise the Bearer
+    // header is sent with a known-bad placeholder).
+    assert.notEqual(parsed.authToken, "not-a-uuid");
+  });
+
+  it("ignores a default block with a placeholder authToken", () => {
+    // Some installs leave `default.authToken === "not-a-uuid"` after a
+    // failed login. We must NOT extract the placeholder — that would
+    // silently store a known-bad token.
+    const parsed = parseFreebuffPastedCredentials(
+      JSON.stringify({
+        authToken: "not-a-uuid",
+        default: { authToken: "not-a-uuid", id: VALID_USER_ID },
+      }),
+    );
+    assert.notEqual(parsed.authToken, "not-a-uuid");
+  });
 });
 
 describe("freebuff schemas", () => {
@@ -515,5 +663,160 @@ describe("freebuff schemas", () => {
   it("freebuffTokenSchema accepts a valid UUID", () => {
     const parsed = freebuffTokenSchema.parse({ authToken: VALID_AUTH_TOKEN });
     assert.equal(parsed.authToken, VALID_AUTH_TOKEN);
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// Regression tests for the self-healing helpers added in v3.8.43.
+//
+// Background: prior to the parseFreebuffPastedCredentials Shape-2 fix, an
+// import-token call with the legacy Freebuff CLI credentials.json (which
+// has a `default.authToken` wrapper) would persist the entire JSON blob as
+// the connection's `accessToken`. The default executor then re-serialized
+// that blob into `Authorization: Bearer <json>`, which Node's Headers.append
+// rejected with "is an invalid header value" (HTTP 502 to the caller).
+//
+// `sanitizeFreebuffAccessToken` + `repairFreebuffConnectionRow` are the
+// single seam that recognises the broken shape and returns the real UUID +
+// fingerprint triple so the caller can rewrite the row in place.
+// ───────────────────────────────────────────────────────────────────────────
+
+describe("sanitizeFreebuffAccessToken (self-healing helper)", () => {
+  // Captured from a real ~/.config/manicode/credentials.json — top-level
+  // `authToken: "not-a-uuid"` is a known placeholder; the real UUID lives
+  // under `default.authToken` along with the fingerprint triple the chat
+  // dispatcher needs to stamp on the upstream request.
+  const realCredentialsJson = JSON.stringify({
+    authToken: "not-a-uuid",
+    default: {
+      id: "3007ab39-7390-4812-a4e3-0f71087ed9ea",
+      name: "Twi Ti",
+      email: "amine.twiti17@gmail.com",
+      authToken: "51ec26cc-c062-438c-b99a-3b5452116f0b",
+      fingerprintId:
+        "enhanced-0SXVprLnIDmnBvUtjS-FX-akZZfb85A21MOZkA5MX6A",
+      fingerprintHash:
+        "bf6d2f8ffa826c1ce56d99e079859b67c30d91d52ff1adbcc90d3e7d6b0b4aa2",
+    },
+  });
+
+  it("extracts the real UUID + fingerprint from a real credentials.json blob", () => {
+    const repair = sanitizeFreebuffAccessToken(realCredentialsJson);
+    assert.ok(repair, "expected a repair for the legacy blob shape");
+    assert.equal(repair?.authToken, "51ec26cc-c062-438c-b99a-3b5452116f0b");
+    assert.equal(repair?.userId, "3007ab39-7390-4812-a4e3-0f71087ed9ea");
+    assert.equal(repair?.email, "amine.twiti17@gmail.com");
+    assert.equal(
+      repair?.fingerprintId,
+      "enhanced-0SXVprLnIDmnBvUtjS-FX-akZZfb85A21MOZkA5MX6A",
+    );
+    assert.equal(
+      repair?.fingerprintHash,
+      "bf6d2f8ffa826c1ce56d99e079859b67c30d91d52ff1adbcc90d3e7d6b0b4aa2",
+    );
+  });
+
+  it("returns null for an already-clean UUID accessToken (fast path)", () => {
+    // Steady-state case: the connection was imported correctly, so the
+    // hot path must NOT trigger the JSON re-parse. Returning null tells
+    // the caller there's nothing to repair.
+    const result = sanitizeFreebuffAccessToken(VALID_AUTH_TOKEN);
+    assert.equal(result, null);
+  });
+
+  it("returns null for a bare bearer JWT or other non-JSON garbage", () => {
+    // Defensive: we must not invent a token out of thin air. Anything that
+    // doesn't start with `{` AND isn't a UUID is someone else's problem.
+    assert.equal(sanitizeFreebuffAccessToken(""), null);
+    assert.equal(sanitizeFreebuffAccessToken("not-a-uuid"), null);
+    assert.equal(sanitizeFreebuffAccessToken("eyJhbGciOiJIUzI1NiJ9.payload.sig"), null);
+  });
+
+  it("returns null when the JSON parses but contains no valid authToken", () => {
+    // `parseFreebuffPastedCredentials` falls back to `{ authToken: <whole
+    // string> }` when nothing matches. We refuse to write that back to the
+    // DB because the upstream would 401 again on the next chat call.
+    const bogus = JSON.stringify({ default: { authToken: "still-not-a-uuid" } });
+    assert.equal(sanitizeFreebuffAccessToken(bogus), null);
+  });
+
+  it("returns null for non-string input (defensive against bad DB rows)", () => {
+    assert.equal(sanitizeFreebuffAccessToken(null), null);
+    assert.equal(sanitizeFreebuffAccessToken(undefined), null);
+    assert.equal(sanitizeFreebuffAccessToken(123), null);
+    assert.equal(sanitizeFreebuffAccessToken({}), null);
+  });
+});
+
+describe("repairFreebuffConnectionRow (self-healing DB write helper)", () => {
+  // Mirrors the real row shape stored before the parser fix landed. The
+  // accessToken is the entire credentials.json blob (which is exactly the
+  // state of the user's broken connection 6603687f-…).
+  const realCredentialsJson = JSON.stringify({
+    authToken: "not-a-uuid",
+    default: {
+      id: "3007ab39-7390-4812-a4e3-0f71087ed9ea",
+      name: "Twi Ti",
+      email: "amine.twiti17@gmail.com",
+      authToken: "51ec26cc-c062-438c-b99a-3b5452116f0b",
+      fingerprintId:
+        "enhanced-0SXVprLnIDmnBvUtjS-FX-akZZfb85A21MOZkA5MX6A",
+      fingerprintHash:
+        "bf6d2f8ffa826c1ce56d99e079859b67c30d91d52ff1adbcc90d3e7d6b0b4aa2",
+    },
+  });
+
+  it("returns null when the row is already clean (no repair needed)", () => {
+    const row = {
+      accessToken: VALID_AUTH_TOKEN,
+      providerSpecificData: { userId: VALID_USER_ID },
+    };
+    assert.equal(repairFreebuffConnectionRow(row), null);
+  });
+
+  it("returns a partial update that replaces accessToken + augments providerSpecificData", () => {
+    const row = {
+      accessToken: realCredentialsJson,
+      providerSpecificData: null,
+    };
+    const updates = repairFreebuffConnectionRow(row);
+    assert.ok(updates);
+    assert.equal(updates?.accessToken, "51ec26cc-c062-438c-b99a-3b5452116f0b");
+    assert.deepEqual(updates?.providerSpecificData, {
+      fingerprintId:
+        "enhanced-0SXVprLnIDmnBvUtjS-FX-akZZfb85A21MOZkA5MX6A",
+      fingerprintHash:
+        "bf6d2f8ffa826c1ce56d99e079859b67c30d91d52ff1adbcc90d3e7d6b0b4aa2",
+      userId: "3007ab39-7390-4812-a4e3-0f71087ed9ea",
+      userEmail: "amine.twiti17@gmail.com",
+    });
+  });
+
+  it("preserves pre-existing providerSpecificData fields (no clobber)", () => {
+    // A connection row may already carry fields the repair helper doesn't
+    // know about (instanceId, loginCompletedAt, future extensions). The
+    // update must merge, not replace.
+    const row = {
+      accessToken: realCredentialsJson,
+      providerSpecificData: {
+        instanceId: "11111111-1111-4111-8111-111111111111",
+        loginCompletedAt: 1_700_000_000_000,
+        authMethod: "freebuff-import",
+      },
+    };
+    const updates = repairFreebuffConnectionRow(row);
+    assert.ok(updates);
+    assert.equal(updates?.accessToken, "51ec26cc-c062-438c-b99a-3b5452116f0b");
+    assert.deepEqual(updates?.providerSpecificData, {
+      instanceId: "11111111-1111-4111-8111-111111111111",
+      loginCompletedAt: 1_700_000_000_000,
+      authMethod: "freebuff-import",
+      fingerprintId:
+        "enhanced-0SXVprLnIDmnBvUtjS-FX-akZZfb85A21MOZkA5MX6A",
+      fingerprintHash:
+        "bf6d2f8ffa826c1ce56d99e079859b67c30d91d52ff1adbcc90d3e7d6b0b4aa2",
+      userId: "3007ab39-7390-4812-a4e3-0f71087ed9ea",
+      userEmail: "amine.twiti17@gmail.com",
+    });
   });
 });

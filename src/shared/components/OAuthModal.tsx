@@ -49,6 +49,18 @@ type OAuthModalProps = {
    * Only honored for providers that support paste-token. Ignored otherwise.
    */
   defaultTab?: "browser" | "paste";
+  /**
+   * Render a "Use paste credentials.json instead" CTA in the error step when
+   * the upstream failure carries `recommendedAction: "use_import_token"`
+   * (e.g. freebuff's hardware-fingerprint mismatch against codebuff.com).
+   * The wrapper that owns the modal owns the auth-method state machine and
+   * flips it when this fires, so the paste form mounts in place of the
+   * browser flow without the user having to back out manually.
+   *
+   * No-op when omitted or when the upstream error doesn't carry the
+   * structured signal.
+   */
+  onSwitchToPaste?: () => void;
 };
 
 /**
@@ -65,6 +77,7 @@ export default function OAuthModal({
   idcConfig,
   reauthConnection,
   defaultTab,
+  onSwitchToPaste,
 }: OAuthModalProps) {
   const t = useTranslations("oauthModal");
   const [step, setStep] = useState("waiting"); // waiting | input | success | error
@@ -74,6 +87,19 @@ export default function OAuthModal({
   const [isDeviceCode, setIsDeviceCode] = useState(false);
   const [deviceData, setDeviceData] = useState(null);
   const [polling, setPolling] = useState(false);
+  /**
+   * Provider-specific remediation hints surfaced by the /poll endpoint.
+   *   - `recommendedAction === "use_import_token"` (freebuff): render a
+   *     "Use paste credentials.json instead" CTA instead of the generic
+   *     "try again" button.
+   *   - `errorCode === "fingerprint_mismatch"` (freebuff): the upstream
+   *     rejected the server-side hardware fingerprint.
+   *
+   * Both fields are reset at the start of every poll loop so a stale
+   * classification from a previous attempt cannot leak into a fresh one.
+   */
+  const [recommendedAction, setRecommendedAction] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   // Providers that accept a pasted token directly (no browser OAuth):
   // windsurf, devin-cli, grok-cli, freebuff. The OAuthModal renders the
   // paste-token form for any of these and (if listed in
@@ -235,6 +261,10 @@ export default function OAuthModal({
   const startPolling = useCallback(
     async (deviceCode, codeVerifier, interval, extraData) => {
       setPolling(true);
+      // Reset provider-specific remediation hints from any previous poll
+      // so a stale classification cannot leak into the next attempt.
+      setRecommendedAction(null);
+      setErrorCode(null);
       const maxAttempts = 60;
 
       for (let i = 0; i < maxAttempts; i++) {
@@ -262,6 +292,15 @@ export default function OAuthModal({
           }
 
           if (data.error === "expired_token" || data.error === "access_denied") {
+            // Capture provider-specific remediation hints before throwing
+            // so the error step can render a "Switch to paste" CTA
+            // instead of the generic "try again" button.
+            if (typeof data.recommendedAction === "string") {
+              setRecommendedAction(data.recommendedAction);
+            }
+            if (typeof data.errorCode === "string") {
+              setErrorCode(data.errorCode);
+            }
             throw new Error(data.errorDescription || data.error);
           }
 
@@ -996,13 +1035,34 @@ export default function OAuthModal({
             </div>
             <h3 className="text-lg font-semibold mb-2">{t("error")}</h3>
             <p className="text-sm text-red-600 mb-4">{error}</p>
-            <div className="flex gap-2">
-              <Button onClick={startOAuthFlow} variant="secondary" fullWidth>
-                {t("tryAgain")}
-              </Button>
-              <Button onClick={onClose} variant="ghost" fullWidth>
-                {t("cancel")}
-              </Button>
+            {/* Provider-specific remediation (e.g. freebuff fingerprint
+                mismatch → switch to paste credentials.json). Only renders
+                when the wrapper supplied onSwitchToPaste AND the upstream
+                /poll response carried the structured signal. */}
+            {recommendedAction === "use_import_token" && onSwitchToPaste && (
+              <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-left text-xs text-amber-200">
+                <span className="material-symbols-outlined text-sm align-middle mr-1">
+                  warning
+                </span>
+                {errorCode === "fingerprint_mismatch"
+                  ? "The server-side hardware fingerprint did not match your local Codebuff CLI. Paste credentials.json exported from your local CLI to authenticate instead."
+                  : "Browser PKCE polling is not viable in this environment. Paste credentials.json to continue."}
+              </div>
+            )}
+            <div className="flex flex-col gap-2">
+              {recommendedAction === "use_import_token" && onSwitchToPaste && (
+                <Button onClick={onSwitchToPaste} variant="primary" fullWidth>
+                  Use paste credentials.json instead
+                </Button>
+              )}
+              <div className="flex gap-2">
+                <Button onClick={startOAuthFlow} variant="secondary" fullWidth>
+                  {t("tryAgain")}
+                </Button>
+                <Button onClick={onClose} variant="ghost" fullWidth>
+                  {t("cancel")}
+                </Button>
+              </div>
             </div>
           </div>
         )}

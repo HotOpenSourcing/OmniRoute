@@ -1,4 +1,5 @@
 import { getUnifiedModelsResponse } from "@/app/api/v1/models/catalog";
+import { FREEBUFF_MODELS } from "@/lib/providers/freebuff/models";
 import { getServiceModels } from "@/lib/db/serviceModels";
 import { getRegistryEntry } from "@omniroute/open-sse/config/providerRegistry.ts";
 
@@ -29,6 +30,20 @@ export async function GET(request: Request, { params }: { params: Promise<{ prov
         owned_by: rawProvider,
         ...model,
         id: model.id,
+        parent: null,
+      })),
+    });
+  }
+
+  if (rawProvider === "freebuff") {
+    return Response.json({
+      object: "list",
+      data: FREEBUFF_MODELS.map((model) => ({
+        object: "model",
+        owned_by: "freebuff",
+        id: model.id,
+        name: model.displayName,
+        context_length: model.contextWindow,
         parent: null,
       })),
     });

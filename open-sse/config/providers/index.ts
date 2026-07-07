@@ -70,6 +70,7 @@ import { snowflakeProvider } from "./registry/snowflake/index.ts";
 import { huggingfaceProvider } from "./registry/huggingface/index.ts";
 import { chipotleProvider } from "./registry/chipotle/index.ts";
 import { freeaiapikeyProvider } from "./registry/freeaiapikey/index.ts";
+import { freebuffProvider } from "./registry/freebuff/index.ts";
 import { qwenProvider } from "./registry/qwen/index.ts";
 import { qwen_webProvider } from "./registry/qwen/web/index.ts";
 import { modalProvider } from "./registry/modal/index.ts";
@@ -243,6 +244,7 @@ export const REGISTRY: Record<string, RegistryEntry> = {
   huggingface: huggingfaceProvider,
   chipotle: chipotleProvider,
   freeaiapikey: freeaiapikeyProvider,
+  freebuff: freebuffProvider,
   qwen: qwenProvider,
   "qwen-web": qwen_webProvider,
   modal: modalProvider,

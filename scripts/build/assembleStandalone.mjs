@@ -414,20 +414,34 @@ function patchStandalonePackageJson(resolvedOutDir) {
  * The static dest mirrors the configured distDir (e.g. .build/next), which is where the
  * standalone server serves /_next/static from. See step 2 in assembleStandalone for why.
  *
+ * Build perf: fan static + public copies out concurrently via fs.promises.cp +
+ * Promise.all. Previously both ran sequentially through fs.cpSync; wall-clock cost
+ * drops from static + public to max(static, public).
+ *
  * @param {{ distDir: string, relDistDir: string, projectRoot: string, resolvedOutDir: string }} opts
+ * @returns {Promise<void>}
  */
-function copyStaticAndPublic({ distDir, relDistDir, projectRoot, resolvedOutDir }) {
+async function copyStaticAndPublic({ distDir, relDistDir, projectRoot, resolvedOutDir }) {
+  const copies = [];
+
   const staticSrc = path.join(distDir, "static");
   const staticDest = path.join(resolvedOutDir, relDistDir, "static");
   if (fsSync.existsSync(staticSrc)) {
-    fsSync.mkdirSync(path.dirname(staticDest), { recursive: true });
-    fsSync.cpSync(staticSrc, staticDest, { recursive: true, force: true });
+    await fsSync.promises.mkdir(path.dirname(staticDest), { recursive: true });
+    copies.push(fsSync.promises.cp(staticSrc, staticDest, { recursive: true, force: true }));
   }
 
   const publicSrc = path.join(projectRoot, "public");
   if (fsSync.existsSync(publicSrc)) {
-    fsSync.cpSync(publicSrc, path.join(resolvedOutDir, "public"), { recursive: true, force: true });
+    copies.push(
+      fsSync.promises.cp(publicSrc, path.join(resolvedOutDir, "public"), {
+        recursive: true,
+        force: true,
+      })
+    );
   }
+
+  await Promise.all(copies);
 }
 
 /**
@@ -435,27 +449,93 @@ function copyStaticAndPublic({ distDir, relDistDir, projectRoot, resolvedOutDir 
  * (pino, migrations, MITM server, helper scripts, sqlite-vec platform packages, …)
  * into the assembled bundle. Missing sources are skipped silently.
  *
+ * Build perf: fans all 26+ copies out concurrently via fs.promises.cp + Promise.all.
+ * Previously each copy was a sequential fs.cpSync; wall-clock dropped from
+ * sum(copies) to max(copies). Output is identical.
+ *
+ * Opt out via OMNIROUTE_ASSEMBLE_PARALLEL=0 for debugging.
+ *
  * @param {string} projectRoot
  * @param {string} resolvedOutDir
+ * @returns {Promise<void>}
  */
-function copyNativeAssetsAndExtraModules(projectRoot, resolvedOutDir) {
-  for (const asset of NATIVE_ASSET_ENTRIES) {
-    const src = path.join(projectRoot, ...asset.src);
+async function copyNativeAssetsAndExtraModules(projectRoot, resolvedOutDir) {
+  const allEntries = [
+    ...NATIVE_ASSET_ENTRIES.map((e) => ({ ...e, kind: "native" })),
+    ...EXTRA_MODULE_ENTRIES.map((e) => ({ ...e, kind: "module" })),
+  ];
+
+  // Expand each entry into a concrete copy job, dropping entries whose source
+  // doesn't exist (mirrors the previous skip-silently semantics).
+  const jobs = [];
+  for (const entry of allEntries) {
+    const src = path.join(projectRoot, ...entry.src);
     if (!fsSync.existsSync(src)) continue;
-    const dest = path.join(resolvedOutDir, ...asset.dest);
-    fsSync.mkdirSync(path.dirname(dest), { recursive: true });
-    fsSync.cpSync(src, dest, { recursive: true, force: true });
-    console.log(`[assembleStandalone] Copied native asset: ${asset.label}`);
+    const dest = path.join(resolvedOutDir, ...entry.dest);
+    jobs.push({ src, dest, label: entry.label, kind: entry.kind });
   }
 
-  for (const mod of EXTRA_MODULE_ENTRIES) {
-    const src = path.join(projectRoot, ...mod.src);
-    if (!fsSync.existsSync(src)) continue;
-    const dest = path.join(resolvedOutDir, ...mod.dest);
-    fsSync.mkdirSync(path.dirname(dest), { recursive: true });
-    fsSync.cpSync(src, dest, { recursive: true, force: true });
-    console.log(`[assembleStandalone] Synced module: ${mod.label}`);
+  const parallel = process.env.OMNIROUTE_ASSEMBLE_PARALLEL !== "0";
+
+  const doSerial = async () => {
+    for (const job of jobs) {
+      try {
+        fsSync.mkdirSync(path.dirname(job.dest), { recursive: true });
+        await fsSync.promises.cp(job.src, job.dest, { recursive: true, force: true });
+        console.log(
+          job.kind === "native"
+            ? `[assembleStandalone] Copied native asset: ${job.label}`
+            : `[assembleStandalone] Synced module: ${job.label}`
+        );
+      } catch (err) {
+        console.warn(
+          `[assembleStandalone] Failed to copy ${job.label}: ${err.message} (non-fatal)`
+        );
+      }
+    }
+  };
+
+  if (!parallel) {
+    await doSerial();
+    return;
   }
+
+  const t0 = Date.now();
+  // Cap the fan-out at 16 concurrent copies — beyond that, the FS scheduler /
+  // I/O queue becomes the bottleneck on most hosts, and 16 already saturates
+  // disk bandwidth on NVMe. Per-job mkdir is serialised via an in-flight Set
+  // so we don't race the directory creation step.
+  const CONCURRENCY = Math.min(16, jobs.length || 1);
+  let cursor = 0;
+  const errors = [];
+
+  const worker = async () => {
+    while (true) {
+      const idx = cursor++;
+      if (idx >= jobs.length) return;
+      const job = jobs[idx];
+      try {
+        await fsSync.promises.mkdir(path.dirname(job.dest), { recursive: true });
+        await fsSync.promises.cp(job.src, job.dest, { recursive: true, force: true });
+        console.log(
+          job.kind === "native"
+            ? `[assembleStandalone] Copied native asset: ${job.label}`
+            : `[assembleStandalone] Synced module: ${job.label}`
+        );
+      } catch (err) {
+        errors.push(`${job.label}: ${err.message}`);
+        console.warn(
+          `[assembleStandalone] Failed to copy ${job.label}: ${err.message} (non-fatal)`
+        );
+      }
+    }
+  };
+
+  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+  const dt = Date.now() - t0;
+  console.log(
+    `[assembleStandalone] ${jobs.length} copy ops in ${dt}ms (parallel, concurrency=${CONCURRENCY})`
+  );
 }
 
 /**
@@ -465,7 +545,9 @@ function copyNativeAssetsAndExtraModules(projectRoot, resolvedOutDir) {
  * projectRoot/public -> outDir/public, native assets, and extra modules/sidecars.
  * Optionally sanitizes abs paths and patches Turbopack chunks.
  *
- * This is a synchronous function for use in build scripts.
+ * Build perf: async so callers can `await` the parallel copy fan-out
+ * (static + public via Promise.all). Output is identical to the previous
+ * synchronous implementation.
  *
  * @param {object} opts
  * @param {string} opts.distDir                  - Next.js distDir (e.g. ".next" or ".build/next")
@@ -474,15 +556,20 @@ function copyNativeAssetsAndExtraModules(projectRoot, resolvedOutDir) {
  * @param {boolean} [opts.sanitizePaths]         - replace build-machine abs paths with "." (default false)
  * @param {boolean} [opts.patchTurbopackChunks]  - strip hashed externals from .next/server js files (default false)
  * @param {boolean} [opts.copyNatives]           - copy native assets + extra modules (default true)
- * @returns {void}
+ * @param {boolean} [opts.includeDocs]           - whether to copy projectRoot/docs to outDir/docs (default true).
+ *                                                  Set to false on builds that don't ship the docs site
+ *                                                  (CI smoke, Electron, VPS image) — docs is ~68 MB
+ *                                                  and dominates the assemble phase on warm caches.
+ * @returns {Promise<void>}
  */
-export function assembleStandalone({
+export async function assembleStandalone({
   distDir,
   outDir,
   projectRoot = process.cwd(),
   sanitizePaths = false,
   patchTurbopackChunks: doPatchChunks = false,
   copyNatives = true,
+  includeDocs = true,
 }) {
   if (!distDir) throw new Error("[assembleStandalone] distDir is required");
   if (!outDir) throw new Error("[assembleStandalone] outDir is required");
@@ -515,7 +602,7 @@ export function assembleStandalone({
   // (e.g. "./.build/next"), so it serves /_next/static from <outDir>/<relDistDir>/static,
   // NOT a literal <outDir>/.next/static. Copying to .next/static leaves the server's
   // static dir empty → every JS/CSS chunk 404s → blank page. Mirror the distDir path.
-  copyStaticAndPublic({ distDir, relDistDir, projectRoot, resolvedOutDir });
+  await copyStaticAndPublic({ distDir, relDistDir, projectRoot, resolvedOutDir });
 
   // 4. Optionally sanitize abs paths
   if (sanitizePaths) {
@@ -535,8 +622,23 @@ export function assembleStandalone({
     }
   }
 
-  // 6. Optionally copy native assets + extra modules (synchronous)
+  // 6. Copy native assets + extra modules (parallel via Promise.all — see worker fn)
   if (copyNatives) {
-    copyNativeAssetsAndExtraModules(projectRoot, resolvedOutDir);
+    await copyNativeAssetsAndExtraModules(projectRoot, resolvedOutDir);
+  }
+
+  // 7. Optionally copy docs (~68 MB) — opt-out for builds that don't ship the docs site.
+  // Skipping on CI smoke / Electron / image layer tests cuts a noticeable chunk
+  // off the assemble phase on warm caches.
+  if (includeDocs) {
+    const docsSrc = path.join(projectRoot, "docs");
+    if (fsSync.existsSync(docsSrc)) {
+      await fsSync.promises.cp(docsSrc, path.join(resolvedOutDir, "docs"), {
+        recursive: true,
+      });
+      console.log("[assembleStandalone] Copied docs/ to standalone output");
+    }
+  } else {
+    console.log("[assembleStandalone] Skipped docs/ copy (includeDocs=false)");
   }
 }

@@ -3,7 +3,11 @@
  * (`src/lib/providers/freebuff/agentRuns.ts`).
  *
  * Source: `~/.config/manicode/freebuff-model-tests/phase4-deliverables/
- * 00-PROTOCOL-SPEC.md` §3.4 (captured 2026-07-03).
+ * 00-PROTOCOL-SPEC.md` §3.4 (captured 2026-07-03) **plus** the empirical
+ * header-validation findings in `final-validations.md` Mission 1,
+ * which proved that `x-unique-id`, `Cookie: __session=<jwt>`, and any
+ * specific `User-Agent` are NOT validated by the server — only
+ * `Authorization` is strictly required.
  */
 
 import test from "node:test";
@@ -14,11 +18,11 @@ import {
   buildFreebuffHeaders,
   startAgentRun,
   finishAgentRun,
-} from "../../../../src/lib/providers/freebuff/agentRuns.ts";
+} from "@/lib/providers/freebuff/agentRuns";
 import {
   FREEBUFF_AGENT_RUNS_PATH,
   FREEBUFF_DEFAULT_API_BASE,
-} from "../../../../src/lib/providers/freebuff/base.ts";
+} from "@/lib/providers/freebuff/base";
 
 // ---------------------------------------------------------------------------
 // Mock fetcher helpers.
@@ -58,26 +62,44 @@ const CREDENTIALS = {
 };
 
 // ---------------------------------------------------------------------------
-// buildFreebuffHeaders tests.
+// buildFreebuffHeaders tests — locked to the validated wire contract.
 // ---------------------------------------------------------------------------
 
-test("buildFreebuffHeaders: includes Authorization, x-unique-id, x-codebuff-fingerprint, Cookie, User-Agent", () => {
+test("buildFreebuffHeaders: Authorization + x-codebuff-fingerprint are the only required headers", () => {
   const h = buildFreebuffHeaders(CREDENTIALS);
   assert.equal(h.Authorization, "Bearer test-token-xyz");
-  assert.equal(h["x-unique-id"], CREDENTIALS.fingerprintId);
   assert.equal(h["x-codebuff-fingerprint"], CREDENTIALS.fingerprintId);
   assert.equal(
     h["x-codebuff-fingerprint-hash"],
     CREDENTIALS.fingerprintHash,
   );
-  assert.equal(
-    h.Cookie,
-    "__session=eyJhbGciOiJIUzI1NiJ9.fake.test",
-  );
-  assert.match(
-    h["User-Agent"] ?? "",
-    /^codebuff-cli\/1\.0\.0 \(win32-x64; node\/\d+\.\d+\.\d+\)$/,
-  );
+});
+
+test("buildFreebuffHeaders: omits x-unique-id (Mission 1 — server does not validate)", () => {
+  const h = buildFreebuffHeaders(CREDENTIALS);
+  assert.equal(h["x-unique-id"], undefined);
+});
+
+test("buildFreebuffHeaders: omits Cookie (Mission 1 — server does not validate the session cookie)", () => {
+  const h = buildFreebuffHeaders(CREDENTIALS);
+  assert.equal(h.Cookie, undefined);
+  assert.equal(h.cookie, undefined);
+});
+
+test("buildFreebuffHeaders: does NOT pin a User-Agent (Mission 1 case 4 — server accepts any UA)", () => {
+  const h = buildFreebuffHeaders(CREDENTIALS);
+  // We allow `User-Agent` to be present (informational, e.g. for
+  // upstream analytics) but it MUST NOT start with `codebuff-cli/...`
+  // (that UA was the OLD binary signature; we use `ai-sdk/openai-compatible/...`
+  // to match the SDK contract). Either way the server does not care.
+  const ua = h["User-Agent"] ?? h["user-agent"];
+  if (ua !== undefined) {
+    assert.doesNotMatch(
+      ua,
+      /^codebuff-cli\//,
+      "User-Agent should match SDK pattern, not the legacy CLI binary",
+    );
+  }
 });
 
 test("buildFreebuffHeaders: omits fingerprint-hash when not provided", () => {
@@ -115,11 +137,14 @@ test("startAgentRun: POSTs to www.codebuff.com/api/v1/agent-runs with START acti
 
   const headers = captured[0].init.headers as Record<string, string>;
   assert.equal(headers.Authorization, "Bearer test-token-xyz");
-  assert.equal(headers["x-unique-id"], CREDENTIALS.fingerprintId);
+  assert.equal(headers["x-codebuff-fingerprint"], CREDENTIALS.fingerprintId);
   assert.equal(
-    headers.Cookie,
-    "__session=eyJhbGciOiJIUzI1NiJ9.fake.test",
+    headers["x-codebuff-fingerprint-hash"],
+    CREDENTIALS.fingerprintHash,
   );
+  // Per Mission 1, the server does NOT validate these legacy headers.
+  assert.equal(headers["x-unique-id"], undefined);
+  assert.equal(headers.Cookie, undefined);
 
   const body = JSON.parse(captured[0].init.body as string);
   assert.deepEqual(body, {

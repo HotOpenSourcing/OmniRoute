@@ -196,14 +196,9 @@ export async function main() {
     const result = await runNextBuild();
     const standaloneDir = path.join(distDir, "standalone");
     if (result.code === 0 && (await exists(standaloneDir))) {
-      try {
-        await fs.cp(path.join(projectRoot, "docs"), path.join(standaloneDir, "docs"), {
-          recursive: true,
-        });
-        console.log("[build-next-isolated] Copied docs/ to standalone output");
-      } catch (docsCopyErr) {
-        console.warn("[build-next-isolated] Non-fatal error copying docs/:", docsCopyErr?.message);
-      }
+      // docs/ copy is now handled inside assembleStandalone (gated by the
+      // `includeDocs` flag, opt-out via OMNIROUTE_SKIP_DOCS_COPY=1). Removing
+      // the duplicate here eliminates a redundant 68 MB cp on every build.
 
       try {
         await pruneStandaloneArtifacts(projectRoot);
@@ -237,11 +232,16 @@ export async function main() {
         console.log(
           "[build-next-isolated] Assembling standalone bundle (static + public + natives + extras)..."
         );
-        assembleStandalone({
+        // Build perf: assembleStandalone is now async so the parallel copy
+        // fan-out actually waits for completion before we hand off to the
+        // smoke / pack steps. includeDocs=false skips the 68 MB docs/ copy
+        // when OMNIROUTE_SKIP_DOCS_COPY=1 (CI smoke, image-layer tests).
+        await assembleStandalone({
           distDir,
           outDir: standaloneDir,
           projectRoot,
           copyNatives: true,
+          includeDocs: process.env.OMNIROUTE_SKIP_DOCS_COPY !== "1",
         });
       } catch (assembleErr) {
         console.warn("[build-next-isolated] Non-fatal error assembling standalone:", assembleErr);

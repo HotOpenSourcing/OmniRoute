@@ -172,6 +172,18 @@ export function pipeStreamThroughTransformer(
 /**
  * Load the Freebuff credentials for a given connection / user from the
  * OmniRoute connection store.
+ *
+ * Credentials can live in two places depending on how the connection was
+ * created:
+ *
+ *   1. `apiKey` — JSON-serialized FreebuffConnection (legacy meta-service path).
+ *   2. `accessToken` (decrypted) + `providerSpecificData` — the OAuth
+ *      import-token flow stores the real `authToken` in `accessToken` and
+ *      the fingerprint triple in `providerSpecificData`. This is the path
+ *      taken when the user pastes a `credentials.json` blob via the dashboard.
+ *
+ * Both shapes must work — otherwise the chat dispatcher returns
+ * "No Freebuff connection found" even though the connection row exists.
  */
 async function loadFreebuffCredentials(
   options: FreebuffChatOptions,
@@ -183,13 +195,18 @@ async function loadFreebuffCredentials(
     "@/shared/schemas/providers/freebuff"
   );
 
-  if (options.connectionId) {
-    const row = await getProviderConnectionById(options.connectionId);
-    if (row && row.provider === "freebuff") {
+  const tryRow = (row: {
+    provider?: string;
+    apiKey?: string | null;
+    accessToken?: string | null;
+    providerSpecificData?: Record<string, unknown> | string | null;
+  }): { authToken: string; fingerprintId: string; fingerprintHash?: string } | null => {
+    if (row.provider !== "freebuff") return null;
+
+    // Path 1: apiKey as JSON (meta-service path)
+    if (row.apiKey) {
       try {
-        const parsed = freebuffConnectionSchema.safeParse(
-          JSON.parse(row.apiKey ?? "{}"),
-        );
+        const parsed = freebuffConnectionSchema.safeParse(JSON.parse(row.apiKey));
         if (parsed.success) {
           return {
             authToken: parsed.data.authToken,
@@ -198,34 +215,62 @@ async function loadFreebuffCredentials(
           };
         }
       } catch {
-        // fall through
+        // fall through to path 2
       }
+    }
+
+    // Path 2: accessToken + providerSpecificData (OAuth import-token flow)
+    if (row.accessToken) {
+      const psd =
+        typeof row.providerSpecificData === "string"
+          ? safeJsonParse(row.providerSpecificData)
+          : row.providerSpecificData && typeof row.providerSpecificData === "object"
+            ? row.providerSpecificData
+            : null;
+
+      const fingerprintId =
+        typeof psd?.fingerprintId === "string" ? psd.fingerprintId : undefined;
+      const fingerprintHash =
+        typeof psd?.fingerprintHash === "string" ? psd.fingerprintHash : undefined;
+
+      if (fingerprintId && /^enhanced-[A-Za-z0-9_-]{43}$/.test(fingerprintId)) {
+        // accessToken is stored encrypted (enc:v1:...) — getProviderConnectionById
+        // applies decryptConnectionFields before returning, so this is plaintext.
+        return {
+          authToken: row.accessToken,
+          fingerprintId,
+          fingerprintHash,
+        };
+      }
+    }
+
+    return null;
+  };
+
+  if (options.connectionId) {
+    const row = await getProviderConnectionById(options.connectionId);
+    if (row) {
+      const creds = tryRow(row as Parameters<typeof tryRow>[0]);
+      if (creds) return creds;
     }
   }
 
-  const rows = (await getProviderConnections({ provider: "freebuff" })) as Array<{
-    id: string;
-    provider: string;
-    apiKey?: string;
-  }>;
+  const rows = (await getProviderConnections({ provider: "freebuff" })) as Array<
+    Parameters<typeof tryRow>[0]
+  >;
   for (const row of rows) {
-    if (row.provider !== "freebuff") continue;
-    try {
-      const parsed = freebuffConnectionSchema.safeParse(
-        JSON.parse(row.apiKey ?? "{}"),
-      );
-      if (parsed.success) {
-        return {
-          authToken: parsed.data.authToken,
-          fingerprintId: parsed.data.fingerprintId,
-          fingerprintHash: parsed.data.fingerprintHash,
-        };
-      }
-    } catch {
-      continue;
-    }
+    const creds = tryRow(row);
+    if (creds) return creds;
   }
   return null;
+}
+
+function safeJsonParse(s: string): Record<string, unknown> | null {
+  try {
+    return JSON.parse(s);
+  } catch {
+    return null;
+  }
 }
 
 /**

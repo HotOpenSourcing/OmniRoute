@@ -140,6 +140,17 @@ const OAUTH_TEST_CONFIG = {
     checkExpiry: true,
     refreshable: true,
   },
+  freebuff: {
+    // Freebuff (Codebuff Free Tier) exposes /api/v1/me — a GET that returns
+    // the authenticated user when the authToken is valid and 401 otherwise.
+    // We use it as the connection-test probe (mirrors the antigravity pattern).
+    url: "https://www.codebuff.com/api/v1/me",
+    method: "GET",
+    authHeader: "Authorization",
+    authPrefix: "Bearer ",
+    extraHeaders: { Accept: "application/json" },
+    acceptStatuses: [200],
+  },
 };
 
 import { CLI_RUNTIME_PROVIDER_MAP } from "./cliRuntimeProviderMap";

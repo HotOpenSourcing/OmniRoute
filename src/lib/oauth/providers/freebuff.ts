@@ -40,6 +40,24 @@ export const freebuffTokenSchema = z.object({
   authToken: freebuffUuidSchema,
   userId: freebuffUuidSchema.optional(),
   email: z.string().email().optional(),
+  /**
+   * Optional fingerprint triple carried over from the legacy Freebuff CLI
+   * `credentials.json` paste path. The PKCE device-code poll does not
+   * expose these — when present they are propagated into the connection's
+   * `providerSpecificData` so the chat dispatcher can stamp the
+   * `x-codebuff-fingerprint[-hash]` headers the upstream requires.
+   */
+  fingerprintId: z
+    .string()
+    .regex(
+      /^enhanced-[A-Za-z0-9_-]{43}$/,
+      "fingerprintId must match /^enhanced-[A-Za-z0-9_-]{43}$/",
+    )
+    .optional(),
+  fingerprintHash: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/, "fingerprintHash must be a 64-char hex sha256")
+    .optional(),
 });
 export type FreebuffToken = z.infer<typeof freebuffTokenSchema>;
 
@@ -57,6 +75,16 @@ export const freebuffPollResponseSchema = z.object({
   userId: freebuffUuidSchema.optional(),
   email: z.string().email().optional(),
   error: z.string().optional(),
+  /**
+   * Structured upstream-error code. Set when `status === "error"` and we can
+   * classify the failure (e.g. `fingerprint_mismatch` when the upstream
+   * returned HTTP 401, which means the OmniRoute server's hardware
+   * fingerprint does not match the user's local Codebuff CLI fingerprint).
+   * The OAuthModal uses this to recommend the paste-credentials.json path
+   * instead of asking the user to retry the browser PKCE flow.
+   */
+  errorCode: z.enum(["fingerprint_mismatch", "generic"]).optional(),
+  message: z.string().optional(),
 });
 export type FreebuffPollResponse = z.infer<typeof freebuffPollResponseSchema>;
 
@@ -295,10 +323,26 @@ export async function pollFreebuffDeviceCode(
     if (response.status === 410) {
       return { status: "expired", error: "Device code expired" };
     }
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
+      // 401 from /api/auth/cli/status with the server-side fingerprintId
+      // almost always means the OmniRoute server's hardware fingerprint
+      // does not match the user's local Codebuff CLI fingerprint. Surface
+      // this as a structured signal so the UI can recommend the
+      // paste-credentials.json fallback instead of asking the user to
+      // "try again". The structured `errorCode` is distinct from `error`
+      // (which carries the upstream message verbatim) so `pollToken` can
+      // branch on it without parsing strings.
       return {
         status: "error",
-        error: `Authentication failed (HTTP ${response.status})`,
+        error: `Authentication failed (HTTP 401)`,
+        errorCode: "fingerprint_mismatch" as const,
+        message: `Authentication failed (HTTP 401). The server-side hardware fingerprint does not match your local Codebuff CLI fingerprint — paste credentials.json instead.`,
+      };
+    }
+    if (response.status === 403) {
+      return {
+        status: "error",
+        error: `Authentication failed (HTTP 403)`,
       };
     }
 
@@ -323,9 +367,48 @@ export async function pollFreebuffDeviceCode(
 }
 
 /**
+ * Known placeholder `authToken` values emitted by stub / uninstalled
+ * Freebuff CLI installs. We never want to treat these as a real token
+ * — doing so would store a known-bad credential that the upstream
+ * rejects immediately, and (worse) when pasted as JSON, the parser
+ * would otherwise return the entire JSON string as the `authToken`,
+ * producing the malformed `Authorization: Bearer <json>` header.
+ */
+const FREEBUFF_AUTH_TOKEN_PLACEHOLDERS = new Set([
+  "not-a-uuid",
+  "REFRESH_NEEDED",
+]);
+
+function isFreebuffAuthToken(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    !FREEBUFF_AUTH_TOKEN_PLACEHOLDERS.has(value) &&
+    freebuffUuidSchema.safeParse(value).success
+  );
+}
+
+/**
  * Internal: best-effort parse of the pasted text into a FreebuffToken. Used by
  * `mapTokens` (import-token path) so the same logic can be unit-tested
  * independently from the connection-shaping concerns.
+ *
+ * Accepted shapes (in order):
+ *
+ *   1. `{"authToken": "<uuid>", "userId"?: "<uuid>", "email"?: "<email>"}`
+ *      — the OmniRoute-documented shape (matches `freebuffTokenSchema`).
+ *   2. `{"authToken": "not-a-uuid" (placeholder),
+ *        "default": {
+ *          "id": "<uuid>", "name": "...", "email": "...",
+ *          "authToken": "<uuid>", "fingerprintId": "...", "fingerprintHash": "..."
+ *        }}`
+ *      — the legacy Freebuff CLI `~/.config/manicode/credentials.json` on
+ *        disk. The real authToken + fingerprint triple live under `default`;
+ *        the top-level `authToken` is a known placeholder that some
+ *        installs leave behind even when `default.authToken` is valid.
+ *   3. A bare UUID — the simplest paste fallback.
+ *   4. Any other string — returned as `authToken` so the upstream can
+ *      reject it with its own error (rather than silently storing garbage).
  */
 export function parseFreebuffPastedCredentials(
   pasted: string,
@@ -333,14 +416,192 @@ export function parseFreebuffPastedCredentials(
   const trimmed = pasted?.trim() ?? "";
   if (trimmed.startsWith("{")) {
     try {
-      const obj = JSON.parse(trimmed);
-      const result = freebuffTokenSchema.safeParse(obj);
-      if (result.success) return result.data;
+      const obj = JSON.parse(trimmed) as Record<string, unknown>;
+
+      // Shape 1: direct FreebuffToken (top-level fields).
+      const direct = freebuffTokenSchema.safeParse(obj);
+      if (direct.success) return direct.data;
+
+      // Shape 2: legacy CLI credentials.json — extract the real authToken
+      // + fingerprint from `default`. Without this branch the parser
+      // falls back to wrapping the entire JSON string as `authToken`,
+      // which the default executor would then re-serialize into a
+      // malformed `Authorization: Bearer <json>` header (bug observed in
+      // v3.8.40 — see #TBD).
+      if (obj.default && typeof obj.default === "object") {
+        const def = obj.default as Record<string, unknown>;
+        if (isFreebuffAuthToken(def.authToken)) {
+          const parsed: FreebuffToken = {
+            authToken: def.authToken,
+            userId:
+              typeof def.id === "string" &&
+              freebuffUuidSchema.safeParse(def.id).success
+                ? def.id
+                : undefined,
+            email:
+              typeof def.email === "string" && def.email.length > 0
+                ? def.email
+                : undefined,
+          };
+          const fpId =
+            typeof def.fingerprintId === "string" &&
+            /^enhanced-[A-Za-z0-9_-]{43}$/.test(def.fingerprintId)
+              ? def.fingerprintId
+              : undefined;
+          const fpHash =
+            typeof def.fingerprintHash === "string" &&
+            /^[a-f0-9]{64}$/.test(def.fingerprintHash)
+              ? def.fingerprintHash
+              : undefined;
+          if (fpId) parsed.fingerprintId = fpId;
+          if (fpHash) parsed.fingerprintHash = fpHash;
+          return parsed;
+        }
+      }
     } catch {
       /* fall through to bare-token path */
     }
   }
   return { authToken: trimmed };
+}
+
+/**
+ * Shape of the result returned by `sanitizeFreebuffAccessToken`. The fields
+ * are intentionally narrow — only what is safe to overwrite on an existing
+ * connection row without changing its identity (id, provider, authType, etc.).
+ */
+export interface FreebuffTokenRepair {
+  /** The real UUID `authToken` extracted from a malformed stored value. */
+  authToken: string;
+  /** Carried over from `default.fingerprintId` when present. */
+  fingerprintId?: string;
+  /** Carried over from `default.fingerprintHash` when present. */
+  fingerprintHash?: string;
+  /** Carried over from `default.id` when it parses as a UUID. */
+  userId?: string;
+  /** Carried over from `default.email` when present. */
+  email?: string;
+}
+
+/**
+ * Detect and repair a malformed `accessToken` stored in a Freebuff connection
+ * row.
+ *
+ * Background: in v3.8.40 and earlier, `parseFreebuffPastedCredentials` fell
+ * through to `{ authToken: <whole JSON string> }` when `freebuffTokenSchema`
+ * rejected the top-level `authToken: "not-a-uuid"` placeholder. The resulting
+ * connection row stored the entire `credentials.json` blob as its
+ * `accessToken`, which the default OpenAI executor then re-serialized into a
+ * malformed `Authorization: Bearer { "authToken": ... }` header that
+ * `Headers.append` rejected with an invalid-header-value exception (502 to
+ * the client).
+ *
+ * v3.8.43 added Shape 2 to `parseFreebuffPastedCredentials` so new imports
+ * extract the real `default.authToken` correctly. **Existing** connection
+ * rows created before that fix still hold the JSON blob. This helper is the
+ * single point that recognises the broken shape and returns the real UUID
+ * + fingerprint triple so the caller can rewrite the row in place.
+ *
+ * Returns:
+ *   - `null` if `raw` already looks like a valid UUID (no repair needed)
+ *     OR is empty / not a string (caller cannot help)
+ *   - `FreebuffTokenRepair` if `raw` looks like a Freebuff credentials blob
+ *     AND a real UUID can be extracted from `default.authToken`
+ *
+ * Pure function — no DB / network side effects. Callers decide what to do
+ * with the result (rewrite the row, log the repair, emit a warning, etc.).
+ */
+export function sanitizeFreebuffAccessToken(
+  raw: unknown,
+): FreebuffTokenRepair | null {
+  if (typeof raw !== "string" || raw.length === 0) return null;
+
+  // Fast path: already a clean UUID. Skip the JSON parse cost on the hot
+  // path — the malformed-blob case is a one-time repair, not steady state.
+  if (
+    !raw.startsWith("{") &&
+    freebuffUuidSchema.safeParse(raw).success
+  ) {
+    return null;
+  }
+
+  // Anything that starts with `{` might be the broken credentials.json blob
+  // (Shape 2 of parseFreebuffPastedCredentials). Try to re-parse it.
+  if (!raw.startsWith("{")) return null;
+
+  const parsed = parseFreebuffPastedCredentials(raw);
+  // Reject anything that didn't yield a clean UUID after re-parse — we
+  // refuse to write a malformed token back to the DB.
+  if (!freebuffUuidSchema.safeParse(parsed.authToken).success) return null;
+
+  const repair: FreebuffTokenRepair = { authToken: parsed.authToken };
+  if (parsed.userId) repair.userId = parsed.userId;
+  if (parsed.email) repair.email = parsed.email;
+  if (parsed.fingerprintId) repair.fingerprintId = parsed.fingerprintId;
+  if (parsed.fingerprintHash) repair.fingerprintHash = parsed.fingerprintHash;
+  return repair;
+}
+
+/**
+ * Connection-row shape accepted by `repairFreebuffConnectionRow`. Intentionally
+ * a structural subset of the full row — we only need the fields the repair
+ * touches so callers can pass either a raw DB row or a normalized shape.
+ */
+export interface FreebuffRepairableConnectionRow {
+  accessToken: unknown;
+  providerSpecificData?: Record<string, unknown> | null;
+}
+
+/**
+ * Apply `sanitizeFreebuffAccessToken` to a connection row and return the
+ * updated fields. Returns `null` when the row is already clean (no repair
+ * needed) so callers can branch on the result without diffing the input.
+ *
+ * The returned partial only contains the fields that changed. Callers are
+ * responsible for the actual DB write (`updateProviderConnection` or
+ * equivalent). The function does NOT bump `tokenExpiresAt` — the upstream
+ * has no refresh endpoint and the user will need to re-auth when the
+ * existing token expires anyway.
+ *
+ * Example (one-time repair script):
+ *
+ *   const rows = await getProviderConnections({ provider: "freebuff" });
+ *   for (const row of rows) {
+ *     const repair = repairFreebuffConnectionRow(row);
+ *     if (repair) {
+ *       console.warn(`repairing freebuff connection ${row.id}`);
+ *       await updateProviderConnection(row.id, repair);
+ *     }
+ *   }
+ */
+export function repairFreebuffConnectionRow(
+  row: FreebuffRepairableConnectionRow,
+): Partial<FreebuffRepairableConnectionRow> | null {
+  const repair = sanitizeFreebuffAccessToken(row.accessToken);
+  if (!repair) return null;
+
+  const updates: Partial<FreebuffRepairableConnectionRow> = {
+    accessToken: repair.authToken,
+  };
+
+  // Merge fingerprint triple + userId / email into providerSpecificData.
+  // We do NOT clobber existing fields the caller may have set — we only
+  // fill in the keys we know about. This preserves any future extension
+  // (instanceId, loginCompletedAt, etc.) that may already live in the row.
+  const existing =
+    row.providerSpecificData && typeof row.providerSpecificData === "object"
+      ? row.providerSpecificData
+      : {};
+  const merged: Record<string, unknown> = { ...existing };
+  if (repair.fingerprintId) merged.fingerprintId = repair.fingerprintId;
+  if (repair.fingerprintHash) merged.fingerprintHash = repair.fingerprintHash;
+  if (repair.userId) merged.userId = repair.userId;
+  if (repair.email) merged.userEmail = repair.email;
+  if (Object.keys(merged).length > 0) {
+    updates.providerSpecificData = merged;
+  }
+
+  return updates;
 }
 
 export const freebuff = {
@@ -440,11 +701,27 @@ export const freebuff = {
       };
     }
     // status === "error"
+    // `fingerprint_mismatch` is special-cased so the UI can offer a
+    // "Switch to paste credentials.json" CTA instead of "try again".
+    // Any other `error` status is bubbled up as a generic access_denied
+    // with the upstream message preserved verbatim.
+    if (result.errorCode === "fingerprint_mismatch") {
+      return {
+        ok: true as const,
+        data: {
+          error: "access_denied" as const,
+          error_description:
+            result.message ?? "Hardware fingerprint mismatch with Codebuff upstream.",
+          error_code: "fingerprint_mismatch" as const,
+          recommended_action: "use_import_token" as const,
+        },
+      };
+    }
     return {
       ok: true as const,
       data: {
         error: "access_denied" as const,
-        error_description: result.error ?? "Authentication failed",
+        error_description: result.message ?? result.error ?? "Authentication failed",
       },
     };
   },
@@ -473,6 +750,8 @@ export const freebuff = {
     let userId: string | undefined;
     let email: string | undefined;
     let authMethod: "freebuff-import" | "freebuff-oauth";
+    let fingerprintId: string | undefined;
+    let fingerprintHash: string | undefined;
 
     if (typeof input?.accessToken === "string") {
       // Path 1: import-token route — pasted text or credentials.json
@@ -480,6 +759,8 @@ export const freebuff = {
       authToken = parsed.authToken;
       userId = parsed.userId;
       email = parsed.email;
+      fingerprintId = parsed.fingerprintId;
+      fingerprintHash = parsed.fingerprintHash;
       authMethod = "freebuff-import";
     } else if (typeof input?.access_token === "string") {
       // Path 2: device-code poll success — upstream OAuth bundle
@@ -513,6 +794,8 @@ export const freebuff = {
       tokenExpiresAt: Date.now() + 60 * 60 * 1000,
       providerSpecificData: {
         ...(userId ? { userId } : {}),
+        ...(fingerprintId ? { fingerprintId } : {}),
+        ...(fingerprintHash ? { fingerprintHash } : {}),
         authMethod,
         tokenExpiresAt: Date.now() + 60 * 60 * 1000,
       },

@@ -63,6 +63,17 @@ export default function FreebuffOAuthWrapper({
     onSuccess?.();
   }, [onSuccess]);
 
+  /**
+   * Called from `OAuthModal`'s error step when the upstream poll fails with
+   * `recommendedAction: "use_import_token"` (e.g. freebuff's hardware
+   * fingerprint mismatch against codebuff.com). Flips the wrapper directly
+   * to the paste form, bypassing the method selector so the user does not
+   * have to back out and pick again.
+   */
+  const handleSwitchToPaste = useCallback(() => {
+    setAuthMethod("paste");
+  }, []);
+
   const oauthProviderId = providerInfo?.id || "freebuff";
 
   if (!isOpen) return null;
@@ -72,6 +83,39 @@ export default function FreebuffOAuthWrapper({
     return (
       <Modal isOpen={isOpen} title={`Connect Freebuff`} onClose={onClose} size="lg">
         <div className="flex flex-col gap-4">
+          {/* Prominent up-front warning — the hardware fingerprint almost
+              never matches on remote OmniRoute deployments, so paste mode
+              is the recommended path. Surfacing this BEFORE the user picks
+              "browser" prevents them from spending a full poll timeout
+              (5 minutes) only to be told to use paste mode anyway. */}
+          <div
+            role="alert"
+            className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200"
+          >
+            <div className="flex items-start gap-2">
+              <span className="material-symbols-outlined text-sm mt-0.5">
+                warning
+              </span>
+              <div className="flex-1">
+                <p className="font-semibold mb-1">
+                  Paste credentials.json is recommended for most setups
+                </p>
+                <p>
+                  The browser PKCE flow derives its fingerprint from this
+                  server&apos;s hardware. If you are running OmniRoute on a
+                  remote host (VPS, Docker, WSL), that fingerprint will not
+                  match the one in your local Codebuff CLI and the upstream
+                  will reject the login with HTTP 401. Run{" "}
+                  <code className="font-mono bg-black/30 px-1 rounded">
+                    freebuff login
+                  </code>{" "}
+                  on the machine where you normally use Codebuff, then paste
+                  the resulting credentials.json below.
+                </p>
+              </div>
+            </div>
+          </div>
+
           <p className="text-sm text-text-muted">
             Choose how to authenticate with Codebuff (www.codebuff.com):
           </p>
@@ -137,7 +181,12 @@ export default function FreebuffOAuthWrapper({
         providerInfo={providerInfo}
         onSuccess={handleBrowserSuccess}
         reauthConnection={reauthConnection}
+        // `handleBack` returns the user to the method selector when they
+        // cancel the browser flow; `handleSwitchToPaste` flips them
+        // straight to the paste form when the upstream rejects the
+        // server-side fingerprint (recommendedAction: "use_import_token").
         onClose={handleBack}
+        onSwitchToPaste={handleSwitchToPaste}
         defaultTab="browser"
       />
     );

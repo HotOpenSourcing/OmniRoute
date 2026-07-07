@@ -9,6 +9,8 @@ import {
 import { getRegistryEntry } from "@omniroute/open-sse/config/providerRegistry.ts";
 import { getModelsByProviderId } from "@/shared/constants/models";
 import { getStaticModelsForProvider, type LocalCatalogModel } from "@/lib/providers/staticModels";
+import { FREEBUFF_MODELS } from "@/lib/providers/freebuff/models";
+import { filterByAccessTier } from "@/lib/providers/freebuff/freeModelFilter";
 import { isProviderBlockedByIdOrAlias } from "@/shared/utils/noAuthProviders";
 import {
   getProviderConnectionById,
@@ -1098,6 +1100,23 @@ export async function GET(
     if (provider === "reka") {
       const localCatalog = buildLocalCatalogResponse();
       if (localCatalog) return localCatalog;
+    }
+
+    if (provider === "freebuff") {
+      const accessTier =
+        (connection.providerSpecificData?.accessTier as "full" | "limited" | undefined) ?? "full";
+      const filtered = filterByAccessTier(FREEBUFF_MODELS, accessTier);
+      return buildResponse({
+        provider,
+        connectionId,
+        models: filtered.map((model) => ({
+          id: model.id,
+          name: model.displayName,
+          contextLength: model.contextWindow,
+          vision: model.modalities?.includes("image") ?? false,
+        })),
+        source: "local_catalog",
+      });
     }
 
     if (provider === "bedrock") {
