@@ -31,6 +31,7 @@ const AGENT_MAP: Readonly<Record<string, string>> = Object.freeze({
   "deepseek/deepseek-v4-pro": "base2-free-deepseek-v4-pro",
   "mimo/mimo-v2.5": "base2-free-mimo-v2.5",
   "mimo/mimo-v2.5-pro": "base2-free-mimo-v2.5-pro",
+  "minimax/minimax-m2.7": "base2-free",
   "minimax/minimax-m3": "base2-free-minimax-m3",
   "moonshotai/kimi-k2.6": "base2-free-kimi-k2.6",
   "z-ai/glm-5.2": "base2-free-glm-5.2",

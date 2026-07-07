@@ -4,8 +4,11 @@ import type { RegistryEntry } from "../../shared.ts";
  * Freebuff (Codebuff Free Tier) — opt-in OAuth provider that wraps the
  * `freebuff.exe` binary. Models come from `FREEBUFF_MODELS`
  * (`src/lib/providers/freebuff/models.ts`); the chat executor is
- * custom-handled in `src/lib/providers/freebuff/chat.ts`, so this
- * registry entry uses the default executor.
+ * `FreebuffExecutor` (`open-sse/executors/freebuff.ts`), which delegates
+ * to `routeFreebuffChat` (`src/lib/providers/freebuff/chatIntegration.ts`)
+ * to inject the proprietary Codebuff wire envelope (top-level `runId`,
+ * `provider`, `codebuff_metadata`, plus seat acquisition and agent-run
+ * registration).
  *
  * Models with `requiresReferral` or `premium` flags are listed here for
  * the `full` tier — tier filtering happens at the per-connection
@@ -15,7 +18,7 @@ import type { RegistryEntry } from "../../shared.ts";
 export const freebuffProvider: RegistryEntry = {
   id: "freebuff",
   format: "openai",
-  executor: "default",
+  executor: "freebuff",
   baseUrl: "https://www.codebuff.com",
   chatPath: "/api/v1/chat/completions",
   urlSuffix: "/api/v1/chat/completions",
