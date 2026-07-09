@@ -55,6 +55,14 @@ export type TransformerFormat = "openai" | "anthropic";
 export interface TransformerOptions {
   /** Model identifier to stamp on every outgoing chunk (e.g. "mimo-v2.5"). */
   model: string;
+  /**
+   * Whether to surface sub-agent text in the stream. Only honoured by the
+   * Anthropic transformer (Codebuff sub-agents emit `subagent-response-chunk`
+   * events that the Anthropic transformer can re-frame as text deltas).
+   * For the OpenAI format the upstream already emits standard OpenAI SSE
+   * chunks, so this flag is a no-op.
+   */
+  includeSubagentOutput?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -148,13 +156,37 @@ function parseBlock(block: string): CodebuffEvent | null {
 
 import { createOpenAITransformer } from "./openaiTransformer.ts";
 import { createAnthropicTransformer } from "./anthropicTransformer.ts";
+import { createPassthroughTransformer } from "./passthroughTransformer.ts";
 
+/**
+ * Factory that returns the right `TransformStream` for the caller.
+ *
+ * The Codebuff/Freebuff upstream emits **standard OpenAI SSE chunks**
+ * (`data: {"id":...,"object":"chat.completion.chunk",...}`) on the
+ * `/api/v1/chat/completions` endpoint — see the module-level note above.
+ * Re-framing those chunks through the legacy `openaiTransformer` (which
+ * expects Codebuff's custom `response-chunk` / `reasoning_delta` events)
+ * produces an empty `choices` array, which trips
+ * `detectMalformedNonStream` in `open-sse/handlers/chatCore.ts`.
+ *
+ * Therefore the OpenAI format is a **pass-through**: we relay the bytes
+ * verbatim. The Anthropic format still needs the legacy transformer
+ * because the `/v1/messages` handler must emit Anthropic-shaped events,
+ * and Anthropic clients cannot consume raw OpenAI chunks.
+ */
 export function createTransformer(
   format: TransformerFormat,
   options: TransformerOptions,
 ): TransformStream<Uint8Array, Uint8Array> {
-  if (format === "openai") return createOpenAITransformer(options);
-  if (format === "anthropic") return createAnthropicTransformer(options);
+  if (format === "openai") {
+    return createPassthroughTransformer({
+      model: options.model,
+      includeSubagentOutput: options.includeSubagentOutput,
+    });
+  }
+  if (format === "anthropic") {
+    return createAnthropicTransformer(options);
+  }
   throw new Error(`Unknown transformer format: ${format as string}`);
 }
 

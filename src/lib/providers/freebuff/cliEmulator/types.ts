@@ -168,6 +168,7 @@ export interface FreebuffWireEnvelope {
     readonly cost_mode: "free" | "paid";
     readonly run_id: string;
     readonly freebuff_instance_id: string;
+    readonly trace_session_id: string;
   };
   /** Free-form passthrough for tools, temperature, etc. */
   readonly [key: string]: unknown;
@@ -186,7 +187,7 @@ export interface FreebuffHeaders {
   readonly Accept: string;
   readonly "user-agent": string;
   readonly "x-codebuff-fingerprint": string;
-  readonly "x-codebuff-fingerprint-hash"?: string;
+  readonly "x-codebuff-fingerprint-hash": string;
   readonly "x-freebuff-instance-id"?: string;
   readonly "x-freebuff-model"?: string;
   readonly "X-Codebuff-OpenRouter-Api-Key"?: string;
@@ -258,6 +259,20 @@ export abstract class FreebuffError extends Error {
   abstract readonly code: string;
   abstract readonly httpStatus?: number;
   abstract readonly retryable: boolean;
+}
+
+/**
+ * The user's auth token is invalid or expired. The caller must trigger
+ * a re-auth flow (device-code, OAuth refresh, credentials.json paste).
+ */
+export class FreebuffAuthError extends FreebuffError {
+  readonly code = "unauthenticated";
+  readonly httpStatus = 401;
+  readonly retryable = false;
+  constructor(message = "Freebuff authentication required") {
+    super(message);
+    this.name = "FreebuffAuthError";
+  }
 }
 
 /**

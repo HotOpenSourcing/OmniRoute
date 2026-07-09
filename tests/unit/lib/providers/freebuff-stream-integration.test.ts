@@ -78,6 +78,9 @@ class FakeEventSource {
       // Browsers set readyState=OPEN synchronously after construction;
       // we emulate that with a microtask.
       this.readyState = FakeEventSource.OPEN;
+      // Defer the "open" event to the next microtask so listeners attached
+      // synchronously after `new FakeEventSource(...)` still receive it.
+      await Promise.resolve();
       this.fire("open", undefined);
 
       const reader = stream.getReader();
@@ -147,8 +150,8 @@ class FakeEventSource {
 }
 
 // ---------------------------------------------------------------------------
-// Helper — build a ReadableStream of raw Codebuff SSE bytes from a string.
-// Mirrors what `freebuff.exe` would emit over HTTP, byte for byte.
+// Helper — build a ReadableStream of raw OpenAI SSE bytes from a string.
+// Mirrors what the Freebuff upstream now emits over HTTP, byte for byte.
 // ---------------------------------------------------------------------------
 
 function streamFromString(sse: string): ReadableStream<Uint8Array> {
@@ -161,15 +164,41 @@ function streamFromString(sse: string): ReadableStream<Uint8Array> {
   });
 }
 
+/** Build a minimal OpenAI chat.completion.chunk frame. */
+function chunk(
+  partial: {
+    id?: string;
+    delta?: Record<string, unknown>;
+    finish_reason?: string | null;
+  } = {},
+): string {
+  const full = {
+    id: partial.id ?? "chatcmpl-test",
+    object: "chat.completion.chunk",
+    created: 1700000000,
+    model: "glm-5.2",
+    choices: [
+      {
+        index: 0,
+        delta: partial.delta ?? {},
+        finish_reason: partial.finish_reason ?? null,
+      },
+    ],
+  };
+  return `data: ${JSON.stringify(full)}\n\n`;
+}
+
 // ---------------------------------------------------------------------------
-// End-to-end — Codebuff SSE → transformer → FakeEventSource (OpenAI client).
+// End-to-end — OpenAI SSE → passthrough transformer → FakeEventSource.
+// The transformer is a byte-for-byte relay; the consumer sees the upstream
+// chunks unchanged.
 // ---------------------------------------------------------------------------
 
-describe("Freebuff SSE → OpenAI — end-to-end via FakeEventSource", () => {
+describe("OpenAI SSE → passthrough → FakeEventSource", () => {
   test("readyState transitions CONNECTING → OPEN → CLOSED", async () => {
     const stream = streamFromString(
-      'event: response-chunk\ndata: {"text":"hi"}\n\n' +
-        "event: prompt-response\ndata: {}\n\n",
+      chunk({ delta: { role: "assistant", content: "hi" } }) +
+        chunk({ delta: {}, finish_reason: "stop" }),
     );
     const es = new FakeEventSource(
       stream.pipeThrough(createTransformer("openai", { model: "glm-5.2" })),
@@ -181,13 +210,12 @@ describe("Freebuff SSE → OpenAI — end-to-end via FakeEventSource", () => {
     // Wait for end-of-stream.
     while (!es.ended) await new Promise((r) => setTimeout(r, 1));
     assert.equal(es.readyState, FakeEventSource.CLOSED);
-    assert.equal(es.messages.length, 2); // role+content chunk, tail chunk
+    assert.equal(es.messages.length, 2);
   });
 
   test("open event fires once and before the first message", async () => {
     const stream = streamFromString(
-      'event: response-chunk\ndata: {"text":"x"}\n\n' +
-        "event: prompt-response\ndata: {}\n\n",
+      chunk({ delta: { content: "x" } }) + chunk({ delta: {}, finish_reason: "stop" }),
     );
     let openCount = 0;
     let firstMessageAt = -1;
@@ -207,11 +235,11 @@ describe("Freebuff SSE → OpenAI — end-to-end via FakeEventSource", () => {
     assert.ok(messagesSeen >= 1);
   });
 
-  test("plain text run: role announcement + content + tail chunks", async () => {
+  test("plain text run: content chunks arrive in order", async () => {
     const stream = streamFromString(
-      'event: response-chunk\ndata: {"text":"hello "}\n\n' +
-        'event: response-chunk\ndata: {"text":"world"}\n\n' +
-        "event: prompt-response\ndata: {}\n\n",
+      chunk({ id: "a", delta: { role: "assistant", content: "hello " } }) +
+        chunk({ id: "b", delta: { content: "world" } }) +
+        chunk({ id: "c", delta: {}, finish_reason: "stop" }),
     );
     const es = new FakeEventSource(
       stream.pipeThrough(createTransformer("openai", { model: "glm-5.2" })),
@@ -219,29 +247,24 @@ describe("Freebuff SSE → OpenAI — end-to-end via FakeEventSource", () => {
 
     while (!es.ended) await new Promise((r) => setTimeout(r, 1));
 
-    // Reconstruct the assistant text from content deltas.
     type Chunk = {
-      choices: Array<{ delta: { role?: string; content?: string }; finish_reason: string | null }>;
+      choices: Array<{ delta: { content?: string }; finish_reason: string | null }>;
     };
     const text = es.messages
       .map((m) => (m as Chunk).choices[0].delta.content ?? "")
       .join("");
     assert.equal(text, "hello world");
 
-    // The very first message announces role=assistant.
-    const first = es.messages[0] as Chunk;
-    assert.equal(first.choices[0].delta.role, "assistant");
-
     // The final message carries the finish_reason stop.
     const tail = es.messages[es.messages.length - 1] as Chunk;
     assert.equal(tail.choices[0].finish_reason, "stop");
   });
 
-  test("reasoning arrives as reasoning_content before the visible content", async () => {
+  test("reasoning_content deltas arrive before visible content", async () => {
     const stream = streamFromString(
-      'event: reasoning_delta\ndata: {"text":"pondering","ancestorRunIds":[],"runId":"r","agentId":"a"}\n\n' +
-        'event: response-chunk\ndata: {"text":"answer"}\n\n' +
-        "event: prompt-response\ndata: {}\n\n",
+      chunk({ delta: { reasoning_content: "pondering" } }) +
+        chunk({ delta: { content: "answer" } }) +
+        chunk({ delta: {}, finish_reason: "stop" }),
     );
     const es = new FakeEventSource(
       stream.pipeThrough(createTransformer("openai", { model: "glm-5.2" })),
@@ -264,10 +287,20 @@ describe("Freebuff SSE → OpenAI — end-to-end via FakeEventSource", () => {
     assert.deepEqual(order.slice(0, 2), ["reasoning", "content"]);
   });
 
-  test("tool calls are delivered as a tool_calls delta on the first message", async () => {
+  test("tool_calls deltas are delivered verbatim", async () => {
     const stream = streamFromString(
-      'event: tool-call\ndata: {"toolCallId":"tc1","toolName":"read_file","input":{"path":"/tmp"}}\n\n' +
-        "event: prompt-response\ndata: {}\n\n",
+      chunk({
+        delta: {
+          tool_calls: [
+            {
+              index: 0,
+              id: "tc1",
+              type: "function",
+              function: { name: "read_file", arguments: '{"path":"/tmp"}' },
+            },
+          ],
+        },
+      }) + chunk({ delta: {}, finish_reason: "tool_calls" }),
     );
     const es = new FakeEventSource(
       stream.pipeThrough(createTransformer("openai", { model: "glm-5.2" })),
@@ -296,9 +329,13 @@ describe("Freebuff SSE → OpenAI — end-to-end via FakeEventSource", () => {
     assert.equal(tail.choices[0].finish_reason, "tool_calls");
   });
 
-  test("country_blocked error fires onerror with a friendly payload", async () => {
+  test("upstream error envelope fires onerror with the raw payload", async () => {
+    // The upstream now emits standard OpenAI error envelopes. The
+    // passthrough relays them unchanged — no sanitization.
     const stream = streamFromString(
-      'event: prompt-error\ndata: {"code":"country_blocked","message":"raw","countryBlockReason":"FR"}\n\n',
+      `data: ${JSON.stringify({
+        error: { message: "raw upstream detail", type: "upstream_error", code: "rate_limited" },
+      })}\n\n`,
     );
     const es = new FakeEventSource(
       stream.pipeThrough(createTransformer("openai", { model: "glm-5.2" })),
@@ -308,17 +345,15 @@ describe("Freebuff SSE → OpenAI — end-to-end via FakeEventSource", () => {
 
     assert.equal(es.errors.length, 1, "exactly one error should fire");
     const err = es.errors[0] as { type: string; message: string };
-    assert.equal(err.type, "country_blocked");
-    assert.match(err.message, /region/);
-    assert.doesNotMatch(err.message, /raw/);
+    assert.equal(err.type, "upstream_error");
+    assert.equal(err.message, "raw upstream detail");
     // No assistant content reached the consumer.
     assert.equal(es.messages.length, 0);
   });
 
   test("the done marker is suppressed and does not produce a message", async () => {
     const stream = streamFromString(
-      'event: response-chunk\ndata: {"text":"x"}\n\n' +
-        "event: prompt-response\ndata: {}\n\n",
+      chunk({ delta: { content: "x" } }) + chunk({ delta: {}, finish_reason: "stop" }),
     );
     const es = new FakeEventSource(
       stream.pipeThrough(createTransformer("openai", { model: "glm-5.2" })),
@@ -332,29 +367,11 @@ describe("Freebuff SSE → OpenAI — end-to-end via FakeEventSource", () => {
     }
   });
 
-  test("subagent chunks are dropped unless includeSubagentOutput is set", async () => {
+  test("includeSubagentOutput does not alter the output stream", async () => {
+    // The passthrough ignores includeSubagentOutput — the upstream already
+    // decides what to emit. We verify the flag is accepted without effect.
     const stream = streamFromString(
-      'event: subagent-response-chunk\ndata: {"agentId":"a1","text":"hidden"}\n\n' +
-        'event: response-chunk\ndata: {"text":"visible"}\n\n' +
-        "event: prompt-response\ndata: {}\n\n",
-    );
-    const es = new FakeEventSource(
-      stream.pipeThrough(createTransformer("openai", { model: "glm-5.2" })),
-    );
-
-    while (!es.ended) await new Promise((r) => setTimeout(r, 1));
-
-    type Chunk = { choices: Array<{ delta: { content?: string } }> };
-    const text = es.messages
-      .map((m) => (m as Chunk).choices[0].delta.content ?? "")
-      .join("");
-    assert.equal(text, "visible");
-  });
-
-  test("subagent chunks surface as bracketed content when opted in", async () => {
-    const stream = streamFromString(
-      'event: subagent-response-chunk\ndata: {"agentId":"a1","text":"trace"}\n\n' +
-        "event: prompt-response\ndata: {}\n\n",
+      chunk({ delta: { content: "visible" } }) + chunk({ delta: {}, finish_reason: "stop" }),
     );
     const es = new FakeEventSource(
       stream.pipeThrough(
@@ -368,7 +385,7 @@ describe("Freebuff SSE → OpenAI — end-to-end via FakeEventSource", () => {
     const text = es.messages
       .map((m) => (m as Chunk).choices[0].delta.content ?? "")
       .join("");
-    assert.equal(text, "[sub-agent:a1] trace");
+    assert.equal(text, "visible");
   });
 });
 
@@ -378,12 +395,12 @@ describe("Freebuff SSE → OpenAI — end-to-end via FakeEventSource", () => {
 // as the onmessage/onerror properties.
 // ---------------------------------------------------------------------------
 
-describe("Freebuff SSE → OpenAI — addEventListener parity", () => {
+describe("OpenAI SSE → passthrough — addEventListener parity", () => {
   test("addEventListener('message') receives every onmessage payload", async () => {
     const stream = streamFromString(
-      'event: response-chunk\ndata: {"text":"alpha"}\n\n' +
-        'event: response-chunk\ndata: {"text":"beta"}\n\n' +
-        "event: prompt-response\ndata: {}\n\n",
+      chunk({ id: "a", delta: { content: "alpha" } }) +
+        chunk({ id: "b", delta: { content: "beta" } }) +
+        chunk({ delta: {}, finish_reason: "stop" }),
     );
     const es = new FakeEventSource(
       stream.pipeThrough(createTransformer("openai", { model: "glm-5.2" })),
@@ -402,7 +419,9 @@ describe("Freebuff SSE → OpenAI — addEventListener parity", () => {
 
   test("addEventListener('error') fires for OpenAI error envelopes", async () => {
     const stream = streamFromString(
-      'event: prompt-error\ndata: {"code":"rate_limited","message":"x"}\n\n',
+      `data: ${JSON.stringify({
+        error: { message: "rate_limited", type: "rate_limit_error" },
+      })}\n\n`,
     );
     const es = new FakeEventSource(
       stream.pipeThrough(createTransformer("openai", { model: "glm-5.2" })),
@@ -419,8 +438,7 @@ describe("Freebuff SSE → OpenAI — addEventListener parity", () => {
 
   test("removeEventListener detaches a handler", async () => {
     const stream = streamFromString(
-      'event: response-chunk\ndata: {"text":"x"}\n\n' +
-        "event: prompt-response\ndata: {}\n\n",
+      chunk({ delta: { content: "x" } }) + chunk({ delta: {}, finish_reason: "stop" }),
     );
     const es = new FakeEventSource(
       stream.pipeThrough(createTransformer("openai", { model: "glm-5.2" })),
@@ -438,21 +456,23 @@ describe("Freebuff SSE → OpenAI — addEventListener parity", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Partial-chunk resilience — the upstream may split a single SSE event
-// across multiple network reads. The transformer must reassemble it
-// before exposing anything to the FakeEventSource.
+// Partial-chunk resilience — the upstream may split a single SSE frame
+// across multiple network reads. The passthrough must preserve byte order
+// so the consumer reassembles correctly.
 // ---------------------------------------------------------------------------
 
-describe("Freebuff SSE → OpenAI — partial chunk reassembly", () => {
-  test("a Codebuff event split across two reads is reassembled into one OpenAI chunk", async () => {
+describe("OpenAI SSE → passthrough — partial chunk reassembly", () => {
+  test("a frame split across two reads is reassembled into one chunk", async () => {
     const encoder = new TextEncoder();
     const transformer = createTransformer("openai", { model: "glm-5.2" });
 
+    const full = chunk({ delta: { content: "split" } });
+    const midpoint = Math.floor(full.length / 2);
+
     const source = new ReadableStream<Uint8Array>({
       start(controller) {
-        controller.enqueue(encoder.encode('event: response-chunk\ndata: {"tex'));
-        controller.enqueue(encoder.encode('t":"split"}\n\n'));
-        controller.enqueue(encoder.encode("event: prompt-response\ndata: {}\n\n"));
+        controller.enqueue(encoder.encode(full.slice(0, midpoint)));
+        controller.enqueue(encoder.encode(full.slice(midpoint)));
         controller.close();
       },
     });
@@ -467,15 +487,17 @@ describe("Freebuff SSE → OpenAI — partial chunk reassembly", () => {
     assert.equal(text, "split");
   });
 
-  test("a Codebuff event split mid-data-line is reassembled correctly", async () => {
+  test("a frame split mid-data-line is reassembled correctly", async () => {
     const encoder = new TextEncoder();
     const transformer = createTransformer("openai", { model: "glm-5.2" });
 
+    const full = chunk({ delta: { content: "hello world" } });
+    const splitPoint = full.indexOf('"hello');
+
     const source = new ReadableStream<Uint8Array>({
       start(controller) {
-        controller.enqueue(encoder.encode('event: response-chunk\ndata: {"text":'));
-        controller.enqueue(encoder.encode('"hello world"}\n\n'));
-        controller.enqueue(encoder.encode("event: prompt-response\ndata: {}\n\n"));
+        controller.enqueue(encoder.encode(full.slice(0, splitPoint)));
+        controller.enqueue(encoder.encode(full.slice(splitPoint)));
         controller.close();
       },
     });
@@ -497,11 +519,10 @@ describe("Freebuff SSE → OpenAI — partial chunk reassembly", () => {
 // marks itself CLOSED); this test guards the public-API contract.
 // ---------------------------------------------------------------------------
 
-describe("Freebuff SSE → OpenAI — close()", () => {
+describe("OpenAI SSE → passthrough — close()", () => {
   test("readyState becomes CLOSED after close() and stays there", async () => {
     const stream = streamFromString(
-      'event: response-chunk\ndata: {"text":"x"}\n\n' +
-        "event: prompt-response\ndata: {}\n\n",
+      chunk({ delta: { content: "x" } }) + chunk({ delta: {}, finish_reason: "stop" }),
     );
     const es = new FakeEventSource(
       stream.pipeThrough(createTransformer("openai", { model: "glm-5.2" })),
