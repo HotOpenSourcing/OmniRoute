@@ -393,16 +393,18 @@ export const freebuffSessionServerResponseSchema = z.discriminatedUnion(
       model: z.string().min(1),
       admittedAt: z.string().datetime(),
       expiresAt: z.string().datetime(),
-      remainingMs: z.number().int().nonnegative(),
+      remainingMs: z.number().nonnegative(),
       rateLimit: z
         .object({
           model: z.string(),
-          limit: z.number().int().nonnegative(),
+          limit: z.number().nonnegative(),
           period: z.enum(["pacific_day", "pacific_week"]),
           resetTimeZone: z.string(),
           resetAt: z.string().datetime(),
-          windowHours: z.number().int().nonnegative().optional(),
-          recentCount: z.number().int().nonnegative(),
+          windowHours: z.number().nonnegative().optional(),
+          // Upstream sends fractional values (e.g. 2.1) — accept any
+          // non-negative number, not just integers.
+          recentCount: z.number().nonnegative(),
         })
         .optional(),
     }),
