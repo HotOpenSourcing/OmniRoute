@@ -122,6 +122,41 @@ is fetched on demand — click **Refresh**.
   quota. If you hit `429`, OmniRoute surfaces the error to the client
   without retrying.
 
+## Known Issues
+
+### Empty Output Error
+
+**Symptom**: The model returns an error stating:
+```
+model output error: model output must contain either output text or tool calls, these cannot both be empty, please try again
+```
+
+**Cause**: The upstream Freebuff model fails to produce any usable output (no text content and no tool calls). This is typically a model-level issue rather than a client error.
+
+**Handling**: OmniRoute automatically detects this error as **non-retryable** and immediately falls back to the next model in the combo chain. The error is detected at multiple levels:
+
+1. **Early Detection** (`emulateChat.ts`): Peeks at the first 8KB of the stream to detect the error before processing
+2. **Stream Readiness** (`streamReadiness.ts`): Short-circuits if the error pattern is found in the SSE stream
+3. **Error Classification** (`errorClassifier.ts`): Classifies as `EMPTY_OUTPUT` (HTTP 502, non-retryable)
+
+**Fallback Behavior**:
+- ❌ No retry on the same model (would fail again)
+- ✅ Immediate fallback to next model in combo
+- ✅ Fast failure (<1s instead of 80s timeout)
+
+**Debug Logging**: Set `FREEBUFF_DEBUG=1` to enable diagnostic logging:
+```bash
+export FREEBUFF_DEBUG=1  # Linux/macOS
+$env:FREEBUFF_DEBUG="1"  # PowerShell
+```
+
+This will log:
+- Request envelope sent to upstream
+- Response status codes
+- Early detection results
+- Stream reconstruction details
+
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |

@@ -1,4 +1,5 @@
 import { HTTP_STATUS } from "../config/constants.ts";
+import { EMPTY_OUTPUT_REGEX } from "../services/errorClassifier.ts";
 
 type StreamReadinessLogger = {
   debug?: (tag: string, message: string) => void;
@@ -364,6 +365,31 @@ export async function ensureStreamReadiness(
       if (!readResult.value) continue;
       chunks.push(readResult.value);
       const decodedChunk = decoder.decode(readResult.value, { stream: true });
+
+      // Short-circuit: if the upstream explicitly returned an "empty output"
+      // error (e.g. Freebuff: "model output must contain either output text
+      // or tool calls"), bail out of the readiness loop immediately rather
+      // than waiting for the full timeout. The error is non-retryable.
+      if (EMPTY_OUTPUT_REGEX.test(decodedChunk)) {
+        const reason = "Upstream returned an empty-output error";
+        options.log?.warn?.(
+          "STREAM",
+          `${reason} (${options.provider || "provider"}/${options.model || "unknown"}): ${decodedChunk.slice(0, 200)}`
+        );
+        await reader.cancel(reason).catch(() => {});
+        return {
+          ok: false,
+          reason,
+          code: "EMPTY_OUTPUT",
+          type: "empty_output",
+          response: createErrorResponse(
+            HTTP_STATUS.BAD_GATEWAY,
+            reason,
+            "EMPTY_OUTPUT",
+            "empty_output"
+          ),
+        };
+      }
 
       if (appendStreamReadinessSignal(readinessState, decodedChunk)) {
         options.log?.debug?.(

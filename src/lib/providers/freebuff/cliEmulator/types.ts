@@ -339,6 +339,25 @@ export class FreebuffModelLockedError extends FreebuffError {
 }
 
 /**
+ * The upstream model produced no usable output (no text, no tool calls).
+ * This is the "model output must contain either output text or tool calls"
+ * error from the upstream. Non-retryable — the fallback chain should skip
+ * to the next candidate model instead of retrying the same one.
+ */
+export class FreebuffEmptyOutputError extends FreebuffError {
+  readonly code = "empty_output";
+  readonly httpStatus = 502;
+  readonly retryable = false;
+  constructor(
+    message = "Freebuff model produced no output",
+    public readonly model?: string,
+  ) {
+    super(message);
+    this.name = "FreebuffEmptyOutputError";
+  }
+}
+
+/**
  * The session acquisition failed for an unknown reason.
  */
 export class FreebuffSessionError extends FreebuffError {

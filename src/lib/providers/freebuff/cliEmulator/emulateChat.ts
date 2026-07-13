@@ -39,6 +39,7 @@ import type {
 import {
   FreebuffAuthError,
   FreebuffCountryBlockedError,
+  FreebuffEmptyOutputError,
   FreebuffSessionError,
 } from "./types.ts";
 import { createHttpClient } from "./httpClient.ts";
@@ -49,6 +50,84 @@ import { buildFallbackChain, classifyError, nextCandidate, type FallbackCandidat
 import { getModelDescriptor, stripProviderPrefix } from "./modelRegistry.ts";
 import { resolveFreebuffBaseUrl } from "../base.ts";
 import { createTransformer, type TransformerFormat } from "../stream/index.ts";
+import { EMPTY_OUTPUT_REGEX } from "../../../../../open-sse/services/errorClassifier.ts";
+
+/**
+ * Peek the first bytes of an upstream SSE stream to detect an early
+ * empty-output error. Returns the error message + buffered chunks if
+ * detected (so the caller can rebuild the stream), otherwise null.
+ * @internal - Exported for testing only
+ */
+export async function peekEmptyOutputError(
+  body: ReadableStream<Uint8Array>,
+): Promise<{ message: string | null; buffered: Uint8Array[] }> {
+  const reader = body.getReader();
+  const buffered: Uint8Array[] = [];
+  const decoder = new TextDecoder();
+  let sniffed = "";
+  const maxBytes = 8192;
+  let total = 0;
+
+  try {
+    while (total < maxBytes) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      buffered.push(value);
+      total += value.byteLength;
+      sniffed += decoder.decode(value, { stream: true });
+      if (EMPTY_OUTPUT_REGEX.test(sniffed)) {
+        // Extract the error message — usually wrapped in a "data:" SSE frame.
+        const match =
+          sniffed.match(/data:\s*(\{.*?"message"\s*:\s*"[^"]*empty[^"]*".*?\})/i) ??
+          sniffed.match(/(model output error:[^"\\]*)/i);
+        return { message: match?.[1] ?? match?.[0] ?? "empty_output", buffered };
+      }
+    }
+  } catch {
+    return { message: null, buffered };
+  } finally {
+    reader.releaseLock();
+  }
+
+  // No empty-output error detected — caller must rebuild the stream from buffered chunks.
+  return { message: null, buffered };
+}
+
+/**
+ * Rebuild a ReadableStream from buffered chunks + the original stream.
+ * Used after peekEmptyOutputError to restore the stream for downstream consumers.
+ * @internal - Exported for testing only
+ */
+export function rebuildStream(
+  buffered: Uint8Array[],
+  original: ReadableStream<Uint8Array>,
+): ReadableStream<Uint8Array> {
+  let index = 0;
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      if (index < buffered.length) {
+        controller.enqueue(buffered[index++]!);
+        return;
+      }
+      const reader = original.getReader();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            controller.close();
+            return;
+          }
+          if (value) controller.enqueue(value);
+        }
+      } catch (err) {
+        controller.error(err);
+      } finally {
+        reader.releaseLock();
+      }
+    },
+  });
+}
 
 /**
  * Options for `emulateChat()`. Extends `FreebuffChatInput` with
@@ -249,13 +328,62 @@ async function attemptChat(
     options.signal,
   );
 
+  // Diagnostic: log envelope + upstream status for debugging empty-output loops.
+  // #freebuff-empty-output — when the upstream returns 200 with a stream that
+  // closes immediately with "model output must contain either output text or
+  // tool calls", we need to see exactly what envelope we sent and what the
+  // upstream responded with to determine if the issue is on our side.
+  if (process.env.FREEBUFF_DEBUG === "1") {
+    try {
+      // eslint-disable-next-line no-console
+      console.log("[freebuff-debug] envelope keys:", Object.keys(envelope as object).join(","));
+      // eslint-disable-next-line no-console
+      console.log(
+        "[freebuff-debug] envelope.model:",
+        (envelope as { model?: string })?.model,
+        "agent:",
+        (envelope as { agent?: string })?.agent,
+        "runId:",
+        (envelope as { runId?: string })?.runId
+      );
+      // eslint-disable-next-line no-console
+      console.log("[freebuff-debug] upstream status:", upstream.status, "content-type:", upstream.headers.get("content-type"));
+    } catch {
+      /* ignore logging errors */
+    }
+  }
+
   if (!upstream.ok || !upstream.body) {
     const bodyText = await upstream.text().catch(() => "");
+    if (process.env.FREEBUFF_DEBUG === "1") {
+      // eslint-disable-next-line no-console
+      console.log("[freebuff-debug] upstream non-ok body:", bodyText.slice(0, 500));
+    }
     throw new FreebuffSessionError(
       `Freebuff chat returned HTTP ${upstream.status}: ${bodyText.slice(0, 200)}`,
       upstream.status,
       bodyText.slice(0, 500),
     );
+  }
+
+  // Peek the first bytes to detect an early empty-output error from the upstream.
+  // If detected, throw a typed error so the fallback chain can skip to the next
+  // candidate instead of waiting for the readiness timeout.
+  const peekResult = await peekEmptyOutputError(upstream.body);
+  if (peekResult.message) {
+    if (process.env.FREEBUFF_DEBUG === "1") {
+      // eslint-disable-next-line no-console
+      console.log("[freebuff-debug] detected empty-output error early:", peekResult.message.slice(0, 300));
+    }
+    throw new FreebuffEmptyOutputError(peekResult.message, candidate.model.id);
+  }
+
+  // No empty-output error detected — rebuild the stream from buffered chunks
+  // so the downstream transformer can consume it from the start.
+  if (peekResult.buffered.length > 0) {
+    const rebuilt = rebuildStream(peekResult.buffered, upstream.body);
+    // Mutate the response-like wrapper so the pipe below sees the rebuilt stream.
+    (upstream as { body: ReadableStream<Uint8Array> }).body = rebuilt;
   }
 
   // 5. Pipe the upstream SSE stream through the caller's transformer.
