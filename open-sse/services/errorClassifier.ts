@@ -77,6 +77,13 @@ export const PROVIDER_ERROR_TYPES = {
   CONTEXT_OVERFLOW: "context_overflow",
   OAUTH_INVALID_TOKEN: "oauth_invalid_token",
   EMPTY_CONTENT: "empty_content",
+  /**
+   * Upstream explicitly returned a "model produced no output" error (e.g.
+   * Freebuff: "model output must contain either output text or tool calls").
+   * Non-retryable: retrying the exact same request will produce the same
+   * upstream error. The client should reformulate the prompt or switch model.
+   */
+  EMPTY_OUTPUT: "empty_output",
   MODEL_NOT_FOUND: "model_not_found",
 };
 
@@ -98,6 +105,29 @@ export const CONTEXT_OVERFLOW_REGEX = new RegExp(CONTEXT_OVERFLOW_SIGNALS.join("
 
 export function isContextOverflow(errorText: string): boolean {
   return CONTEXT_OVERFLOW_REGEX.test(String(errorText || ""));
+}
+
+/**
+ * Signals emitted by upstreams when the model produced no usable output
+ * (no text, no tool calls). The request itself is well-formed — the upstream
+ * LLM just returned an empty / malformed completion. Non-retryable as-is.
+ */
+export const EMPTY_OUTPUT_SIGNALS = [
+  "model output must contain either output text or tool calls",
+  "model output error: model output must contain",
+  "no output generated",
+  "empty completion",
+  "model returned no content",
+];
+
+export const EMPTY_OUTPUT_REGEX = new RegExp(EMPTY_OUTPUT_SIGNALS.map(escapeRegex).join("|"), "i");
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function isEmptyOutputError(errorText: string): boolean {
+  return EMPTY_OUTPUT_REGEX.test(String(errorText || ""));
 }
 
 // Matches phrasing like `Model minimax-m3-free is not supported` or
@@ -259,6 +289,10 @@ export function classifyProviderError(
     }
     return PROVIDER_ERROR_TYPES.FORBIDDEN;
   }
+  if (isEmptyOutputError(bodyStr)) {
+    return PROVIDER_ERROR_TYPES.EMPTY_OUTPUT;
+  }
+
   if (statusCode >= 500) return PROVIDER_ERROR_TYPES.SERVER_ERROR;
 
   if (statusCode === 400) {
