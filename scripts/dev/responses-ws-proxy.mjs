@@ -29,6 +29,25 @@ const INTERNAL_ROUTE = "/api/internal/codex-responses-ws";
 const WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 const WS_QUERY_TOKEN_KEYS = ["api_key", "token", "access_token"];
 const textDecoder = new TextDecoder();
+const DEFAULT_MAX_WS_BUFFER_BYTES = 16 * 1024 * 1024;
+const DEFAULT_MAX_WS_MESSAGE_BYTES = 16 * 1024 * 1024;
+// #7388: sentinel turn key for session-ending terminal events that don't carry
+// a `response.id` (prepare failure, upstream error/close, connect failure).
+const SESSION_TERMINAL_TURN_KEY = "__session_terminal__";
+
+class WebSocketInputTooLargeError extends Error {
+  constructor(message, reason = "message_too_large") {
+    super(message);
+    this.name = "WebSocketInputTooLargeError";
+    this.closeCode = 1009;
+    this.reason = reason;
+  }
+}
+
+function normalizePositiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
 
 function isText(value) {
   return typeof value === "string" && value.length > 0;
@@ -167,7 +186,10 @@ export function encodeWsFrame(opcode, payload = Buffer.alloc(0)) {
   return Buffer.concat([header, payloadBuffer]);
 }
 
-export function decodeClientFrames(buffer) {
+export function decodeClientFrames(
+  buffer,
+  { maxPayloadBytes = DEFAULT_MAX_WS_MESSAGE_BYTES } = {}
+) {
   const frames = [];
   let offset = 0;
 
@@ -192,10 +214,14 @@ export function decodeClientFrames(buffer) {
       if (buffer.length - offset < 10) break;
       const bigLength = buffer.readBigUInt64BE(offset + 2);
       if (bigLength > BigInt(Number.MAX_SAFE_INTEGER)) {
-        throw new Error("WebSocket payload too large");
+        throw new WebSocketInputTooLargeError("WebSocket payload too large");
       }
       payloadLength = Number(bigLength);
       headerLength = 10;
+    }
+
+    if (payloadLength > maxPayloadBytes) {
+      throw new WebSocketInputTooLargeError("WebSocket payload exceeds configured limit");
     }
 
     const totalLength = headerLength + 4 + payloadLength;
@@ -366,6 +392,8 @@ class ResponsesWsSession {
     wsFactory,
     pingIntervalMs,
     idleTimeoutMs,
+    maxBufferBytes,
+    maxMessageBytes,
   }) {
     this.baseUrl = baseUrl;
     this.bridgeSecret = bridgeSecret;
@@ -376,17 +404,29 @@ class ResponsesWsSession {
     this.wsFactory = wsFactory;
     this.pingIntervalMs = pingIntervalMs;
     this.idleTimeoutMs = idleTimeoutMs;
+    this.maxBufferBytes = normalizePositiveInteger(maxBufferBytes, DEFAULT_MAX_WS_BUFFER_BYTES);
+    this.maxMessageBytes = normalizePositiveInteger(maxMessageBytes, DEFAULT_MAX_WS_MESSAGE_BYTES);
     this.sessionId = randomUUID();
     this.startedAt = Date.now();
     this.closed = false;
     this.buffer = Buffer.alloc(0);
     this.fragmentOpcode = null;
     this.fragmentParts = [];
+    this.fragmentBytes = 0;
+    this.processing = Promise.resolve();
     this.upstream = null;
     this.upstreamReady = null;
     this.firstResponseBody = null;
+    this.currentRequestBody = null;
     this.preparedContext = null;
-    this.historyLogged = false;
+    // #7388: logging must be scoped per logical turn (one `response.create`
+    // through its terminal event), not once for the lifetime of the WS
+    // connection — a single boolean here silently dropped every turn after
+    // the first on a reused connection. Terminal events carry a
+    // `response.id` we can key on; session-ending failure paths (prepare
+    // failure, upstream error/close, connect failure) don't, so they fall
+    // back to a session-scoped sentinel key that still logs exactly once.
+    this.loggedTurnIds = new Set();
     this.lastSeenAt = Date.now();
 
     this.pingTimer = setInterval(() => {
@@ -400,18 +440,35 @@ class ResponsesWsSession {
     }, this.pingIntervalMs);
 
     this.socket.setNoDelay(true);
-    this.socket.on("data", (chunk) => {
-      this.onData(chunk).catch((error) => {
-        this.sendFailure(
-          "frame_decode_failed",
-          error instanceof Error ? error.message : String(error)
-        );
-        this.close(1011, "frame_decode_failed");
-      });
-    });
+    this.socket.on("data", (chunk) => this.enqueueData(chunk));
     this.socket.on("close", () => this.dispose());
     this.socket.on("end", () => this.dispose());
     this.socket.on("error", () => this.dispose());
+  }
+
+  enqueueData(chunk) {
+    this.processing = this.processing
+      .then(() => this.onData(chunk))
+      .catch((error) => {
+        if (this.closed) return;
+        const isTooLarge =
+          error instanceof WebSocketInputTooLargeError || error?.closeCode === 1009;
+        this.sendFailure(
+          isTooLarge ? "message_too_large" : "frame_decode_failed",
+          error instanceof Error ? error.message : String(error)
+        );
+        this.close(
+          isTooLarge ? 1009 : 1011,
+          isTooLarge ? error.reason || "message_too_large" : "frame_decode_failed"
+        );
+      });
+  }
+
+  cleanupBuffers() {
+    this.buffer = Buffer.alloc(0);
+    this.fragmentOpcode = null;
+    this.fragmentParts = [];
+    this.fragmentBytes = 0;
   }
 
   sendFrame(opcode, payload) {
@@ -430,12 +487,21 @@ class ResponsesWsSession {
   }
 
   async onData(chunk) {
+    if (this.closed) return;
     this.lastSeenAt = Date.now();
+    if (this.buffer.length + chunk.length > this.maxBufferBytes) {
+      throw new WebSocketInputTooLargeError("WebSocket input buffer exceeds configured limit");
+    }
     this.buffer = Buffer.concat([this.buffer, chunk]);
-    const parsed = decodeClientFrames(this.buffer);
+    const parsed = decodeClientFrames(this.buffer, { maxPayloadBytes: this.maxMessageBytes });
     this.buffer = parsed.remaining;
 
+    if (this.buffer.length > this.maxBufferBytes) {
+      throw new WebSocketInputTooLargeError("WebSocket input buffer exceeds configured limit");
+    }
+
     for (const frame of parsed.frames) {
+      if (this.closed) return;
       await this.handleFrame(frame);
     }
   }
@@ -447,12 +513,19 @@ class ResponsesWsSession {
           this.sendFailure("unexpected_continuation", "Unexpected continuation frame");
           return;
         }
+        this.fragmentBytes += frame.payload.length;
+        if (this.fragmentBytes > this.maxMessageBytes) {
+          throw new WebSocketInputTooLargeError(
+            "Fragmented WebSocket message exceeds configured limit"
+          );
+        }
         this.fragmentParts.push(frame.payload);
         if (frame.fin) {
           const payload = Buffer.concat(this.fragmentParts);
           const opcode = this.fragmentOpcode;
           this.fragmentOpcode = null;
           this.fragmentParts = [];
+          this.fragmentBytes = 0;
           await this.handleDataFrame(opcode, payload);
         }
         return;
@@ -461,6 +534,12 @@ class ResponsesWsSession {
         if (!frame.fin) {
           this.fragmentOpcode = frame.opcode;
           this.fragmentParts = [frame.payload];
+          this.fragmentBytes = frame.payload.length;
+          if (this.fragmentBytes > this.maxMessageBytes) {
+            throw new WebSocketInputTooLargeError(
+              "Fragmented WebSocket message exceeds configured limit"
+            );
+          }
           return;
         }
         await this.handleDataFrame(frame.opcode, frame.payload);
@@ -480,6 +559,9 @@ class ResponsesWsSession {
   }
 
   async handleDataFrame(opcode, payload) {
+    if (payload.length > this.maxMessageBytes) {
+      throw new WebSocketInputTooLargeError("WebSocket message exceeds configured limit");
+    }
     if (opcode !== 0x1) {
       this.sendFailure("unsupported_payload", "Only UTF-8 text messages are supported");
       return;
@@ -497,6 +579,52 @@ class ResponsesWsSession {
     await this.forwardClientMessage(message);
   }
 
+  // #8052: shared by ensureUpstream() (first turn — also owns socket creation) and
+  // forwardClientMessage() (subsequent turns on a reused connection). Calls the internal
+  // "prepare" action — auth/policy/memory/reasoning-routing/compression — and refreshes
+  // preparedContext, but never touches this.upstream/this.upstreamReady; the caller decides
+  // whether a new upstream socket is needed.
+  async runPrepare(message, responseBody) {
+    const prepared = await callInternal(this.fetchImpl, this.baseUrl, this.bridgeSecret, "prepare", {
+      requestUrl: this.requestUrl,
+      headers: getAuthHeaders(this.requestUrl, this.requestHeaders),
+      message,
+      response: responseBody,
+    });
+
+    if (!prepared.ok) {
+      const message2 =
+        prepared.json?.error?.message ||
+        prepared.json?.message ||
+        prepared.text ||
+        "Codex WS prepare failed";
+      const code = prepared.json?.error?.code || "codex_ws_prepare_failed";
+      const error = new Error(message2);
+      error.code = code;
+      error.status = prepared.status;
+      throw error;
+    }
+
+    this.preparedContext = {
+      upstreamUrl: toStringOrNull(prepared.json?.upstreamUrl),
+      connectionId: toStringOrNull(prepared.json?.connectionId),
+      account: toStringOrNull(prepared.json?.account),
+      provider: toStringOrNull(prepared.json?.provider) || "codex",
+      model: toStringOrNull(prepared.json?.model) || toStringOrNull(responseBody.model),
+      requestedModel: toStringOrNull(responseBody.model),
+      reasoningRouting:
+        prepared.json?.reasoningRouting &&
+        typeof prepared.json.reasoningRouting === "object" &&
+        !Array.isArray(prepared.json.reasoningRouting)
+          ? prepared.json.reasoningRouting
+          : null,
+      serviceTier:
+        toStringOrNull(responseBody.service_tier) || toStringOrNull(responseBody.serviceTier),
+    };
+
+    return prepared;
+  }
+
   async ensureUpstream(firstMessage) {
     if (this.upstreamReady) return this.upstreamReady;
 
@@ -506,49 +634,21 @@ class ResponsesWsSession {
         throw new Error("First Responses WebSocket message must be response.create");
       }
       this.firstResponseBody ||= responseBody;
+      this.currentRequestBody = responseBody;
 
-      const prepared = await callInternal(
-        this.fetchImpl,
-        this.baseUrl,
-        this.bridgeSecret,
-        "prepare",
-        {
-          requestUrl: this.requestUrl,
-          headers: getAuthHeaders(this.requestUrl, this.requestHeaders),
-          message: firstMessage,
-          response: responseBody,
-        }
-      );
+      const prepared = await this.runPrepare(firstMessage, responseBody);
 
-      if (!prepared.ok) {
-        const message =
-          prepared.json?.error?.message ||
-          prepared.json?.message ||
-          prepared.text ||
-          "Codex WS prepare failed";
-        const code = prepared.json?.error?.code || "codex_ws_prepare_failed";
-        const error = new Error(message);
-        error.code = code;
-        error.status = prepared.status;
-        throw error;
-      }
-
-      this.preparedContext = {
-        upstreamUrl: toStringOrNull(prepared.json?.upstreamUrl),
-        connectionId: toStringOrNull(prepared.json?.connectionId),
-        account: toStringOrNull(prepared.json?.account),
-        provider: toStringOrNull(prepared.json?.provider) || "codex",
-        model: toStringOrNull(prepared.json?.model) || toStringOrNull(responseBody.model),
-        requestedModel: toStringOrNull(responseBody.model),
-        serviceTier:
-          toStringOrNull(responseBody.service_tier) || toStringOrNull(responseBody.serviceTier),
-      };
-
-      const upstream = await this.wsFactory(prepared.json.upstreamUrl, {
-        browser: prepared.json.browser || "chrome_149",
+      const wsOptions = {
+        // #5591: chrome_149 is not a wreq-js 2.3.1 profile (max chrome_147); the
+        // prepare route now sends chrome_142, this fallback matches it.
+        browser: prepared.json.browser || "chrome_142",
         os: prepared.json.os || "windows",
         headers: prepared.json.headers || {},
-      });
+      };
+      // #5611: forward the configured proxy so the upstream WS connect honors the
+      // Proxy Registry in no-direct-egress deployments.
+      if (prepared.json.proxy) wsOptions.proxy = prepared.json.proxy;
+      const upstream = await this.wsFactory(prepared.json.upstreamUrl, wsOptions);
 
       upstream.onmessage = (event) => {
         if (this.closed) return;
@@ -604,6 +704,21 @@ class ResponsesWsSession {
         upstream.send(jsonStringifySafe(firstMessage));
         return;
       }
+      // #7388: a reused WS connection forwards subsequent response.create
+      // turns straight through (ensureUpstream() only runs once); track each
+      // turn's own request body so persistHistory() attaches the right
+      // clientRequest instead of always the first turn's.
+      const nextTurnBody = getResponseCreatePayload(message);
+      if (nextTurnBody !== null) {
+        this.currentRequestBody = nextTurnBody;
+        // #8052: a reused connection must re-run "prepare" (auth/policy/memory/
+        // reasoning-routing/compression) for every logical turn, not just the first —
+        // otherwise every turn after the first bypasses the whole pipeline. This reuses
+        // the already-established upstream transport; it must NOT recreate the socket.
+        const prepared = await this.runPrepare(message, nextTurnBody);
+        this.upstream.send(jsonStringifySafe(withPreparedResponseCreate(message, prepared.json.response)));
+        return;
+      }
       this.upstream.send(jsonStringifySafe(message));
     } catch (error) {
       const code = error?.code || "upstream_websocket_connect_failed";
@@ -628,8 +743,17 @@ class ResponsesWsSession {
     terminalMessage = null,
     responseBody = null,
   } = {}) {
-    if (this.historyLogged || !this.firstResponseBody) return;
-    this.historyLogged = true;
+    if (!this.firstResponseBody) return;
+    // #7388: key the "already logged" guard per logical turn instead of once
+    // per WS connection. Terminal events from a real response carry
+    // `response.id` — use it so each turn on a reused connection logs
+    // independently, while the same id firing twice (retries) still logs
+    // exactly once. Session-ending failure paths (prepare failure, upstream
+    // error/close, connect failure) don't carry a response id — they end the
+    // session, so they share one sentinel key and still log exactly once.
+    const turnId = toStringOrNull(terminalMessage?.response?.id) || SESSION_TERMINAL_TURN_KEY;
+    if (this.loggedTurnIds.has(turnId)) return;
+    this.loggedTurnIds.add(turnId);
 
     const finishedAt = Date.now();
     try {
@@ -646,7 +770,7 @@ class ResponsesWsSession {
         success,
         errorCode,
         errorMessage,
-        clientRequest: this.firstResponseBody,
+        clientRequest: this.currentRequestBody || this.firstResponseBody,
         terminalMessage,
         responseBody,
         sourceFormat: "openai-responses",
@@ -663,6 +787,7 @@ class ResponsesWsSession {
     this.closed = true;
 
     clearInterval(this.pingTimer);
+    this.cleanupBuffers();
     try {
       this.upstream?.close?.(code, reason);
     } catch {
@@ -673,7 +798,9 @@ class ResponsesWsSession {
     const payload = Buffer.allocUnsafe(2 + reasonBuffer.length);
     payload.writeUInt16BE(code, 0);
     reasonBuffer.copy(payload, 2);
-    this.sendFrame(0x8, payload);
+    if (!this.socket.destroyed && this.socket.writable) {
+      this.socket.write(encodeWsFrame(0x8, payload));
+    }
     this.socket.end();
     setTimeout(() => {
       if (!this.socket.destroyed) {
@@ -686,6 +813,7 @@ class ResponsesWsSession {
     if (this.closed) return;
     this.closed = true;
     clearInterval(this.pingTimer);
+    this.cleanupBuffers();
     try {
       this.upstream?.close?.(1000, "downstream_closed");
     } catch {
@@ -701,6 +829,8 @@ export function createResponsesWsProxy({
   wsFactory = getWebSocketTransport(),
   pingIntervalMs = 25000,
   idleTimeoutMs = 90000,
+  maxBufferBytes = DEFAULT_MAX_WS_BUFFER_BYTES,
+  maxMessageBytes = DEFAULT_MAX_WS_MESSAGE_BYTES,
 } = {}) {
   if (!isText(baseUrl)) {
     throw new Error("createResponsesWsProxy requires a baseUrl");
@@ -802,6 +932,8 @@ export function createResponsesWsProxy({
           wsFactory,
           pingIntervalMs,
           idleTimeoutMs,
+          maxBufferBytes,
+          maxMessageBytes,
         });
         return true;
       } catch (error) {

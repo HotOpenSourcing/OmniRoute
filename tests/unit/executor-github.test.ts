@@ -112,6 +112,11 @@ test("GithubExecutor.transformRequest injects JSON response instructions for Cla
         reasoning_text: "internal",
         reasoning_content: "internal",
       },
+      // Trailing user turn: dropTrailingAssistantPrefill (9router#2143) strips a
+      // conversation that ends in "assistant", which would otherwise remove the very
+      // message this test inspects below. Keep the array ending in "user" so this test
+      // stays focused on response_format injection + reasoning-field stripping.
+      { role: "user", content: "thanks" },
     ],
   };
 
@@ -156,7 +161,13 @@ test("GithubExecutor.transformRequest sanitizes Anthropic-shape content parts (t
     ],
   };
 
-  const result = executor.transformRequest("claude-sonnet-4.6", body, true, {});
+  // Use an unregistered claude-* id (not "claude-sonnet-4.6"/etc.) so
+  // getModelTargetFormat("gh", ...) resolves to null and this stays on the
+  // /chat/completions path this test targets. Registered claude-* ids now
+  // carry targetFormat:"claude" (native /v1/messages — port of
+  // decolua/9router#2608, see github-copilot-claude-native-messages.test.ts)
+  // and intentionally skip this sanitization.
+  const result = executor.transformRequest("claude-sonnet-4", body, true, {});
 
   // user message keeps text + image_url parts untouched
   assert.equal(result.messages[0].content[0].type, "text");
@@ -225,6 +236,11 @@ test("GithubExecutor.transformRequest leaves string content and missing content 
         role: "assistant",
         tool_calls: [{ id: "c1", type: "function", function: { name: "f", arguments: "{}" } }],
       },
+      // Trailing tool response: dropTrailingAssistantPrefill (9router#2143) strips a
+      // conversation that ends in "assistant", which would otherwise remove the very
+      // tool_calls message this test inspects below. A real tool round-trip ends in
+      // "tool", not "assistant" — model that shape instead.
+      { role: "tool", tool_call_id: "c1", content: "result" },
     ],
   };
   const result = executor.transformRequest("claude-sonnet-4.6", body, true, {});

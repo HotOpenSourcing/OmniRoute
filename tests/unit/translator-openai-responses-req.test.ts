@@ -360,22 +360,26 @@ test("Chat -> Responses converts messages, tool calls, tool outputs, tools and p
         { type: "input_image", image_url: "https://example.com/cat.png", detail: "high" },
         { type: "input_file", file_data: "abc", filename: "doc.txt" },
       ],
+      status: "completed",
     },
     {
       type: "message",
       role: "assistant",
       content: [{ type: "output_text", text: "Done" }],
+      status: "completed",
     },
     {
       type: "function_call",
       call_id: "call_1",
       name: "read_file",
       arguments: '{"path":"/tmp/a"}',
+      status: "completed",
     },
     {
       type: "function_call_output",
       call_id: "call_1",
       output: [{ type: "input_text", text: "ok" }],
+      status: "completed",
     },
   ]);
   assert.deepEqual((result as any).tools, [
@@ -391,6 +395,81 @@ test("Chat -> Responses converts messages, tool calls, tool outputs, tools and p
   assert.equal((result as any).temperature, 0.2);
   assert.equal((result as any).max_output_tokens, 100);
   assert.equal((result as any).top_p, 0.9);
+});
+
+test("Chat -> Responses converts json_schema response_format to text.format", () => {
+  const schema = {
+    type: "object",
+    additionalProperties: false,
+    properties: { answer: { type: "string" } },
+    required: ["answer"],
+  };
+
+  const result = openaiToOpenAIResponsesRequest(
+    "gpt-5.2-codex",
+    {
+      messages: [{ role: "user", content: "Return the answer as JSON" }],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "answer_schema",
+          description: "A structured answer",
+          strict: true,
+          schema,
+        },
+      },
+    },
+    false,
+    null
+  ) as any;
+
+  assert.deepEqual(result.text, {
+    format: {
+      type: "json_schema",
+      name: "answer_schema",
+      description: "A structured answer",
+      strict: true,
+      schema,
+    },
+  });
+  assert.equal(result.response_format, undefined);
+});
+
+test("Chat -> Responses uses response_format over nonstandard chat text.format", () => {
+  const result = openaiToOpenAIResponsesRequest(
+    "gpt-5.2-codex",
+    {
+      messages: [{ role: "user", content: "Return JSON" }],
+      text: {
+        format: { type: "json_schema", name: "nonstandard", schema: { type: "object" } },
+        verbosity: "low",
+      },
+      response_format: {
+        type: "json_schema",
+        json_schema: { name: "chat", schema: { type: "object", properties: {} } },
+      },
+    },
+    false,
+    null
+  ) as any;
+
+  assert.deepEqual(result.text, {
+    format: { type: "json_schema", name: "chat", schema: { type: "object", properties: {} } },
+  });
+});
+
+test("Chat -> Responses ignores nonstandard chat text.format without response_format", () => {
+  const result = openaiToOpenAIResponsesRequest(
+    "gpt-5.2-codex",
+    {
+      messages: [{ role: "user", content: "Return JSON" }],
+      text: { format: { type: "json_schema", name: "nonstandard", schema: { type: "object" } } },
+    },
+    false,
+    null
+  ) as any;
+
+  assert.equal(result.text, undefined);
 });
 
 test("Responses round-trip preserves store and previous_response_id when opt-in is enabled", () => {
@@ -445,6 +524,7 @@ test("Chat -> Responses converts assistant image_url history parts to output_tex
         { type: "output_text", text: "I inspected the screenshot." },
         { type: "output_text", text: "[Image: https://example.com/scope.png]" },
       ],
+      status: "completed",
     },
   ]);
   assert.equal(JSON.stringify(result).includes('"image_url"'), false);
@@ -524,9 +604,32 @@ test("Chat -> Responses maps reasoning_effort into Responses reasoning", () => {
     null
   );
 
-  assert.deepEqual((result as any).reasoning, { effort: "low" });
+  // Effort-only chat requests now default `summary: "auto"` + the encrypted
+  // reasoning include so Responses-API upstreams stream thinking back to the
+  // chat client (previously the summary was empty and no think was visible).
+  assert.deepEqual((result as any).reasoning, { effort: "low", summary: "auto" });
+  assert.deepEqual((result as Record<string, unknown>).include, ["reasoning.encrypted_content"]);
   assert.equal((result as any).reasoning_effort, undefined);
   assert.equal((result as any).store, false);
+});
+
+test("Chat -> Responses does not default a reasoning summary for reasoning_effort none", () => {
+  const result = openaiToOpenAIResponsesRequest(
+    "gpt-5.3-codex-spark",
+    {
+      messages: [{ role: "user", content: "Hello" }],
+      reasoning_effort: "none",
+    },
+    false,
+    null
+  );
+
+  const record = result as Record<string, unknown>;
+  const reasoning = record.reasoning as Record<string, unknown> | undefined;
+  if (reasoning !== undefined) {
+    assert.equal(reasoning.summary, undefined);
+  }
+  assert.equal(record.include, undefined);
 });
 
 test("Chat -> Responses normalizes reasoning_effort max to xhigh", () => {
@@ -540,7 +643,7 @@ test("Chat -> Responses normalizes reasoning_effort max to xhigh", () => {
     null
   );
 
-  assert.deepEqual((result as any).reasoning, { effort: "xhigh" });
+  assert.deepEqual((result as any).reasoning, { effort: "xhigh", summary: "auto" });
   assert.equal((result as any).reasoning_effort, undefined);
 });
 
@@ -812,21 +915,17 @@ test("Responses -> Chat: tool_search does not throw (issue #2766)", () => {
   );
 });
 
-test("Responses -> Chat: tool_search is stripped from output tools array (issue #2766)", () => {
-  // Codex clients send tool_search alongside function tools. tool_search has no
-  // Chat Completions equivalent and must be dropped; function tools must remain.
+test("Responses -> Chat: tool_search is mapped to a Chat function tool, not dropped (#7532)", () => {
+  // tool_search (execution: "client") is client-resolved, same as local_shell -> shell;
+  // dropping it (#2766) hid the tool and broke Codex's deferred tool-discovery on
+  // downgrade (#7532) — it is now mapped to a Chat function tool instead.
   const result = openaiResponsesToOpenAIRequest(
     "gpt-4o",
     {
       input: [{ role: "user", content: [{ type: "input_text", text: "hello" }] }],
       tools: [
         { type: "tool_search", name: "search" },
-        {
-          type: "function",
-          name: "foo",
-          description: "A function",
-          parameters: { type: "object" },
-        },
+        { type: "function", name: "foo", description: "A function", parameters: { type: "object" } },
       ],
     },
     false,
@@ -835,14 +934,12 @@ test("Responses -> Chat: tool_search is stripped from output tools array (issue 
 
   const tools = result.tools as any[];
   assert.ok(Array.isArray(tools), "tools array must be present");
-  assert.equal(
-    tools.some((t) => t.type === "tool_search"),
-    false,
-    "tool_search must be stripped from output"
-  );
-  assert.equal(tools.length, 1, "only the function tool must remain");
-  assert.equal(tools[0].type, "function");
-  assert.equal(tools[0].function.name, "foo");
+  assert.equal(tools.some((t) => t.type === "tool_search"), false, "raw tool_search type must not survive");
+  assert.equal(tools.length, 2, "mapped tool_search function + the function tool must remain");
+  const toolSearch = tools.find((t) => t.function?.name === "search");
+  assert.ok(toolSearch, "tool_search must be mapped to a Chat function tool named after it");
+  assert.equal(toolSearch.type, "function");
+  assert.equal(tools.find((t) => t.function?.name === "foo")?.type, "function");
 });
 
 // --- Issue #2950: image_generation built-in should be silently dropped ---

@@ -305,6 +305,7 @@ const ENV_VAR_DENYLIST = new Set([
   "KNOWN_STALE_DOC_REFS", // export const in check-docs-symbols.mjs
   "KNOWN_MISSING", // export const in check-fetch-targets.mjs
   "KNOWN_RAW_SQL", // export const in check-db-rules.mjs
+  "ROUTER_BACKENDS", // typed router-backend registry constant documented in the ADR (ROUTER_BACKENDS.md); code lands with PR #5868 (#5798)
   // ── Error / Node codes documented in prose (string-literal codes, not env vars) ──
   "URL_GUARD_BLOCKED", // HTTP 422 guard-violation code (ARCHITECTURE.md)
   "AUTHZ_NOT_INITIALIZED", // AuthzAssertionError code (AUTHZ_GUIDE.md)
@@ -401,9 +402,9 @@ function allScanFiles(root = ROOT) {
   const files = [];
   for (const p of SCAN_PATHS) walkMarkdown(p, files, root);
   return files.filter((f) => {
-    const rel = path.relative(root, f);
+    const rel = path.relative(root, f).split(path.sep).join("/");
     for (const skip of SKIP_DOC_FILES) {
-      if (rel === skip || rel.startsWith(skip + path.sep)) return false;
+      if (rel === skip || rel.startsWith(skip + "/")) return false;
     }
     return true;
   });
@@ -860,9 +861,13 @@ export function formatHumanReport(result) {
   return lines.join("\n");
 }
 
+export function isDirectExecution(moduleUrl, argvEntry) {
+  if (!argvEntry) return false;
+  return path.resolve(fileURLToPath(moduleUrl)) === path.resolve(argvEntry);
+}
+
 // CLI entry — only run when invoked directly (not when imported for tests).
-const isMain = import.meta.url === `file://${process.argv[1]}`;
-if (isMain) {
+if (isDirectExecution(import.meta.url, process.argv[1])) {
   main();
 }
 

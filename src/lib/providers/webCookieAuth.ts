@@ -106,6 +106,29 @@ export function extractQwenToken(rawValue: string): string {
   return match ? match[1] : "";
 }
 
+/** Extract Kimi Web's current localStorage access token, with legacy cookie compatibility. */
+export function extractKimiAccessToken(rawValue: string): string {
+  const raw = String(rawValue ?? "").trim();
+  if (!raw) return "";
+
+  const bearer = raw.match(/^(?:authorization:\s*)?bearer\s+([^;\s]+)/i);
+  if (bearer) return bearer[1];
+
+  const trimmed = stripCookieInputPrefix(raw);
+  for (const key of ["access_token", "kimi-auth"]) {
+    const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const match = trimmed.match(new RegExp(`(?:^|[\\s;])${escaped}=([^;\\s]+)`));
+    if (match) return match[1];
+  }
+
+  return !trimmed.includes("=") && !trimmed.includes(";") ? trimmed : "";
+}
+
+/** @deprecated Use extractKimiAccessToken; retained for existing imports. */
+export function extractKimiJwt(rawValue: string): string {
+  return extractKimiAccessToken(rawValue);
+}
+
 export function normalizeSessionCookieHeaders(
   rawValues: Array<string | null | undefined>,
   defaultCookieName: string

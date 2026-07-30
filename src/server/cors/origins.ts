@@ -97,6 +97,28 @@ export function resolveAllowedOrigin(requestOrigin: string | null | undefined): 
 }
 
 /**
+ * Read-only snapshot of the effective CORS allowlist configuration, for
+ * dashboards / monitoring (`/api/settings/authz-inventory`). `allowAll` mirrors
+ * the `CORS_ALLOW_ALL` opt-in (and the legacy `CORS_ORIGIN=*`); `allowedOrigins`
+ * is the merged, normalized, sorted, deduped env + runtime allowlist.
+ *
+ * A `true` `allowAll` is what the dashboard surfaces as a wildcard-CORS warning.
+ * See `docs/security/CORS.md`.
+ */
+export interface CorsStatus {
+  allowAll: boolean;
+  allowedOrigins: string[];
+}
+
+export function getCorsStatus(): CorsStatus {
+  const merged = new Set<string>([...envAllowedOrigins(), ...runtimeAllowedOrigins]);
+  return {
+    allowAll: envAllowAll(),
+    allowedOrigins: [...merged].sort(),
+  };
+}
+
+/**
  * Apply CORS headers to a response in-place. Safe to call on any response
  * (rejections, preflight, normal `next()` continuations). When the origin
  * is not allowed, no `Access-Control-Allow-Origin` is added — browsers
@@ -116,6 +138,11 @@ export function resolveAllowedOrigin(requestOrigin: string | null | undefined): 
  * is returned when there is no `Origin` header. This is NEVER paired with
  * `Access-Control-Allow-Credentials` (these routes are not cookie-authed), so
  * the echo/wildcard stays safe.
+ *
+ * On that same `relaxForTokenAuth` surface, also appends `Vary: Accept-Encoding`
+ * to every response with a body (RFC 9110 §12.5.5, issue #6737) — Next's built-in
+ * compression middleware only appends it conditionally, so shared caches can't
+ * otherwise reliably tell compressed vs uncompressed variants apart.
  */
 export function applyCorsHeaders(
   response: Response,
@@ -130,6 +157,16 @@ export function applyCorsHeaders(
   if (allowed !== null) {
     response.headers.set("Access-Control-Allow-Origin", allowed);
     response.headers.append("Vary", "Origin");
+  }
+  // RFC 9110 §12.5.5 (issue #6737): the token-authenticated /v1*/v1beta* surface
+  // (relaxForTokenAuth) negotiates content-encoding via Next's built-in
+  // compression middleware, which only appends `Vary: Accept-Encoding`
+  // conditionally (after its own content-type/threshold filter) — so shared
+  // caches (CDNs/proxies) can't reliably tell compressed vs uncompressed variants
+  // apart. Stamp it explicitly here, at the same chokepoint that already appends
+  // `Vary: Origin`, on every relaxed-CORS response with a body.
+  if (relaxForTokenAuth && response.status !== 204) {
+    response.headers.append("Vary", "Accept-Encoding");
   }
   response.headers.set("Access-Control-Allow-Methods", STANDARD_ALLOW_METHODS);
   response.headers.set("Access-Control-Allow-Headers", STANDARD_ALLOW_HEADERS);

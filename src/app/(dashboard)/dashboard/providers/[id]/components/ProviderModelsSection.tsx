@@ -11,11 +11,15 @@
  * Cycle-safe: no import from ProviderDetailPageClient.
  */
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/shared/components";
 import { matchesModelCatalogQuery } from "@/shared/utils/modelCatalogSearch";
 import { isFreeModel, sortModelsFreeFirst } from "@/shared/utils/freeModels";
-import { providerText, type ProviderMessageTranslator } from "../providerPageHelpers";
+import {
+  getDisplayModelAlias,
+  providerText,
+  type ProviderMessageTranslator,
+} from "../providerPageHelpers";
 import ModelRow, { ModelVisibilityToolbar } from "./ModelRow";
 import PassthroughModelsSection from "./PassthroughModelsSection";
 import CompatibleModelsSection from "./CompatibleModelsSection";
@@ -38,6 +42,7 @@ export interface ProviderModelsSectionProps {
   isAnthropicProtocolCompatible: boolean;
   isManagedAvailableModelsProvider: boolean;
   compatibleSupportsModelImport: boolean;
+  allowModelImport: boolean;
 
   // Models data
   models: Array<{ id: string; name?: string; source?: string }>;
@@ -117,6 +122,7 @@ export default function ProviderModelsSection({
   isAnthropicProtocolCompatible,
   isManagedAvailableModelsProvider,
   compatibleSupportsModelImport,
+  allowModelImport,
   models,
   modelMeta,
   modelAliases,
@@ -165,22 +171,8 @@ export default function ProviderModelsSection({
   t,
 }: ProviderModelsSectionProps) {
   const [freeFilter, setFreeFilter] = useState<"all" | "free" | "paid">("all");
-
-  // Passthrough providers (e.g. Kimchi) ship built-in registry models in the
-  // `models` prop, but PassthroughModelsSection only received synced/imported
-  // models and custom models. Merge built-in + synced registry models here and
-  // keep custom models flowing through their dedicated prop so source labels
-  // stay correct and rows are not duplicated.
-  const customModelIds = useMemo(
-    () => new Set(modelMeta.customModels.map((cm: any) => cm.id).filter(Boolean)),
-    [modelMeta.customModels]
-  );
-  const passthroughAvailableModels = useMemo(
-    () => models.filter((m) => !customModelIds.has(m.id)),
-    [models, customModelIds]
-  );
   const [sortFreeFirst, setSortFreeFirst] = useState(false);
-  const autoSyncToggle = compatibleSupportsModelImport && canImportModels && (
+  const autoSyncToggle = allowModelImport && compatibleSupportsModelImport && canImportModels && (
     <button
       onClick={handleToggleAutoSync}
       disabled={togglingAutoSync}
@@ -258,11 +250,9 @@ export default function ProviderModelsSection({
           saveModelCompatFlags={saveModelCompatFlags}
           compatSavingModelId={compatSavingModelId}
           onModelsChanged={fetchProviderModelMeta}
-          allowImport={compatibleSupportsModelImport}
+          allowImport={allowModelImport && compatibleSupportsModelImport}
           isModelHidden={effectiveModelHidden}
-          onToggleHidden={(modelId, hidden) =>
-            handleToggleModelHidden(providerId, modelId, hidden)
-          }
+          onToggleHidden={(modelId, hidden) => handleToggleModelHidden(providerId, modelId, hidden)}
           onBulkToggleHidden={(modelIds, hidden) =>
             handleBulkToggleModelHidden(providerId, modelIds, hidden)
           }
@@ -300,25 +290,28 @@ export default function ProviderModelsSection({
     return (
       <div>
         <div className="flex items-center gap-2 mb-4">
-          <Button
-            size="sm"
-            variant="secondary"
-            icon="download"
-            onClick={handleImportModels}
-            disabled={!canImportModels || importingModels}
-          >
-            {importingModels ? t("importingModels") : t("importFromModels")}
-          </Button>
+          {allowModelImport && (
+            <Button
+              size="sm"
+              variant="secondary"
+              icon="download"
+              onClick={handleImportModels}
+              disabled={!canImportModels || importingModels}
+            >
+              {importingModels ? t("importingModels") : t("importFromModels")}
+            </Button>
+          )}
           {autoSyncToggle}
           {clearAllButton}
-          {!canImportModels && (
+          {allowModelImport && !canImportModels && (
             <span className="text-xs text-text-muted">{t("addConnectionToImport")}</span>
           )}
         </div>
         <PassthroughModelsSection
           providerAlias={providerAlias}
           modelAliases={modelAliases}
-          availableModels={passthroughAvailableModels}
+          catalogModels={models}
+          availableModels={syncedAvailableModels}
           customModels={modelMeta.customModels}
           description={passthroughDescription}
           inputLabel={passthroughInputLabel}
@@ -334,9 +327,7 @@ export default function ProviderModelsSection({
           saveModelCompatFlags={saveModelCompatFlags}
           compatSavingModelId={compatSavingModelId}
           isModelHidden={effectiveModelHidden}
-          onToggleHidden={(modelId, hidden) =>
-            handleToggleModelHidden(providerId, modelId, hidden)
-          }
+          onToggleHidden={(modelId, hidden) => handleToggleModelHidden(providerId, modelId, hidden)}
           onBulkToggleHidden={(modelIds, hidden) =>
             handleBulkToggleModelHidden(providerId, modelIds, hidden)
           }
@@ -355,7 +346,7 @@ export default function ProviderModelsSection({
     );
   }
 
-  const importButton = (
+  const importButton = allowModelImport ? (
     <div className="flex items-center gap-2 mb-4">
       <Button
         size="sm"
@@ -371,7 +362,7 @@ export default function ProviderModelsSection({
         <span className="text-xs text-text-muted">{t("addConnectionToImport")}</span>
       )}
     </div>
-  );
+  ) : null;
 
   if (models.length === 0) {
     return (
@@ -386,7 +377,9 @@ export default function ProviderModelsSection({
     (acc, [alias, fullModel]) => {
       const prefix = `${providerDisplayAlias}/`;
       if (fullModel.startsWith(prefix)) {
-        acc[fullModel.slice(prefix.length)] = alias;
+        const modelId = fullModel.slice(prefix.length);
+        const displayAlias = getDisplayModelAlias(modelId, alias);
+        if (displayAlias) acc[modelId] = displayAlias;
       }
       return acc;
     },
@@ -476,9 +469,7 @@ export default function ProviderModelsSection({
               onCopy={onCopy}
               onSetAlias={(a) => onSetAlias(model.id, a, providerDisplayAlias)}
               onDeleteAlias={
-                aliasByModelId[model.id]
-                  ? () => onDeleteAlias(aliasByModelId[model.id])
-                  : undefined
+                aliasByModelId[model.id] ? () => onDeleteAlias(aliasByModelId[model.id]) : undefined
               }
               t={t}
               showDeveloperToggle
