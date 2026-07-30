@@ -1,0 +1,24 @@
+﻿=== TEST 1: GET /api/v1/me (verify token) ===
+node : (node:21648) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS 
+connections and HTTPS requests insecure by disabling certificate verification.
+Au caractère Ligne:1 : 1
++ node C:\Users\amine\OmniRoute\scripts\freebuff\test-session-flow.mjs  ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ((node:21648) Wa...e verification.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+(Use `node --trace-warnings ...` to show where the warning was created)
+[200] {"id":"3007ab39-7390-4812-a4e3-0f71087ed9ea"}
+
+=== TEST 2: GET /api/v1/freebuff/session (probe) ===
+[200] {"status":"ended","accessTier":"limited","instanceId":"c57ad837-acec-468d-99ca-3f2481252160","admittedAt":"2026-07-14T17:03:09.533Z","expiresAt":"2026-07-14T18:03:09.533Z","gracePeriodEndsAt":"2026-07-14T18:33:09.533Z","gracePeriodRemainingMs":909084,"countryCode":"TN","countryBlockReason":"country_not_allowed","ipPrivacySignals":null,"rateLimitsByModel":{"deepseek/deepseek-v4-flash":{"model":"deepseek/deepseek-v4-flash","limit":5,"period":"pacific_day","resetTimeZone":"America/Los_Angeles","res
+
+=== TEST 3: POST /api/v1/freebuff/session (join, default model) ===
+[200] {"status":"active","accessTier":"limited","instanceId":"1d3cecd8-8bcf-46d2-a7d3-1a87b1e8a4fe","model":"deepseek/deepseek-v4-flash","admittedAt":"2026-07-14T18:18:01.324Z","expiresAt":"2026-07-14T19:18:01.324Z","remainingMs":3598786,"countryCode":"TN","countryBlockReason":"country_not_allowed","ipPrivacySignals":null,"rateLimit":{"model":"deepseek/deepseek-v4-flash","limit":5,"period":"pacific_day","resetTimeZone":"America/Los_Angeles","resetAt":"2026-07-15T07:00:00.000Z","windowHours":24,"recentCount":4.1},"rateLimitsByModel":{"deepseek/deepseek-v4-flash":{"model":"deepseek/deepseek-v4-flash","limit":5,"period":"pacific_day","resetTimeZone":"America/Los_Angeles","resetAt":"2026-07-15T07:00:00.000Z","windowHours":24,"recentCount":4.1},"mimo/mimo-v2.5":{"model":"mimo/mimo-v2.5","limit":5,"period":"pacific_day","resetTimeZone":"America/Los_Angeles","resetAt":"2026-07-15T07:00:00.000Z","windowHours":24,"recentCount":4.1}}}
+
+=== TEST 4: POST /api/v1/freebuff/session (join, gpt-5) ===
+[200] {"status":"active","accessTier":"limited","instanceId":"d9157db8-d6ff-487d-a473-902baf450221","model":"deepseek/deepseek-v4-flash","admittedAt":"2026-07-14T18:18:01.324Z","expiresAt":"2026-07-14T19:18:01.324Z","remainingMs":3597730,"countryCode":"TN","countryBlockReason":"country_not_allowed","ipPrivacySignals":null,"rateLimit":{"model":"deepseek/deepseek-v4-flash","limit":5,"period":"pacific_day","resetTimeZone":"America/Los_Angeles","resetAt":"2026-07-15T07:00:00.000Z","windowHours":24,"recentCount":4.1},"rateLimitsByModel":{"deepseek/deepseek-v4-flash":{"model":"deepseek/deepseek-v4-flash","limit":5,"period":"pacific_day","resetTimeZone":"America/Los_Angeles","resetAt":"2026-07-15T07:00:00.000Z","windowHours":24,"recentCount":4.1},"mimo/mimo-v2.5":{"model":"mimo/mimo-v2.5","limit":5,"period":"pacific_day","resetTimeZone":"America/Los_Angeles","resetAt":"2026-07-15T07:00:00.000Z","windowHours":24,"recentCount":4.1}}}
+
+=== TEST 5: POST /api/v1/freebuff/session (join, opus) ===
+[200] {"status":"active","accessTier":"limited","instanceId":"4c370c8f-5ade-4e28-95e4-01371a2b145d","model":"deepseek/deepseek-v4-flash","admittedAt":"2026-07-14T18:18:01.324Z","expiresAt":"2026-07-14T19:18:01.324Z","remainingMs":3596670,"countryCode":"TN","countryBlockReason":"country_not_allowed","ipPrivacySignals":null,"rateLimit":{"model":"deepseek/deepseek-v4-flash","limit":5,"period":"pacific_day","resetTimeZone":"America/Los_Angeles","resetAt":"2026-07-15T07:00:00.000Z","windowHours":24,"recentCount":4.1},"rateLimitsByModel":{"deepseek/deepseek-v4-flash":{"model":"deepseek/deepseek-v4-flash","limit":5,"period":"pacific_day","resetTimeZone":"America/Los_Angeles","resetAt":"2026-07-15T07:00:00.000Z","windowHours":24,"recentCount":4.1},"mimo/mimo-v2.5":{"model":"mimo/mimo-v2.5","limit":5,"period":"pacific_day","resetTimeZone":"America/Los_Angeles","resetAt":"2026-07-15T07:00:00.000Z","windowHours":24,"recentCount":4.1}}}
+

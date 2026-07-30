@@ -86,7 +86,7 @@ export function classifyError(err: unknown): FallbackDecision {
     if (err.httpStatus !== undefined && err.httpStatus >= 500) {
       return { action: "retry-same", reason: `upstream ${err.httpStatus}` };
     }
-    return { action: "next-model", reason: `session error: ${err.httpStatus ?? "?"}` };
+    return { action: "next-model", reason: `session error: ${err.httpStatus ?? "?"} - ${err.bodyText?.substring(0, 200) ?? "no body"}` };
   }
   // Unknown error — skip to next model.
   const message = err instanceof Error ? err.message : String(err);

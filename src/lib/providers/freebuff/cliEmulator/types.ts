@@ -395,11 +395,15 @@ export interface FreebuffHttpRequest {
   readonly signal?: AbortSignal;
   /** Optional TLS impersonation target. Defaults to Bun 0.1.0. */
   readonly tlsClientIdentifier?: string;
+  /** Optional proxy URL to route the request through. */
+  readonly proxyUrl?: string;
 }
 
 export interface FreebuffHttpResponse {
   readonly status: number;
   readonly statusText: string;
+  /** True when status is in the 200–299 range (mirrors the Web Fetch API). */
+  readonly ok: boolean;
   readonly headers: Record<string, string>;
   readonly body: ReadableStream<Uint8Array>;
   /** Read the body as text (consumes the stream). */

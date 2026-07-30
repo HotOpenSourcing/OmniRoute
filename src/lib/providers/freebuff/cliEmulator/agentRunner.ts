@@ -26,10 +26,11 @@ import { FreebuffSessionError } from "./types.ts";
  */
 const freebuffAgentRunSchema = z.object({
   runId: z.string().uuid(),
-  agent: z.string(),
-  model: z.string(),
-  status: z.enum(["started", "completed", "failed"]),
-  startedAt: z.string().datetime(),
+  agent: z.string().optional(),
+  agentId: z.string().optional(),
+  model: z.string().optional(),
+  status: z.enum(["started", "completed", "failed"]).optional(),
+  startedAt: z.string().datetime().optional(),
 });
 
 /**
@@ -62,7 +63,7 @@ export function createAgentRunner(
         },
         body: JSON.stringify({
           action: "START",
-          agent,
+          agentId: agent,
           model,
           fingerprintId,
           fingerprintHash,
@@ -90,7 +91,12 @@ export function createAgentRunner(
         );
       }
 
-      return parsed.data as FreebuffAgentRun;
+      // Normalise: prefer `agent` field, fall back to `agentId`.
+      const data = parsed.data;
+      return {
+        ...data,
+        agent: data.agent ?? data.agentId ?? agent,
+      } as FreebuffAgentRun;
     },
 
     async finish({ authToken, runId, status, signal }) {

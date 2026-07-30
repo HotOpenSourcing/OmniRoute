@@ -1,0 +1,24 @@
+﻿Total: 24
+0: GET http://clients2.google.com/time/1/current?cup2key=10:JOns-r_k4iYidJ7PI2yTTR58yS05EaVgdHyAkR8LhoA&cup2hreq=e3b0c44298fc1c149afbf4c8996fb92427 -> 200
+1: GET https://clients2.google.com/service/update2/crx?os=win&arch=x64&prod=chromecrx&prodchannel=&prodversion=150.0.7871.114&lang=fr&acceptformat= -> 200
+2: GET https://safebrowsingohttpgateway.googleapis.com/v1/ohttp/hpkekeyconfig?key=AIzaSyA2KlwBX3mkFo30om9LUFYQhpqLoa_BNhE -> 200
+3: GET https://redirector.gvt1.com/edgedl/chrome/dict/fr-fr-3-0.bdic -> 302
+4: GET https://www.google.com/async/folae?async=_fmt:pb&udm=50&client_locale=fr&client_country=fr -> 200
+5: POST https://accounts.google.com/ListAccounts?gpsia=1&source=ChromiumBrowser&json=standard&laf=b64bin -> 200
+6: GET https://redirector.gvt1.com/edgedl/chrome/dict/fr-fr-3-0.bdic -> 302
+7: GET https://clientservices.googleapis.com/chrome-variations/seed?osname=win&channel=stable&milestone=150 -> 200
+8: GET https://clients2.googleusercontent.com/crx/blobs/AcPRoeo64YPcnd6NpmmcuG-8zPiRy0BA20rQo46aQf5rtum0iWMVkcMfZGvBViwmYsw5l62Dpb41gtFzptRRq41TRTy -> 200
+9: GET https://clients2.googleusercontent.com/crx/blobs/AcPRoeo4G-1rDCZS4aAerr8vciFy3znG7B1kPjKI3BZeA7l090A7rQUyF3Xaa8SB1tKcKJ4kdPQmo6JWYlOsxDvs2WL -> 200
+10: GET https://r5---sn-u0opnp5o5-u0ol.gvt1.com/edgedl/chrome/dict/fr-fr-3-0.bdic?cms_redirect=yes&met=1784051730,&mh=jn&mip=154.110.9.4&mm=28&mn=sn -> 200
+11: GET http://redirector.gvt1.com/edgedl/chromewebstore/L2Nocm9tZV9leHRlbnNpb24vYmxvYnMvNzI0QUFXNV9zT2RvdUwyMERESEZGVmJnQQ/1.0.0.6_nmmhkkegccagdldg -> 302
+12: GET http://r1---sn-u0opnp5o5-u0od.gvt1.com/edgedl/chromewebstore/L2Nocm9tZV9leHRlbnNpb24vYmxvYnMvNzI0QUFXNV9zT2RvdUwyMERESEZGVmJnQQ/1.0.0.6_nmmh -> 200
+13: GET https://clients2.googleusercontent.com/crx/blobs/AcPRoer2Zc8Cgsxh3W97Ool_-PGKhLaIiI3sel8eaYNhRISQxgF7RAU9V6yJvXw1e7sYHW2j6vqLEhEQKXjZoaglbnj -> 200
+14: POST https://chromewebstore.googleapis.com/v2/items/cifnddnffldieaamihfkhkdgnbhfmaci:fetchItemSnippet -> 200
+15: POST https://www.googleapis.com/chromewebstore/v1.1/items/verify -> 200
+16: POST https://android.clients.google.com/checkin -> 200
+17: POST https://www.googleapis.com/chromewebstore/v1.1/items/verify -> 200
+18: POST https://chromewebstore.googleapis.com/v2/items/lmjegmlicamnimmfhcmpkclmigmmcbeh:fetchItemSnippet -> 200
+19: POST https://android.clients.google.com/c2dm/register3 -> 200
+20: POST https://android.clients.google.com/c2dm/register3 -> 200
+21: POST https://android.clients.google.com/c2dm/register3 -> 200
+22: POST https://www.googleapis.com/chromewebstore/v1.1/items/verify -> 200

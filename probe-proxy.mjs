@@ -21,7 +21,7 @@ async function probe(modelId) {
       headers,
       body,
       clientIdentifier: 'bun_0.1.0',
-      proxyUrl: 'socks5://benyahiamoutie:STvFGibnqj@209.101.203.231:50100',
+      proxyUrl: 'http://benyahiamoutie:STvFGibnqj@209.101.203.231:50100',
     });
     console.log('status:', r.status, r.statusText);
     let text = '';

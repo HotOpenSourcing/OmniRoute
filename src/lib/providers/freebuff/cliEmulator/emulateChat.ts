@@ -200,13 +200,9 @@ export async function emulateChat(
     );
   }
 
-  // Resolve dependencies once (HTTP client, session manager, agent runner).
+  // Resolve dependencies once (HTTP client only)
   const httpClient = options.httpClient ?? (await createHttpClient());
   const baseUrl = resolveFreebuffBaseUrl() || FREEBUFF_BASE_URL;
-  const sessionManager =
-    options.sessionManager ?? createSessionManager(httpClient, baseUrl);
-  const agentRunner =
-    options.agentRunner ?? createAgentRunner(httpClient, baseUrl);
 
   const clientId = options.sessionId ?? generateClientId();
   const attempts: Array<{ model: string; tier: string; error: string }> = [];
@@ -222,8 +218,7 @@ export async function emulateChat(
         options,
         format,
         httpClient,
-        sessionManager,
-        agentRunner,
+        baseUrl,
         clientId,
       );
       return {
@@ -265,33 +260,27 @@ async function attemptChat(
   options: EmulateChatOptions,
   format: TransformerFormat,
   httpClient: FreebuffHttpClient,
-  sessionManager: FreebuffSessionManager,
-  agentRunner: FreebuffAgentRunner,
+  baseUrl: string,
   clientId: string,
 ): Promise<Omit<EmulateChatResult, "fallbackAttempts">> {
   const { credentials } = options;
 
-  // 1. Acquire a queue seat.
-  let session: FreebuffSession;
-  try {
-    session = await sessionManager.claim({
-      authToken: credentials.authToken,
-      modelId: candidate.model.id,
-      ...(options.signal ? { signal: options.signal } : {}),
-    });
-  } catch (err) {
-    // Map country-blocked to a typed error so the fallback chain can
-    // downgrade to the limited tier.
-    if (err instanceof FreebuffCountryBlockedError) throw err;
-    if (err instanceof FreebuffSessionError) throw err;
-    throw new FreebuffSessionError(
-      err instanceof Error ? err.message : String(err),
-      undefined,
-      undefined,
-    );
-  }
+  // 1. Generate instance ID directly (no session claim needed)
+  // The real CLI doesn't call /api/v1/freebuff/session — it generates
+  // a UUID and sends it in codebuff_metadata.freebuff_instance_id
+  const instanceId = crypto.randomUUID();
+  const session: FreebuffSession = {
+    status: "active",
+    instanceId,
+    model: candidate.model.id,
+    admittedAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 3600000).toISOString(), // +1h
+    remainingMs: 3600000,
+    accessTier: "limited",
+  };
 
-  // 2. Register an agent run.
+  // 2. Register an agent run (real CLI calls /api/v1/agent-runs before chat)
+  const agentRunner = createAgentRunner(httpClient, baseUrl);
   const agentRun = await agentRunner.start({
     authToken: credentials.authToken,
     agent: candidate.model.agent,

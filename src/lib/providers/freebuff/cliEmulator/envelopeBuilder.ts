@@ -20,14 +20,21 @@ import type {
 import { FREEBUFF_SDK_VERSION } from "../chatIntegration.ts";
 
 /**
- * SDK version stamped on the `user-agent` header. Must match the
- * pattern `ai-sdk/openai-compatible/<v>/codebuff` observed in the
- * real CLI (rapport §8.2).
+ * SDK version stamped on the `user-agent` header. Matches the exact
+ * pattern observed in mitmproxy capture of real CLI (2026-07-14).
  */
-export const USER_AGENT = `ai-sdk/openai-compatible/${FREEBUFF_SDK_VERSION}/codebuff`;
+export const USER_AGENT = `ai-sdk/openai-compatible/0.0.0-test/codebuff ai-sdk/provider-utils/3.0.20 runtime/browser`;
 
 /**
  * Build the HTTP headers required for every upstream request.
+ * 
+ * CRITICAL: Based on mitmproxy capture, the real CLI does NOT send:
+ * - x-codebuff-fingerprint
+ * - x-codebuff-fingerprint-hash
+ * - x-freebuff-instance-id
+ * - x-freebuff-model
+ * 
+ * These values are sent in the request BODY under `codebuff_metadata`.
  */
 export function buildHeaders(
   credentials: FreebuffCredentials,
@@ -37,12 +44,8 @@ export function buildHeaders(
   const headers: Record<string, string | undefined> = {
     Authorization: `Bearer ${credentials.authToken}`,
     "Content-Type": "application/json",
-    Accept: "text/event-stream, application/json",
+    Accept: "*/*",
     "user-agent": USER_AGENT,
-    "x-codebuff-fingerprint": credentials.fingerprintId,
-    "x-codebuff-fingerprint-hash": credentials.fingerprintHash,
-    ...(session?.instanceId ? { "x-freebuff-instance-id": session.instanceId } : {}),
-    ...(model ? { "x-freebuff-model": model } : {}),
   };
   return headers as FreebuffHeaders;
 }
@@ -104,21 +107,20 @@ export function buildEnvelope({
     messages,
     stream,
     ...(stream_options ? { stream_options } : {}),
+    stop: ['"cb_easp"'], // Stop token from real CLI capture
     runId,
     provider: {
       ...(providerOrder && providerOrder.length > 0 ? { order: providerOrder } : {}),
       allow_fallbacks: allowFallbacks,
       sort: "price",
+      data_collection: "deny", // Privacy flag from real CLI
     },
     codebuff_metadata: {
-      fingerprint_id: credentials.fingerprintId,
-      client_id: clientId,
-      agent,
-      user_input_id: userInputId,
-      cost_mode: costMode,
-      run_id: runId,
       freebuff_instance_id: session.instanceId,
       trace_session_id: traceSessionId,
+      run_id: runId,
+      client_id: clientId,
+      cost_mode: costMode,
     },
     // Free-form passthrough for tools, temperature, etc.
     ...(max_tokens !== undefined ? { max_tokens } : {}),

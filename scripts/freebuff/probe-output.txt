@@ -1,0 +1,95 @@
+﻿[probe] === PKCE CYCLE PROBE ===
+[probe] account: benammar.benammar17@gmail.com
+[probe] fingerprintId: 
+[probe] fingerprintHash: b223ac389809d757952ff19273b2054f4766b7a67f0b5d50e0b5281e03395ce3
+
+[probe] STEP 1: POST /api/auth/cli/code
+node : (node:12336) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS 
+connections and HTTPS requests insecure by disabling certificate verification.
+Au caractère Ligne:1 : 1
++ node C:\Users\amine\OmniRoute\scripts\freebuff\probe-pkce-cycle.mjs 2 ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ((node:12336) Wa...e verification.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+(Use `node --trace-warnings ...` to show where the warning was created)
+[probe]   status: 200
+[probe]   headers:
+[probe]     access-control-allow-headers: Content-Type
+[probe]     access-control-allow-methods: GET, POST, OPTIONS
+[probe]     access-control-allow-origin: *
+[probe]     alt-svc: h3=":443"; ma=86400
+[probe]     cf-cache-status: DYNAMIC
+[probe]     cf-ray: a1b25e9a583e5bca-TUN
+[probe]     connection: keep-alive
+[probe]     content-encoding: br
+[probe]     content-length: 169
+[probe]     content-type: application/json
+[probe]     date: Tue, 14 Jul 2026 17:50:24 GMT
+[probe]     rndr-id: f956b4be-73e6-40a8
+[probe]     server: cloudflare
+[probe]     vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+[probe]     x-frame-options: SAMEORIGIN
+[probe]     x-render-origin-server: Render
+[probe]   body: {
+  "fingerprintId": "",
+  "fingerprintHash": "8a1b101e9f3e753f32fc351180a2ea8d1ee827cf5ed67209ede401d0a063d251",
+  "loginUrl": "https://www.codebuff.com/login?auth_code=RCxRx7S0DokWR5QW2TtNkg",
+  "expiresAt": 1784055024511
+}
+[probe]   loginUrl: https://www.codebuff.com/login?auth_code=RCxRx7S0DokWR5QW2TtNkg
+[probe]   fingerprintHash: 8a1b101e9f3e753f32fc351180a2ea8d1ee827cf5ed67209ede401d0a063d251
+[probe]   expiresAt: 1784055024511
+
+[probe] STEP 1.5: GET freebuff.com/login?auth_code=... (same code)
+[probe]   freebuff URL: https://freebuff.com/login?auth_code=RCxRx7S0DokWR5QW2TtNkg
+[probe]   status: 200
+[probe]   location: null
+[probe]   headers:
+[probe]     alt-svc: h3=":443"; ma=86400
+[probe]     cache-control: private, no-cache, no-store, max-age=0, must-revalidate
+[probe]     cf-cache-status: DYNAMIC
+[probe]     cf-ray: a1b25e9ecb965bcb-TUN
+[probe]     connection: keep-alive
+[probe]     content-encoding: gzip
+[probe]     content-security-policy: frame-ancestors 'self' https://freebuff.com https://*.freebuff.com https://*.freebuff.dev
+[probe]     content-type: text/html; charset=utf-8
+[probe]     date: Tue, 14 Jul 2026 17:50:25 GMT
+[probe]     link: </_next/static/media/70bc3e132a0a741e.p.3t6q91iet4nsy.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/media/83afe278b6a6bb3c.p.2bn3s6zvc0dyp.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", <https://s2.googleusercontent.com/s2/favicons?domain=github.com&sz=64>; rel=preload; as="image", <https://s2.googleusercontent.com/s2/favicons?domain=google.com&sz=64>; rel=preload; as="image"
+[probe]     rndr-id: c61c43c6-dab7-4cf8
+[probe]     server: cloudflare
+[probe]     transfer-encoding: chunked
+[probe]     vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+[probe]     x-powered-by: Next.js
+[probe]     x-render-origin-server: Render
+[probe]   body (first 500 chars):
+<!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/><link rel="stylesheet" href="/_next/static/chunks/0mogggvet4k2a.css" data-precedence="next"/><link rel="stylesheet" href="/_next/static/chunks/0nfyc9rd0wcna.css" data-precedence="next"/><link rel="preload" as="script" fetchPriority="low" href="/_next/static/chunks/1ct4zu42qfxxb.js"/><script src="/_
+
+[probe] STEP 2: GET codebuff loginUrl
+[probe]   status: 200
+[probe]   location (if redirect): null
+[probe]   headers:
+[probe]     alt-svc: h3=":443"; ma=86400
+[probe]     cache-control: private, no-cache, no-store, max-age=0, must-revalidate
+[probe]     cf-cache-status: DYNAMIC
+[probe]     cf-ray: a1b25ea07efe5bca-TUN
+[probe]     connection: keep-alive
+[probe]     content-encoding: gzip
+[probe]     content-type: text/html; charset=utf-8
+[probe]     date: Tue, 14 Jul 2026 17:50:25 GMT
+[probe]     link: </_next/static/media/bb3ef058b751a6ad-s.p.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/media/e4af272ccee01ff0-s.p.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", <https://s2.googleusercontent.com/s2/favicons?domain=github.com&sz=64>; rel=preload; as="image", <https://s2.googleusercontent.com/s2/favicons?domain=google.com&sz=64>; rel=preload; as="image"
+[probe]     rndr-id: adb23eb0-ef6d-4cbb
+[probe]     server: cloudflare
+[probe]     transfer-encoding: chunked
+[probe]     vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+[probe]     x-frame-options: SAMEORIGIN
+[probe]     x-powered-by: Next.js
+[probe]     x-render-origin-server: Render
+[probe]   body (first 500 chars):
+<!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" as="image" imageSrcSet="/_next/image?url=%2Ffavicon%2Flogo-and-name.ico&amp;w=256&amp;q=75 1x, /_next/image?url=%2Ffavicon%2Flogo-and-name.ico&amp;w=640&amp;q=75 2x"/><link rel="stylesheet" href="/_next/static/css/c62cbb333c7ba946.css" data-precedence="next"/><link rel="stylesheet" href="/_next/static/css/d6ec0008c71bba7e.css" data-precedence="next"
+
+[probe] === END ===
+[probe] NOTE: Don't forget to poll /api/auth/cli/status from another
+[probe]       process to actually capture the token exchange.
+[probe]       Quick command:
+[probe]         curl "https://www.codebuff.com/api/auth/cli/status?fingerprintId=&fingerprintHash=8a1b101e9f3e753f32fc351180a2ea8d1ee827cf5ed67209ede401d0a063d251&expiresAt=1784055024511"

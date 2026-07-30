@@ -1,0 +1,70 @@
+﻿[poll] Polling https://www.codebuff.com/api/auth/cli/status?fingerprintId=&fingerprintHash=230c7b19a7ac71a4b6f290fe247c162b4bf9d325a8221f937518884e252d9d7f&expiresAt=1784054101343
+[poll] Interval: 2000ms, Max attempts: 60
+node : (node:6252) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections 
+and HTTPS requests insecure by disabling certificate verification.
+Au caractère Ligne:1 : 1
++ node C:\Users\amine\OmniRoute\scripts\freebuff\poll-status.mjs 2>&1 | ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ((node:6252) War...e verification.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+(Use `node --trace-warnings ...` to show where the warning was created)
+[poll] [1] status: 401
+[poll] [2] status: 401
+[poll] [3] status: 401
+[poll] [4] status: 401
+[poll] [5] status: 401
+[poll] [6] status: 401
+[poll] [7] status: 401
+[poll] [8] status: 401
+[poll] [9] status: 401
+[poll] [10] status: 401
+[poll] [11] status: 401
+[poll] [12] status: 401
+[poll] [13] status: 401
+[poll] [14] status: 401
+[poll] [15] status: 401
+[poll] [16] status: 401
+[poll] [17] status: 401
+[poll] [18] status: 401
+[poll] [19] status: 401
+[poll] [20] status: 401
+[poll] [21] status: 401
+[poll] [22] status: 401
+[poll] [23] status: 401
+[poll] [24] status: 401
+[poll] [25] status: 401
+[poll] [26] status: 401
+[poll] [27] status: 401
+[poll] [28] status: 401
+[poll] [29] status: 401
+[poll] [30] status: 401
+[poll] [31] status: 401
+[poll] [32] status: 401
+[poll] [33] status: 401
+[poll] [34] status: 401
+[poll] [35] status: 401
+[poll] [36] status: 401
+[poll] [37] status: 401
+[poll] [38] status: 401
+[poll] [39] status: 401
+[poll] [40] status: 401
+[poll] [41] status: 401
+[poll] [42] status: 401
+[poll] [43] status: 401
+[poll] [44] status: 401
+[poll] [45] status: 401
+[poll] [46] status: 401
+[poll] [47] status: 401
+[poll] [48] status: 401
+[poll] [49] status: 401
+[poll] [50] status: 401
+[poll] [51] status: 401
+[poll] [52] status: 401
+[poll] [53] status: 401
+[poll] [54] status: 401
+[poll] [55] status: 401
+[poll] [56] status: 401
+[poll] [57] status: 401
+[poll] [58] status: 401
+[poll] [59] status: 401

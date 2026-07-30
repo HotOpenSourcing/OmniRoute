@@ -92,10 +92,9 @@ export function createSessionManager(
         method: "POST",
         headers: {
           Authorization: `Bearer ${authToken}`,
-          Accept: "application/json",
+          Accept: "*/*",
           "Content-Type": "application/json",
-          "user-agent": "ai-sdk/openai-compatible/1.0.0/codebuff",
-          "x-freebuff-model": modelId,
+          "user-agent": "ai-sdk/openai-compatible/0.0.0-test/codebuff ai-sdk/provider-utils/3.0.20 runtime/browser",
         },
         body: JSON.stringify({ modelId }),
         ...(signal ? { signal } : {}),
@@ -149,6 +148,14 @@ export function createSessionManager(
           "Session ended unexpectedly",
           500,
           JSON.stringify(body),
+        );
+      }
+
+      // Check for country block even if status is "active"
+      if (parsed.data.countryBlockReason) {
+        throw new FreebuffCountryBlockedError(
+          `Country ${parsed.data.countryCode ?? "unknown"} is not allowed for free mode: ${parsed.data.countryBlockReason}`,
+          parsed.data.countryCode,
         );
       }
 

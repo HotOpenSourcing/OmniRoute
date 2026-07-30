@@ -1,0 +1,54 @@
+﻿=== ENDPOINT DISCOVERY ===
+
+Token: dea815ba-d53a-4ade-8790-0b638fe6ffb3
+Base: https://www.codebuff.com
+
+node : (node:25144) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS 
+connections and HTTPS requests insecure by disabling certificate verification.
+Au caractère Ligne:1 : 1
++ node C:\Users\amine\OmniRoute\scripts\freebuff\discover-endpoints.mjs ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ((node:25144) Wa...e verification.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+(Use `node --trace-warnings ...` to show where the warning was created)
+❔ [400] /api/auth/cli/status           {"error":"Invalid query parameters"}
+❔ [400] /api/auth/cli/login            Error: This action with HTTP GET is not supported by NextAuth.js
+❔ [400] /api/auth/cli/refresh          Error: This action with HTTP GET is not supported by NextAuth.js
+❓ [405] /api/auth/cli/logout           
+❔ [400] /api/auth/me                   Error: This action with HTTP GET is not supported by NextAuth.js
+❔ [400] /api/auth/user                 Error: This action with HTTP GET is not supported by NextAuth.js
+✅ [200] /api/auth/session              {}
+❌ [404] /api/me                        (HTML page)
+❌ [404] /api/user                      (HTML page)
+❌ [404] /api/user/me                   (HTML page)
+❌ [404] /api/account                   (HTML page)
+❌ [404] /api/account/me                (HTML page)
+❌ [404] /api/credits                   (HTML page)
+❌ [404] /api/usage                     (HTML page)
+❌ [404] /api/subscription              (HTML page)
+❌ [404] /api/v1                        (HTML page)
+❌ [404] /api/v1/                       (HTML page)
+❌ [404] /api/v1/agents                 (HTML page)
+❌ [404] /api/v1/sessions               (HTML page)
+❌ [404] /api/v1/runs                   (HTML page)
+❓ [405] /api/v1/usage                  
+❌ [404] /api/v1/billing                (HTML page)
+❌ [404] /api/whoami                    (HTML page)
+❌ [404] /api/identity                  (HTML page)
+✅ [200] /health                        (HTML page)
+✅ [200] /healthz                       (HTML page)
+❌ [404] /api/health                    (HTML page)
+✅ [200] /                              (HTML page)
+
+=== SUMMARY ===
+  200: 4 endpoints
+  400: 5 endpoints
+  404: 17 endpoints
+  405: 2 endpoints
+
+=== AUTHENTICATED (2xx) ===
+  /api/auth/session
+  /health
+  /healthz
+  /

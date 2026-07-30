@@ -1,0 +1,44 @@
+﻿=== Status Parameter Discovery ===
+
+node : (node:16396) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS 
+connections and HTTPS requests insecure by disabling certificate verification.
+Au caractère Ligne:1 : 1
++ node C:\Users\amine\OmniRoute\scripts\freebuff\poll-status-params.mjs ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ((node:16396) Wa...e verification.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+(Use `node --trace-warnings ...` to show where the warning was created)
+🔒 [401] hash+expires+id
+     https://www.codebuff.com/api/auth/cli/status?fingerprintHash=e0b2f2bec3168d4dcfdba31e7174a2bd6536c45
+     {"error":"Authentication failed"}
+❓ [400] hash+id
+     https://www.codebuff.com/api/auth/cli/status?fingerprintHash=e0b2f2bec3168d4dcfdba31e7174a2bd6536c45
+     {"error":"Invalid query parameters"}
+❓ [400] id+expires
+     https://www.codebuff.com/api/auth/cli/status?fingerprintId=&expiresAt=1784055823571
+     {"error":"Invalid query parameters"}
+❓ [400] id only
+     https://www.codebuff.com/api/auth/cli/status?fingerprintId=
+     {"error":"Invalid query parameters"}
+🔒 [401] non-empty id+hash+expires
+     https://www.codebuff.com/api/auth/cli/status?fingerprintId=enhanced-Crb4NKDS__h-NJIy5dk3IIMzG-LgIeua
+     {"error":"Authentication failed"}
+❓ [400] expires+id
+     https://www.codebuff.com/api/auth/cli/status?expiresAt=1784055823571&fingerprintId=
+     {"error":"Invalid query parameters"}
+❓ [400] expires+hash
+     https://www.codebuff.com/api/auth/cli/status?expiresAt=1784055823571&fingerprintHash=e0b2f2bec3168d4
+     {"error":"Invalid query parameters"}
+❓ [400] code+hash
+     https://www.codebuff.com/api/auth/cli/status?authCode=RkQFofvrPoHHQWqwciFrWg&fingerprintHash=e0b2f2b
+     {"error":"Invalid query parameters"}
+❓ [400] code only
+     https://www.codebuff.com/api/auth/cli/status?authCode=RkQFofvrPoHHQWqwciFrWg
+     {"error":"Invalid query parameters"}
+❓ [400] expires+code
+     https://www.codebuff.com/api/auth/cli/status?expiresAt=1784055823571&authCode=RkQFofvrPoHHQWqwciFrWg
+     {"error":"Invalid query parameters"}
+❓ [400] id+code
+     https://www.codebuff.com/api/auth/cli/status?fingerprintId=&authCode=RkQFofvrPoHHQWqwciFrWg
+     {"error":"Invalid query parameters"}

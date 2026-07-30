@@ -1,0 +1,136 @@
+﻿[multi-poll] Starting 5 parallel pollers...
+node : (node:16156) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS 
+connections and HTTPS requests insecure by disabling certificate verification.
+Au caractère Ligne:1 : 1
++ node C:\Users\amine\OmniRoute\scripts\freebuff\poll-dynamic.mjs 2>&1  ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ((node:16156) Wa...e verification.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[#4] ✅✅✅ status: 200 on attempt 1
+[#4] body: {"user":{"id":"3007ab39-7390-4812-a4e3-0f71087ed9ea","name":"Twi Ti","email":"amine.twiti17@gmail.com","authToken":"dea815ba-d53a-4ade-8790-0b638fe6ffb3","fingerprintId":"","fingerprintHash":"dfe512882b2869626d2887b834be28461dd6da80384677f87de4a8d8b3e302ff"},"message":"Authentication successful!"}
+[#3] [5] status: 401
+[#1] [5] status: 401
+[#0] [5] status: 401
+[#2] [5] status: 401
+[#1] [10] status: 401
+[#0] [10] status: 401
+[#3] [10] status: 401
+[#2] [10] status: 401
+[#1] [15] status: 401
+[#0] [15] status: 401
+[#3] [15] status: 401
+[#2] [15] status: 401
+[#1] [20] status: 401
+[#3] [20] status: 401
+[#0] [20] status: 401
+[#2] [20] status: 401
+[#1] [25] status: 401
+[#3] [25] status: 401
+[#0] [25] status: 401
+[#2] [25] status: 401
+[#3] [30] status: 401
+[#1] [30] status: 401
+[#0] [30] status: 401
+[#2] [30] status: 401
+[#3] [35] status: 401
+[#0] [35] status: 401
+[#1] [35] status: 401
+[#2] [35] status: 401
+[#3] [40] status: 401
+[#0] [40] status: 401
+[#1] [40] status: 401
+[#2] [40] status: 401
+[#0] [45] status: 401
+[#3] [45] status: 401
+[#1] [45] status: 401
+[#2] [45] status: 401
+[#0] [50] status: 401
+[#3] [50] status: 401
+[#1] [50] status: 401
+[#2] [50] status: 401
+[#0] [55] status: 401
+[#3] [55] status: 401
+[#1] [55] status: 401
+[#2] [55] status: 401
+[#0] [60] status: 401
+[#3] [60] status: 401
+[#1] [60] status: 401
+[#2] [60] status: 401
+[#0] [65] status: 401
+[#3] [65] status: 401
+[#1] [65] status: 401
+[#2] [65] status: 401
+[#0] [70] status: 401
+[#3] [70] status: 401
+[#1] [70] status: 401
+[#2] [70] status: 401
+[#0] [75] status: 401
+[#3] [75] status: 401
+[#1] [75] status: 401
+[#2] [75] status: 401
+[#0] [80] status: 401
+[#3] [80] status: 401
+[#1] [80] status: 401
+[#2] [80] status: 401
+[#0] [85] status: 401
+[#3] [85] status: 401
+[#1] [85] status: 401
+[#2] [85] status: 401
+[#0] [90] status: 401
+[#3] [90] status: 401
+[#1] [90] status: 401
+[#2] [90] status: 401
+[#0] [95] status: 401
+[#1] [95] status: 401
+[#3] [95] status: 401
+[#2] [95] status: 401
+[#0] [100] status: 401
+[#1] [100] status: 401
+[#3] [100] status: 401
+[#2] [100] status: 401
+[#0] [105] status: 401
+[#1] [105] status: 401
+[#3] [105] status: 401
+[#2] [105] status: 401
+[#1] [110] status: 401
+[#0] [110] status: 401
+[#3] [110] status: 401
+[#2] [110] status: 401
+[#1] [115] status: 401
+[#0] [115] status: 401
+[#3] [115] status: 401
+[#2] [115] status: 401
+[#0] [120] status: 401
+[#1] [120] status: 401
+[#3] [120] status: 401
+[#2] [120] status: 401
+[#0] [125] status: 401
+[#1] [125] status: 401
+[#3] [125] status: 401
+[#2] [125] status: 401
+[#0] [130] status: 401
+[#1] [130] status: 401
+[#3] [130] status: 401
+[#2] [130] status: 401
+[#0] [135] status: 401
+[#1] [135] status: 401
+[#3] [135] status: 401
+[#2] [135] status: 401
+[#0] [140] status: 401
+[#1] [140] status: 401
+[#3] [140] status: 401
+[#2] [140] status: 401
+[#0] [145] status: 401
+[#1] [145] status: 401
+[#3] [145] status: 401
+[#2] [145] status: 401
+[#0] [150] status: 401
+[#1] [150] status: 401
+[#3] [150] status: 401
+[#2] [150] status: 401
+
+[multi-poll] 🎉 TOKEN CAPTURED with hash #4
+[multi-poll] {"user":{"id":"3007ab39-7390-4812-a4e3-0f71087ed9ea","name":"Twi Ti","email":"amine.twiti17@gmail.com","authToken":"dea815ba-d53a-4ade-8790-0b638fe6ffb3","fingerprintId":"","fingerprintHash":"dfe512882b2869626d2887b834be28461dd6da80384677f87de4a8d8b3e302ff"},"message":"Authentication successful!"}

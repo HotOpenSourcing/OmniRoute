@@ -281,6 +281,12 @@ export async function startFreebuffDeviceCode(
  * expiry, error, or timeout. Returns the same wire shape as the upstream.
  * Exposed as a named function so unit tests can drive it without the
  * provider object indirection.
+ *
+ * Improvements:
+ * - Progressive intervals (1s → 2s → 3s → 5s → 7s → 10s) for faster UX
+ * - Jitter (±10%) to prevent thundering herd
+ * - Network retry limit (max 3 attempts) for fail-fast on persistent errors
+ * - Progress callback for UI feedback
  */
 export async function pollFreebuffDeviceCode(
   config: typeof FREEBUFF_OAUTH_CONFIG,
@@ -291,11 +297,15 @@ export async function pollFreebuffDeviceCode(
   const now = options.now ?? Date.now;
   const sleepFn = options.sleepFn ?? defaultSleepFn;
   const deadline = now() + config.pollTimeoutMs;
-  const baseInterval = config.pollIntervalMs;
-  const maxInterval = 10_000;
+  
+  // Progressive intervals: faster initial polls for better UX
+  const pollIntervals = [1000, 2000, 3000, 5000, 7000, 10000];
+  const maxNetworkRetries = 3;
+  
   const { fingerprintId, fingerprintHash, expiresAt } = payload;
 
   let attempt = 0;
+  let networkErrorCount = 0;
 
   while (now() < deadline) {
     if (options.signal?.aborted) {
@@ -314,9 +324,23 @@ export async function pollFreebuffDeviceCode(
         headers: { Accept: "application/json" },
         signal: options.signal,
       });
-    } catch {
+      networkErrorCount = 0; // Reset on successful fetch
+    } catch (err) {
+      networkErrorCount++;
+      if (networkErrorCount >= maxNetworkRetries) {
+        return {
+          status: "error",
+          error: `Network error after ${maxNetworkRetries} attempts`,
+          errorCode: "network_error" as const,
+        };
+      }
+      
+      // Progressive backoff on network errors
+      const intervalIndex = Math.min(attempt, pollIntervals.length - 1);
+      const delay = pollIntervals[intervalIndex];
+      options.onProgress?.(attempt, delay);
+      await sleepFn(delay);
       attempt++;
-      await sleepFn(Math.min(baseInterval * Math.pow(1.5, attempt - 1), maxInterval));
       continue;
     }
 
@@ -354,13 +378,20 @@ export async function pollFreebuffDeviceCode(
       const parsed = freebuffPollResponseSchema.safeParse(raw);
       if (parsed.success) {
         if (parsed.data.status !== "pending") {
-          return parsed.data;
+          return parsed.data; // Early success - return immediately
         }
       }
     }
 
+    // Progressive backoff with jitter to prevent thundering herd
     attempt++;
-    await sleepFn(Math.min(baseInterval * Math.pow(1.5, attempt - 1), maxInterval));
+    const intervalIndex = Math.min(attempt - 1, pollIntervals.length - 1);
+    const baseDelay = pollIntervals[intervalIndex];
+    const jitter = baseDelay * 0.2 * (Math.random() - 0.5); // ±10% jitter
+    const delay = Math.floor(baseDelay + jitter);
+    
+    options.onProgress?.(attempt, delay);
+    await sleepFn(delay);
   }
 
   return { status: "expired", error: "Poll timeout exceeded" };

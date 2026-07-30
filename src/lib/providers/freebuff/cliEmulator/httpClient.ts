@@ -98,6 +98,7 @@ async function tlsClientFetch(
   req: FreebuffHttpRequest,
 ): Promise<FreebuffHttpResponse> {
   const identifier = req.tlsClientIdentifier ?? DEFAULT_TLS_CLIENT_IDENTIFIER;
+  const proxyUrl = req.proxyUrl ?? process.env.RESIDENTIAL_PROXY ?? process.env.HTTPS_PROXY ?? process.env.HTTP_PROXY;
   const response = await mod.fetch(req.url, {
     method: req.method,
     headers: req.headers,
@@ -107,12 +108,14 @@ async function tlsClientFetch(
         ? C
         : never
       : never,
+    ...(proxyUrl ? { proxyUrl } : {}),
     // Pass through the abort signal if provided.
     ...(req.signal ? { signal: req.signal } : {}),
   } as Parameters<typeof mod.fetch>[1]);
 
   return {
     status: response.status,
+    ok: response.status >= 200 && response.status < 300,
     statusText: response.statusText ?? "",
     headers: Object.fromEntries(
       Object.entries(response.headers ?? {}).map(([k, v]) => [
@@ -152,6 +155,7 @@ async function wreqFetch(
 
   return {
     status: response.status,
+    ok: response.status >= 200 && response.status < 300,
     statusText: response.statusText ?? "",
     headers: Object.fromEntries(
       Object.entries(response.headers ?? {}).map(([k, v]) => [
@@ -186,6 +190,7 @@ async function globalFetch(req: FreebuffHttpRequest): Promise<FreebuffHttpRespon
 
   return {
     status: response.status,
+    ok: response.status >= 200 && response.status < 300,
     statusText: response.statusText,
     headers: Object.fromEntries(response.headers.entries()),
     body: response.body!,
