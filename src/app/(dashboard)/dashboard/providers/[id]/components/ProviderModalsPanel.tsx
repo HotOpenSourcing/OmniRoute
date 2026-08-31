@@ -9,6 +9,7 @@ import {
   FreebuffOAuthWrapper,
   CursorAuthModal,
   TraeAuthModal,
+  RaycastAuthModal,
   ProxyConfigModal,
 } from "@/shared/components";
 import RiskNoticeModal from "../../components/RiskNoticeModal";
@@ -30,9 +31,11 @@ import { type BatchTestResults } from "../hooks/useProviderConnections";
 import { type ConnectionDeleteConfirmState } from "../hooks/useConnectionDeleteConfirm";
 import { type ImportProgress } from "../hooks/useModelImportHandlers";
 import { providerText, type ProviderMessageTranslator } from "../providerPageHelpers";
+import { resolveProviderOAuthBackendId } from "../../providerPageUtils";
 
 interface ProviderInfo {
   name: string;
+  oauthProviderId?: string;
   riskNoticeVariant?: string;
   website?: string;
   [key: string]: unknown;
@@ -228,6 +231,8 @@ export default function ProviderModalsPanel({
   setShowTutorialModal,
   t,
 }: ProviderModalsPanelProps) {
+  const oauthProviderId = resolveProviderOAuthBackendId(providerId, providerInfo);
+
   return (
     <>
       {showRiskNoticeModal && subscriptionRisk && (
@@ -285,11 +290,18 @@ export default function ProviderModalsPanel({
             onSuccess={handleOAuthSuccess}
             onClose={() => setShowOAuthModal(false)}
           />
+        ) : providerId === "raycast" ? (
+          <RaycastAuthModal
+            isOpen={showOAuthModal}
+            reauthConnection={reauthConnection}
+            onSuccess={handleOAuthSuccess}
+            onClose={() => setShowOAuthModal(false)}
+          />
         ) : (
           <OAuthModal
             isOpen={showOAuthModal}
             reauthConnection={reauthConnection}
-            provider={providerId}
+            provider={oauthProviderId}
             providerInfo={providerInfo}
             onSuccess={handleOAuthSuccess}
             onClose={() => setShowOAuthModal(false)}

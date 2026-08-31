@@ -17,6 +17,7 @@ import type { RegistryEntry } from "../../shared.ts";
  */
 export const freebuffProvider: RegistryEntry = {
   id: "freebuff",
+  alias: "fb",
   format: "openai",
   executor: "freebuff",
   baseUrl: "https://www.codebuff.com",
@@ -33,6 +34,7 @@ export const freebuffProvider: RegistryEntry = {
       contextLength: 128000,
       maxOutputTokens: 8192,
       supportsVision: true,
+      supportsReasoning: true,
     },
     {
       id: "mimo/mimo-v2.5-pro",
@@ -47,6 +49,7 @@ export const freebuffProvider: RegistryEntry = {
       contextLength: 200000,
       maxOutputTokens: 16384,
       supportsVision: true,
+      supportsReasoning: true,
     },
     {
       id: "moonshotai/kimi-k2.6",
@@ -60,12 +63,20 @@ export const freebuffProvider: RegistryEntry = {
       name: "DeepSeek v4 Flash",
       contextLength: 128000,
       maxOutputTokens: 8192,
+      supportsReasoning: true,
     },
     {
       id: "deepseek/deepseek-v4-pro",
       name: "DeepSeek v4 Pro",
       contextLength: 128000,
       maxOutputTokens: 8192,
+      supportsReasoning: true,
+    },
+    {
+      id: "openai/gpt-5.6-luna",
+      name: "GPT-5.6 Luna",
+      contextLength: 131072,
+      supportsReasoning: true,
     },
     {
       id: "z-ai/glm-5.2",
@@ -73,6 +84,7 @@ export const freebuffProvider: RegistryEntry = {
       contextLength: 1000000,
       maxOutputTokens: 8192,
       supportsVision: true,
+      supportsReasoning: true,
     },
     {
       id: "minimax/minimax-m2.7",
@@ -80,6 +92,26 @@ export const freebuffProvider: RegistryEntry = {
       contextLength: 200000,
       maxOutputTokens: 8192,
       supportsVision: true,
+    },
+    {
+      id: "crof/kimi-k3-eco",
+      name: "Kimi K3 Eco",
+      contextLength: 131072,
+      supportsVision: true,
+      supportsReasoning: true,
+    },
+    {
+      id: "anthropic/claude-fable-5",
+      name: "Claude Fable 5",
+      contextLength: 131072,
+      supportsVision: true,
+      supportsReasoning: true,
+    },
+    {
+      id: "meta/muse-spark-1.2-contributor",
+      name: "Meta Muse Spark 1.2 Contributor",
+      contextLength: 131072,
+      supportsReasoning: true,
     },
   ],
 };

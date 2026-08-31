@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 
 /**
- * GET /api/health — Lightweight liveness probe (root)
+ * GET /api/health — canonical liveness probe, no auth required.
  *
  * Top-level health endpoint used by external load balancers and monitoring
  * services that probe a single `/health` path rather than the deeper
  * `/api/health/ping` or the heavy `/api/monitoring/health`.
  *
- * Returns `{ status: "ok", timestamp }` on success, or HTTP 503 on failure.
- * No auth required — public liveness signal (classified via
- * PUBLIC_READONLY_API_ROUTE_PREFIXES in publicApiRoutes.ts).
+ * Deliberately minimal: `{ status, timestamp }` and nothing else. Whatever this returns is
+ * public on an exposed instance, so version, uptime and memory stay behind the authenticated
+ * `/api/monitoring/health`. For a probe that also confirms the database answers, use
+ * `/api/health/ping`.
  */
 
 export const dynamic = "force-dynamic";

@@ -4,7 +4,7 @@
  * All domain modules import `getDbInstance` and helpers from here.
  */
 
-import type { SqliteAdapter } from "./adapters/types";
+import type { SqliteAdapter, PreparedStatement } from "./adapters/types";
 import {
   tryOpenSync,
   getSqlJsAdapter,
@@ -13,9 +13,10 @@ import {
   openDatabaseAsync,
 } from "./adapters/driverFactory";
 import path from "path";
+import { retryProbeIfTransient } from "./probeUtils";
 import fs from "fs";
-import cp from "child_process";
 import { resolveWritableDataDir, getLegacyDotDataDir } from "../dataPaths";
+import { isNextBuildPhase } from "../buildPhase";
 import { runMigrations } from "./migrationRunner";
 import { runDbHealthCheck } from "./healthCheck";
 import { resetAllDbModuleState } from "./stateReset";
@@ -38,6 +39,7 @@ import { migrateLegacyEncryptedString } from "./encryption";
 import { invalidateDbCache } from "./readCache";
 import { rowToCamel } from "./caseMapping";
 import { isAutomatedTestProcess } from "@/shared/utils/testProcess";
+import { parseModelAccessMode } from "./apiKeys/modelAccessMode";
 // Re-exported so existing call sites that pull these helpers off the core module keep working.
 export { toSnakeCase, toCamelCase, objToSnake, rowToCamel, cleanNulls } from "./caseMapping";
 import {
@@ -85,7 +87,18 @@ type CriticalTableSpec = {
 
 export const isCloud = typeof globalThis.caches === "object" && globalThis.caches !== null;
 
-export const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
+// Next.js build workers sometimes drop NEXT_PHASE from their env, so
+// OMNIROUTE_BUILDING=1 (set by build-next-isolated.mjs and inherited by every
+// spawned build worker) is the reliable build signal. During build the native
+// better-sqlite3 addon must never load: its Statement destructor aborts with
+// SIGABRT when the worker thread exits (assertion in
+// node::RemoveEnvironmentCleanupHook, env == nullptr). (#10060)
+//
+// Delegates to the shared leaf helper (src/lib/buildPhase.ts) so every build
+// signal is defined in exactly one place. Kept as a module const (evaluated at
+// import time) to preserve the existing eager-boolean semantics of the many
+// `if (isBuildPhase || isCloud)` call sites across the db layer.
+export const isBuildPhase = isNextBuildPhase();
 
 // ──────────────── Paths ────────────────
 
@@ -1014,6 +1027,51 @@ function startDbHealthCheckScheduler(db: SqliteDatabase) {
   dbHealthCheckTimer.unref?.();
 }
 
+let walTruncateTimer: NodeJS.Timeout | null = null;
+
+function getWalTruncateIntervalMs(): number {
+  const rawValue = process.env.OMNIROUTE_WAL_TRUNCATE_INTERVAL_MS;
+  if (typeof rawValue === "string" && rawValue.trim().length > 0) {
+    const parsed = Number(rawValue);
+    if (Number.isFinite(parsed) && parsed >= 0) {
+      return parsed;
+    }
+  }
+  return 6 * 60 * 60 * 1000;
+}
+
+function clearWalTruncateScheduler() {
+  if (walTruncateTimer) {
+    clearInterval(walTruncateTimer);
+    walTruncateTimer = null;
+  }
+}
+
+// Auto-checkpoint moves WAL pages back into the main DB file but never shrinks the WAL
+// file itself; only wal_checkpoint(TRUNCATE) does, and a long-running server never closes its DB.
+function startWalTruncateScheduler(db: SqliteDatabase) {
+  clearWalTruncateScheduler();
+  if (isCloud || isBuildPhase || isAutomatedTestProcess()) return;
+
+  const intervalMs = getWalTruncateIntervalMs();
+  if (intervalMs <= 0) return;
+
+  walTruncateTimer = setInterval(() => {
+    try {
+      if (!db.open) return;
+      // TRUNCATE waits for readers; under concurrent write load it can no-op without
+      // shrinking the file. That is expected — it retries on the next tick.
+      if (checkpointDb(db, "TRUNCATE")) {
+        console.log("[DB] Periodic SQLite WAL checkpoint completed (TRUNCATE).");
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn("[DB] Periodic WAL truncate failed:", message);
+    }
+  }, intervalMs);
+  walTruncateTimer.unref?.();
+}
+
 export function runManagedDbHealthCheck(options?: { autoRepair?: boolean }) {
   const db = getDbInstance();
   return runDbHealthCheck(db, {
@@ -1029,7 +1087,34 @@ export function getDbInstance(): SqliteDatabase {
 
   if (isCloud || isBuildPhase) {
     if (isBuildPhase) {
-      console.log("[DB] Build phase detected — using in-memory SQLite (read-only)");
+      console.log("[DB] Build phase detected — using no-op SQLite stub (never queried)");
+      // A no-op stub during build avoids loading the better-sqlite3 native
+      // bindings entirely. The native Statement destructor crashes with SIGABRT
+      // when the Next.js build worker thread exits (assertion in
+      // node::RemoveEnvironmentCleanupHook, env == nullptr). The DB is never
+      // actually queried during build — it only exists so module-eval that
+      // touches getDbInstance() at build time does not throw. (#10060)
+      const noopStatement: PreparedStatement = {
+        run: () => ({ changes: 0, lastInsertRowid: 0 }),
+        get: () => undefined,
+        all: () => [],
+      };
+      const stubDb: SqliteDatabase = {
+        driver: "sql.js",
+        open: true,
+        name: ":memory:",
+        prepare: () => noopStatement,
+        exec: () => {},
+        pragma: () => undefined,
+        transaction: <T>(fn: (...args: unknown[]) => T) => fn,
+        immediate: (fn: () => void) => fn(),
+        backup: async () => {},
+        checkpoint: () => {},
+        close: () => {},
+        raw: null,
+      };
+      setDb(stubDb);
+      return stubDb;
     }
     const memoryDb = openSqliteDatabase(":memory:");
     memoryDb.pragma("journal_mode = WAL");
@@ -1098,13 +1183,35 @@ export function getDbInstance(): SqliteDatabase {
   // This is needed so the migration runner skips the mass-migration safety abort
   // that would otherwise trigger because heuristic seeding marks some migrations
   // as applied, making the fresh DB look like a wiped existing DB (#1328).
-  const isNewDb = !fs.existsSync(sqliteFile);
+  // #9934: also classify as fresh a file that `omniroute setup` created with
+  // only the clipped skeleton schema (see the probe below) — even though the
+  // file exists, it has never had migrations run.
+  let isNewDb = !fs.existsSync(sqliteFile);
 
   // Detect and handle old schema format — preserve data when possible (#146)
   // Uses a single probe connection that becomes the real connection when possible.
   if (fs.existsSync(sqliteFile)) {
     try {
       const probe = openSqliteDatabase(sqliteFile, { readonly: true });
+      // #9934: init asymmetry — bin/cli/sqlite.mjs::openOmniRouteDb (used by
+      // `omniroute setup`) creates storage.sqlite with only the partial inline
+      // schema (key_value + provider_connections) and never runs migrations.
+      // Purely file-existence-based freshness made that file look like an
+      // existing DB, so the first `serve` auto-seeded only the 001 marker and
+      // tripped the mass-migration safety abort on a brand-new install. A
+      // skeleton file has provider_connections but none of the tables the 001
+      // migration creates (combos) — treat it as fresh, not as a wiped DB.
+      const probeHasProviderConnections = !!probe
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='provider_connections'"
+        )
+        .get();
+      const probeHasCombos = !!probe
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='combos'")
+        .get();
+      if (probeHasProviderConnections && !probeHasCombos) {
+        isNewDb = true;
+      }
       const hasOldSchema = probe
         .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'")
         .get();
@@ -1196,95 +1303,19 @@ export function getDbInstance(): SqliteDatabase {
             `Original error: ${message}`
         );
       }
-      preservedCriticalState = captureCriticalDbState(sqliteFile);
-
-      // SAFETY: Never delete the database — rename to backup so data can be recovered.
-      // The old code would silently destroy all user data on any probe failure.
-      const failedPath = sqliteFile + `.probe-failed-${Date.now()}`;
-      try {
-        let renamed = false;
-        for (let attempt = 0; attempt < 40; attempt++) {
-          try {
-            fs.renameSync(sqliteFile, failedPath);
-            renamed = true;
-            console.warn(`[DB] Renamed corrupt DB to ${path.basename(failedPath)}`);
-            break;
-          } catch (renameErr) {
-            // brief synchronous wait before retrying
-            try {
-              const sab = new SharedArrayBuffer(4);
-              const ia = new Int32Array(sab);
-              Atomics.wait(ia, 0, 0, 50);
-            } catch {
-              // ignore
-            }
-          }
-        }
-        if (!renamed) {
-          // On Windows the file may be locked; fallback to copying the file
-          try {
-            fs.copyFileSync(sqliteFile, failedPath);
-            console.warn(`[DB] Copied corrupt DB to ${path.basename(failedPath)} (rename retries exhausted)`);
-            // Try to remove the original file to emulate a rename; on Windows this may require retries
-            let removed = false;
-            for (let attempt = 0; attempt < 40; attempt++) {
-              try {
-                fs.unlinkSync(sqliteFile);
-                removed = true;
-                break;
-              } catch (uErr) {
-                try {
-                  const sab = new SharedArrayBuffer(4);
-                  const ia = new Int32Array(sab);
-                  Atomics.wait(ia, 0, 0, 50);
-                } catch {
-                  // ignore
-                }
-              }
-            }
-            if (!removed) {
-                // Final forced delete fallback on Windows: use cmd del to bypass certain file locks
-                try {
-                  if (process.platform === 'win32') {
-                    try {
-                      cp.execSync(`cmd /c del /f /q "${sqliteFile}"`);
-                      removed = !fs.existsSync(sqliteFile);
-                      if (removed) console.warn('[DB] Removed original corrupt DB using cmd del fallback');
-                    } catch (delErr) {
-                      console.warn('[DB] cmd del fallback failed:', String(delErr));
-                    }
-                  }
-                } catch (finalErr) {
-                  // ignore
-                }
-                // Additional PowerShell removal fallback (synchronous) for stubborn locks
-                if (!removed && process.platform === 'win32') {
-                  try {
-                    const psCmd = `powershell -NoProfile -Command "for ($i=0; $i -lt 40; $i++) { try { Remove-Item -LiteralPath '${sqliteFile.replace(/'/g, "''")}' -Force -ErrorAction Stop; exit 0 } catch { Start-Sleep -Milliseconds 100 } } exit 1"`;
-                    try {
-                      cp.execSync(psCmd, { stdio: 'ignore' });
-                      removed = !fs.existsSync(sqliteFile);
-                      if (removed) console.warn('[DB] Removed original corrupt DB using PowerShell fallback');
-                    } catch (psErr) {
-                      console.warn('[DB] PowerShell fallback failed:', String(psErr));
-                    }
-                  } catch {
-                    /* ignore */
-                  }
-                }
-                if (!removed) console.warn('[DB] Could not remove original corrupt DB after copying; original file remains');
-            }
-            failedProbePath = failedPath;
-            failedProbeMessage = message;
-          } catch (copyErr) {
-            console.warn('[DB] Failed to preserve corrupt DB via rename or copy:', String(copyErr));
-          }
-        } else {
+      if (!retryProbeIfTransient(sqliteFile, e, openSqliteDatabase, closeProbeIfSafe)) {
+        preservedCriticalState = captureCriticalDbState(sqliteFile);
+        // SAFETY: Never delete the database — rename to backup so data can be recovered.
+        // The old code would silently destroy all user data on any probe failure.
+        const failedPath = sqliteFile + `.probe-failed-${Date.now()}`;
+        try {
+          fs.renameSync(sqliteFile, failedPath);
+          console.warn(`[DB] Renamed corrupt DB to ${path.basename(failedPath)}`);
           failedProbePath = failedPath;
           failedProbeMessage = message;
+        } catch {
+          /* ok */
         }
-      } catch (errAll) {
-        console.warn('[DB] Unexpected error while preserving corrupt DB:', String(errAll));
       }
     }
   }
@@ -1415,6 +1446,7 @@ export function getDbInstance(): SqliteDatabase {
   }
 
   startDbHealthCheckScheduler(db);
+  startWalTruncateScheduler(db);
   // Log the resolved absolute DATA_DIR + SQLITE_FILE once at init so a
   // multi-replica / Docker volume-topology mismatch (each replica opening a
   // different on-disk DB → "phantom"/missing combos & connections) is
@@ -1448,6 +1480,7 @@ export function pingDb(): boolean {
 
 export function closeDbInstance(options?: { checkpointMode?: CheckpointMode | null }): boolean {
   clearDbHealthCheckScheduler();
+  clearWalTruncateScheduler();
   const db = getDb();
   if (!db) return false;
 
@@ -1694,11 +1727,9 @@ function migrateFromJson(db: SqliteDatabase, jsonPath: string) {
           updatedAt: normalizedCombo.updatedAt || new Date().toISOString(),
         });
       }
-
-      // 5. API Keys
       const insertKey = db.prepare(`
-        INSERT OR REPLACE INTO api_keys (id, name, key, machine_id, allowed_models, no_log, created_at)
-        VALUES (@id, @name, @key, @machineId, @allowedModels, @noLog, @createdAt)
+        INSERT OR REPLACE INTO api_keys (id, name, key, machine_id, model_access_mode, allowed_models, no_log, created_at)
+        VALUES (@id, @name, @key, @machineId, @modelAccessMode, @allowedModels, @noLog, @createdAt)
       `);
       for (const apiKey of data.apiKeys || []) {
         insertKey.run({
@@ -1706,6 +1737,7 @@ function migrateFromJson(db: SqliteDatabase, jsonPath: string) {
           name: apiKey.name,
           key: apiKey.key,
           machineId: apiKey.machineId || null,
+          modelAccessMode: parseModelAccessMode(apiKey.modelAccessMode, apiKey.allowedModels),
           allowedModels: JSON.stringify(apiKey.allowedModels || []),
           noLog: apiKey.noLog ? 1 : 0,
           createdAt: apiKey.createdAt || new Date().toISOString(),
