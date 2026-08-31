@@ -6,8 +6,8 @@
 
 ## Overview
 
-When `FREEBUFF_ENABLED=1` is set, OmniRoute exposes the Freebuff
-provider on the following routes:
+The Freebuff provider is **enabled by default**. OmniRoute exposes it
+on the following routes:
 
 | Endpoint | Method | Auth | Purpose |
 |---|---|---|---|

@@ -157,3 +157,44 @@ export function truncateUrl(url: string | null | undefined, max = 50) {
 export function safePercentage(value: unknown): number | undefined {
   return typeof value === "number" && isFinite(value) ? value : undefined;
 }
+
+/**
+ * Format a reset countdown as a human-readable string: "2h 35m" or "4m 30s".
+ * Returns null if resetAt is in the past or not set.
+ *
+ * Lives here (client-safe utils) — not in db/providers/rateLimit — so client
+ * components can render a cooldown countdown without dragging the server-only
+ * DB barrel (better-sqlite3/ioredis → node:net) into the browser bundle.
+ * `rateLimit.ts` re-exports this for its server callers.
+ */
+export function formatResetCountdown(resetAt: string | number | null | undefined): string | null {
+  if (!resetAt) return null;
+  const resetTime = typeof resetAt === "number" ? resetAt : new Date(resetAt).getTime();
+  if (isNaN(resetTime)) return null;
+  const diffMs = resetTime - Date.now();
+  if (diffMs <= 0) return null;
+  const totalSeconds = Math.floor(diffMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
+
+/**
+ * Coerces a persisted log `error` field into safe display text. It is
+ * legitimate for this field to be a structured object (e.g. `{ code,
+ * message }`) — only the RENDER needs to be a string, never the persisted
+ * artifact itself. Used by RequestLoggerDetail to avoid React error #31
+ * ("Objects are not valid as a React child") when rendering it. See #7845.
+ */
+export function formatErrorForDisplay(err: unknown): string | null {
+  if (err == null) return null;
+  if (typeof err === "string") return err;
+  try {
+    return JSON.stringify(err, null, 2);
+  } catch {
+    return String(err);
+  }
+}

@@ -2,7 +2,7 @@
 // …). Extracted from validation.ts (god-file decomposition) — top-level functions/data with no
 // dispatcher-state captures; behavior is byte-identical to the original inline defs.
 import { SAFE_OUTBOUND_FETCH_PRESETS, safeOutboundFetch } from "@/shared/network/safeOutboundFetch";
-import { getProviderOutboundGuard } from "@/shared/network/outboundUrlGuard";
+import { getProviderOutboundGuard } from "@/shared/network/outboundUrlGuardPolicy";
 import { withCustomUserAgent } from "./headers";
 import { toValidationErrorResult, validationWrite } from "./transport";
 
@@ -186,6 +186,14 @@ export const SEARCH_VALIDATOR_CONFIGS: Record<
     init: {
       method: "GET",
       headers: { Authorization: `Bearer ${apiKey}` },
+    },
+  }),
+  tinyfish: (apiKey) => ({
+    url: "https://api.fetch.tinyfish.ai",
+    init: {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-API-Key": apiKey },
+      body: JSON.stringify({ urls: ["https://example.com"], format: "markdown" }),
     },
   }),
 };

@@ -1,0 +1,20 @@
+﻿node : [eval]:1
+Au caractère Ligne:1 : 1
++ node -e "process.env.FP_HASH='dfe512882b2869626d2887b834be28461dd6da8 ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([eval]:1:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+process.env.FP_HASH='dfe512882b2869626d2887b834be28461dd6da80384677f87de4a8d8b3e302ff'; 
+process.env.FP_EXPIRES='1784056197875'; node C:\Users\amine\OmniRoute\scripts\freebuff\poll-status-modes.mjs
+                                                                                                                       
+              ^
+Expected ';', '}' or <eof>
+
+SyntaxError: Unexpected identifier 'C'
+    at makeContextifyScript (node:internal/vm:185:14)
+    at compileScript (node:internal/process/execution:383:10)
+    at evalTypeScript (node:internal/process/execution:256:22)
+    at node:internal/main/eval_string:74:3
+
+Node.js v22.22.0

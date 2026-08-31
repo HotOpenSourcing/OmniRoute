@@ -39,16 +39,17 @@ If you are not comfortable with the above, do not enable this provider.
 
 ## Enable the provider
 
-Freebuff is **off by default**. Set the environment variable and restart
+Freebuff is **on by default**. The provider card is exposed under
+`/providers/freebuff` immediately after a fresh install. No environment
+variable is required.
+
+To disable the provider, set the following in `.env` and restart
 OmniRoute:
 
 ```bash
 # .env
-FREEBUFF_ENABLED=1
+FREEBUFF_ENABLED=0
 ```
-
-The provider card will appear under `/providers/freebuff` in the
-dashboard once the server is restarted with this variable set.
 
 ## Authentication
 
@@ -121,11 +122,46 @@ is fetched on demand — click **Refresh**.
   quota. If you hit `429`, OmniRoute surfaces the error to the client
   without retrying.
 
+## Known Issues
+
+### Empty Output Error
+
+**Symptom**: The model returns an error stating:
+```
+model output error: model output must contain either output text or tool calls, these cannot both be empty, please try again
+```
+
+**Cause**: The upstream Freebuff model fails to produce any usable output (no text content and no tool calls). This is typically a model-level issue rather than a client error.
+
+**Handling**: OmniRoute automatically detects this error as **non-retryable** and immediately falls back to the next model in the combo chain. The error is detected at multiple levels:
+
+1. **Early Detection** (`emulateChat.ts`): Peeks at the first 8KB of the stream to detect the error before processing
+2. **Stream Readiness** (`streamReadiness.ts`): Short-circuits if the error pattern is found in the SSE stream
+3. **Error Classification** (`errorClassifier.ts`): Classifies as `EMPTY_OUTPUT` (HTTP 502, non-retryable)
+
+**Fallback Behavior**:
+- ❌ No retry on the same model (would fail again)
+- ✅ Immediate fallback to next model in combo
+- ✅ Fast failure (<1s instead of 80s timeout)
+
+**Debug Logging**: Set `FREEBUFF_DEBUG=1` to enable diagnostic logging:
+```bash
+export FREEBUFF_DEBUG=1  # Linux/macOS
+$env:FREEBUFF_DEBUG="1"  # PowerShell
+```
+
+This will log:
+- Request envelope sent to upstream
+- Response status codes
+- Early detection results
+- Stream reconstruction details
+
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `FREEBUFF_ENABLED=1` set, but page says "not enabled" | Server not restarted | Restart OmniRoute |
+| `FREEBUFF_ENABLED=0` set, page says "not enabled" | Provider explicitly disabled | Unset / remove `FREEBUFF_ENABLED` and restart OmniRoute |
 | `country_blocked` errors | Datacenter IP blocked by Codebuff | Route through residential proxy |
 | `fingerprint mismatch` on first PKCE attempt | Running OmniRoute in Docker / cloud | Use **Path B** instead |
 | `409 Conflict` on first request | Another `freebuff` instance is running | Sign out or kill the other instance |
@@ -135,7 +171,7 @@ is fetched on demand — click **Refresh**.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `FREEBUFF_ENABLED` | `0` | Master switch. Set to `1` to enable the provider. |
+| `FREEBUFF_ENABLED` | `1` (on) | Master switch. Set to `0` to disable the provider. |
 | `FREEBUFF_USE_FREE_TIER` | `1` | Restrict the model catalog to free-tier models when set to `1`. |
 | `FREEBUFF_OAUTH_CLIENT_ID` | (unset) | OAuth client id registered with Codebuff. Defaults to the bundled id when unset. |
 | `FREEBUFF_OAUTH_TIMEOUT_MS` | `300000` | Timeout (ms) for the OAuth PKCE round-trip. |

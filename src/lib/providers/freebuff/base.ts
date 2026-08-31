@@ -37,6 +37,17 @@ export const FREEBUFF_ANTHROPIC_PATH = "/api/v1/chat/completions";
 /** OpenAI-compatible chat-completions path exposed by Codebuff/Freebuff. */
 export const FREEBUFF_OPENAI_PATH = "/api/v1/chat/completions";
 
+/**
+ * `agent-runs` handshake path. The chat-completions endpoint rejects
+ * every request whose `runId` has not been previously registered via
+ * `POST /api/v1/agent-runs {action:"START"}` (returns HTTP 400 with
+ * `No runId found in request body` or `runId Not Found: <uuid>`).
+ *
+ * Source: `~/.config/manicode/freebuff-model-tests/phase4-deliverables/
+ * 00-PROTOCOL-SPEC.md` §3.4 / `chat-v4.py` capture (2026-07-03).
+ */
+export const FREEBUFF_AGENT_RUNS_PATH = "/api/v1/agent-runs";
+
 /** Default API base URL for Freebuff/Codebuff requests. Overridable via
  *  the `FREEBUFF_API_BASE` env var. */
 export const FREEBUFF_DEFAULT_API_BASE = "https://www.codebuff.com";
@@ -58,12 +69,16 @@ export function resolveFreebuffBaseUrl(): string {
 }
 
 /**
- * Returns true only if the provider is explicitly opted-in.
- * Default is OFF — freebuff is opt-in per plan constraint C4.
+ * Returns whether the Freebuff (Codebuff) provider is enabled.
+ *
+ * Provider is ON by default — no opt-in required. Set
+ * `FREEBUFF_ENABLED=0` (or `=false`) to explicitly disable it
+ * (e.g. on hosts where Codebuff's ToS is not acceptable).
  */
 export function isFreebuffEnabled(): boolean {
   const v = process.env[FREEBUFF_ENABLED_ENV];
-  return v === "1" || v === "true";
+  if (v === undefined || v === "") return true;
+  return v !== "0" && v.toLowerCase() !== "false";
 }
 
 /**

@@ -17,7 +17,7 @@
  * The duckduckgo-web executor was the first known case. To prevent any
  * future executor from regressing on the same contract, this sweep test
  * imports every executor in `WEB_COOKIE_PROVIDERS` + `NOAUTH_PROVIDERS`
- * (20 web-cookie + 2 noauth = 22 total), calls `execute()` with a minimal
+ * (26 web-cookie + 2 noauth = 28 total), calls `execute()` with a minimal
  * but valid input, and asserts the wrapper shape. Tests use the
  * pre-aborted signal path or empty-creds path so no real upstream call
  * is needed.
@@ -28,10 +28,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { getExecutor } from "../../open-sse/executors/index.ts";
-import {
-  WEB_COOKIE_PROVIDERS,
-  NOAUTH_PROVIDERS,
-} from "../../src/shared/constants/providers.ts";
+import { WEB_COOKIE_PROVIDERS, NOAUTH_PROVIDERS } from "../../src/shared/constants/providers.ts";
 
 type WebCookieId = keyof typeof WEB_COOKIE_PROVIDERS;
 type NoauthId = keyof typeof NOAUTH_PROVIDERS;
@@ -64,7 +61,7 @@ const FAKE_CREDS: Record<string, string> = {
   "venice-web": "fake-audit-sweep",
   "v0-vercel-web": "fake-audit-sweep",
   "kimi-web": "fake-audit-sweep",
-  "doubao-web": "fake-audit-sweep",
+  "doubao-web": "sessionid=fake-audit-sweep; ttwid=fake-audit-sweep; s_v_web_id=verify_fake",
   "qwen-web": "fake-audit-sweep",
   "duckduckgo-web": "",
   "veoaifree-web": "",
@@ -100,11 +97,7 @@ function assertExecutorWrapperShape(
     r.response instanceof Response,
     `[${provider}] result.response must be a Response (got ${typeof r.response})`
   );
-  assert.equal(
-    typeof r.url,
-    "string",
-    `[${provider}] result.url must be a string`
-  );
+  assert.equal(typeof r.url, "string", `[${provider}] result.url must be a string`);
   assert.ok(
     r.headers && typeof r.headers === "object",
     `[${provider}] result.headers must be an object`
@@ -123,7 +116,7 @@ function assertExecutorWrapperShape(
 }
 
 describe("web-cookie + noauth executor wrapper contract sweep", () => {
-  describe("WEB_COOKIE_PROVIDERS (20)", () => {
+  describe("WEB_COOKIE_PROVIDERS (26)", () => {
     for (const providerId of WEB_COOKIE_IDS) {
       it(`${providerId} executor returns wrapper shape`, async () => {
         const executor = getExecutor(providerId);
@@ -148,10 +141,7 @@ describe("web-cookie + noauth executor wrapper contract sweep", () => {
         // We don't require JSON, but we DO require the body to be a
         // non-empty string (not the literal "[object Response]" or
         // a TypeError stack trace).
-        assert.ok(
-          body.length > 0,
-          `[${providerId}] response body must be non-empty`
-        );
+        assert.ok(body.length > 0, `[${providerId}] response body must be non-empty`);
         // And it must NOT be the duckduckgo-web regression signature.
         assert.doesNotMatch(
           body,
@@ -166,9 +156,7 @@ describe("web-cookie + noauth executor wrapper contract sweep", () => {
     // Only noauth providers that should be probed without creds:
     // duckduckgo-web and veoaifree-web. opencode/notice have dedicated
     // executor tests already (executor-opencode.test.ts / executor-notice.test.ts).
-    const TARGETS = NOAUTH_IDS.filter(
-      (id) => id === "duckduckgo-web" || id === "veoaifree-web"
-    );
+    const TARGETS = NOAUTH_IDS.filter((id) => id === "duckduckgo-web" || id === "veoaifree-web");
 
     for (const providerId of TARGETS) {
       it(`${providerId} noauth executor returns wrapper shape`, async () => {
@@ -201,13 +189,8 @@ describe("web-cookie + noauth executor wrapper contract sweep", () => {
         } else {
           assertExecutorWrapperShape(result, providerId);
         }
-        const body = await (
-          result instanceof Response ? result : result.response
-        ).text();
-        assert.ok(
-          body.length > 0,
-          `[${providerId}] response body must be non-empty`
-        );
+        const body = await (result instanceof Response ? result : result.response).text();
+        assert.ok(body.length > 0, `[${providerId}] response body must be non-empty`);
         assert.doesNotMatch(
           body,
           /Cannot read properties of undefined \(reading 'status'\)/,

@@ -35,13 +35,32 @@ describe("barrel exports", () => {
 });
 
 describe("getFreebuffProviderConfig", () => {
-  it("returns null when the provider is disabled", () => {
+  it("returns a config by default (provider is ON when env is unset)", () => {
     delete process.env.FREEBUFF_ENABLED;
+    delete process.env.FREEBUFF_TIER;
+    const cfg = getFreebuffProviderConfig();
+    assert.ok(cfg);
+    assert.equal(cfg.enabled, true);
+    assert.equal(cfg.providerId, "freebuff");
+    assert.equal(cfg.baseUrl, FREEBUFF_FREEBUFF_BASE_URL);
+    assert.equal(cfg.openaiChatPath, FREEBUFF_OPENAI_CHAT_PATH);
+    assert.equal(cfg.anthropicMessagesPath, FREEBUFF_ANTHROPIC_MESSAGES_PATH);
+    assert.match(cfg.credentialsPath, /credentials\.json$/);
+  });
+
+  it("returns null when explicitly disabled via FREEBUFF_ENABLED=0", () => {
+    process.env.FREEBUFF_ENABLED = "0";
     delete process.env.FREEBUFF_TIER;
     assert.equal(getFreebuffProviderConfig(), null);
   });
 
-  it("returns a config when enabled with default tier", () => {
+  it("returns null when explicitly disabled via FREEBUFF_ENABLED=false", () => {
+    process.env.FREEBUFF_ENABLED = "false";
+    delete process.env.FREEBUFF_TIER;
+    assert.equal(getFreebuffProviderConfig(), null);
+  });
+
+  it("returns a config when explicitly enabled via FREEBUFF_ENABLED=1", () => {
     process.env.FREEBUFF_ENABLED = "1";
     delete process.env.FREEBUFF_TIER;
     const cfg = getFreebuffProviderConfig();
@@ -55,15 +74,21 @@ describe("getFreebuffProviderConfig", () => {
   });
 });
 
-describe("endpoint helpers throw when disabled", () => {
-  it("getFreebuffOpenAIEndpoint throws", () => {
-    delete process.env.FREEBUFF_ENABLED;
-    assert.throws(() => getFreebuffOpenAIEndpoint(), /FREEBUFF_ENABLED=1/);
+describe("endpoint helpers throw when explicitly disabled", () => {
+  it("getFreebuffOpenAIEndpoint throws when FREEBUFF_ENABLED=0", () => {
+    process.env.FREEBUFF_ENABLED = "0";
+    assert.throws(
+      () => getFreebuffOpenAIEndpoint(),
+      /FREEBUFF_ENABLED=0/,
+    );
   });
 
-  it("getFreebuffAnthropicEndpoint throws", () => {
-    delete process.env.FREEBUFF_ENABLED;
-    assert.throws(() => getFreebuffAnthropicEndpoint(), /FREEBUFF_ENABLED=1/);
+  it("getFreebuffAnthropicEndpoint throws when FREEBUFF_ENABLED=0", () => {
+    process.env.FREEBUFF_ENABLED = "0";
+    assert.throws(
+      () => getFreebuffAnthropicEndpoint(),
+      /FREEBUFF_ENABLED=0/,
+    );
   });
 });
 

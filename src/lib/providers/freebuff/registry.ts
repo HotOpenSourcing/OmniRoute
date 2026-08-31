@@ -64,7 +64,7 @@ export function getFreebuffOpenAIEndpoint(): string {
   const cfg = getFreebuffProviderConfig();
   if (!cfg) {
     throw new Error(
-      "freebuff.getFreebuffOpenAIEndpoint: provider is disabled (set FREEBUFF_ENABLED=1)",
+      "freebuff.getFreebuffOpenAIEndpoint: provider is disabled (remove FREEBUFF_ENABLED=0)",
     );
   }
   return `${cfg.baseUrl}${cfg.openaiChatPath}`;
@@ -78,7 +78,7 @@ export function getFreebuffAnthropicEndpoint(): string {
   const cfg = getFreebuffProviderConfig();
   if (!cfg) {
     throw new Error(
-      "freebuff.getFreebuffAnthropicEndpoint: provider is disabled (set FREEBUFF_ENABLED=1)",
+      "freebuff.getFreebuffAnthropicEndpoint: provider is disabled (remove FREEBUFF_ENABLED=0)",
     );
   }
   return `${cfg.baseUrl}${cfg.anthropicMessagesPath}`;

@@ -32,6 +32,7 @@ export {
   getFreebuffQuota,
   acquireFreebuffSlot,
   releaseFreebuffSlot,
+  FreebuffAuthError,
   type FreebuffSessionStatus,
   type FreebuffAccessTier,
   type FreebuffSession,
@@ -39,6 +40,19 @@ export {
   type FreebuffQuotaSnapshot,
   type GetFreebuffQuotaOptions,
 } from "./quota";
+
+// ─── session manager ──────────────────────────────────────────────
+export {
+  freebuffSessionManager,
+  FreebuffSessionManager,
+  FreebuffSessionManagerError,
+  FREEBUFF_DEFAULT_REFRESH_LEAD_MS,
+  FREEBUFF_DEFAULT_TTL_MS,
+  type SessionEntry,
+  type SessionManagerOptions,
+  type AcquireSessionArgs,
+  type SessionManagerErrorCode,
+} from "./sessionManager";
 
 // ─── lock ──────────────────────────────────────────────────────────
 export {
@@ -53,6 +67,32 @@ export {
   type FreebuffLockResult,
   type FreebuffLockRecord,
 } from "./lock";
+
+// ─── seat cache (1-hour session cache for chat-completions) ───────
+export {
+  ensureFreebuffSeat,
+  invalidateFreebuffSeat,
+  getFreebuffSeatCacheSize,
+  withFreebuffChatLock,
+  getFreebuffChatLockCount,
+  type FreebuffSeat,
+  type EnsureFreebuffSeatOptions,
+} from "./seatCache";
+
+// ─── connection status (token TTL + re-auth warning) ──────────────
+export {
+  deriveFreebuffConnectionStatus,
+  getFreebuffConnectionStatus,
+  listFreebuffConnectionStatuses,
+  type FreebuffConnectionStatus,
+} from "./metaService";
+
+// ─── connection schema (token TTL constants + helpers) ────────────
+export {
+  FREEBUFF_TOKEN_TTL_MS,
+  effectiveTokenExpiresAt,
+  isFreebuffTokenExpiringSoon,
+} from "@/shared/schemas/providers/freebuff";
 
 // ─── registry ──────────────────────────────────────────────────────
 export {
@@ -69,7 +109,12 @@ export {
   sendFreebuffChat,
   sendFreebuffChatOnce,
   FreebuffChatRequestError,
+  FREEBUFF_SDK_VERSION,
+  FREEBUFF_USER_AGENT,
+  buildFreebuffChatBody,
+  buildFreebuffChatHeaders,
   type FreebuffChatRequest,
+  type FreebuffChatBodyInput,
 } from "./chat";
 
 // ─── pass-through transformer ──────────────────────────────────────
@@ -77,3 +122,25 @@ export {
   createPassthroughTransformer,
   type PassThroughOptions,
 } from "./stream/passthroughTransformer";
+
+// ─── agent-runs handshake ────────────────────────────────────────
+export {
+  FREEBUFF_AGENT_RUNS_PATH,
+} from "./base";
+export {
+  FreebuffProviderError,
+  buildFreebuffHeaders,
+  startAgentRun,
+  finishAgentRun,
+  type FreebuffCredentials,
+  type StartAgentRunParams,
+  type FinishAgentRunParams,
+  type FinishAgentRunStatus,
+} from "./agentRuns";
+
+// ─── model → agentId mapping ──────────────────────────────────────
+export {
+  getFreebuffAgentId,
+  listFreebuffMappedModels,
+  generateFreebuffRequestId,
+} from "./agentMapping";

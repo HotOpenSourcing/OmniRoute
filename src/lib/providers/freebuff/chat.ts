@@ -1,21 +1,34 @@
 /**
  * Freebuff chat-completions orchestrator.
  *
- * Implements the two-step Freebuff flow:
- *   1. Acquire a waiting-room slot via `POST /api/v1/freebuff/session`
- *      → returns an `instanceId` bound to the requested model.
+ * Implements the two-step Freebuff flow with a per-process seat cache:
+ *   1. Acquire (or reuse) a waiting-room slot via the
+ *      `freebuffSessionManager` (cached `instanceId` keyed by
+ *      `(authToken, model)`, with proactive refresh at
+ *      `expiresAt - 5 min`).
  *   2. Stream the chat via `POST /api/v1/chat/completions` with the
- *      `instanceId` embedded as `codebuff.codebuff_metadata.freebuff_instance_id`.
- *   3. Release the slot via `DELETE /api/v1/freebuff/session` (best-effort).
+ *      `instanceId` in the `x-freebuff-instance-id` header and the
+ *      body envelope validated in `chatIntegration.ts` (top-level
+ *      `runId`, `provider`, `codebuff_metadata` — see
+ *      `validation-scripts/final-validations.md` C3).
+ *   3. The seat is NOT released on stream end (the server TTL is 1 h
+ *      and we want to reuse it across requests). Explicit release
+ *      goes through `freebuffSessionManager.releaseSession(...)` for
+ *      sign-out / account-switch flows.
  *
- * The upstream emits standard OpenAI chat-completion SSE chunks, so the
- * caller can pipe the response body through `createPassthroughTransformer`
- * (or re-frame it for Anthropic callers).
+ * The upstream emits standard OpenAI chat-completion SSE chunks, so
+ * the caller can pipe the response body through
+ * `createPassthroughTransformer` (or re-frame it for Anthropic).
  *
  * @module lib/providers/freebuff/chat
  */
 
-import { acquireFreebuffSlot, releaseFreebuffSlot, type FreebuffSessionStatus } from "./quota.ts";
+import { type FreebuffSessionStatus, FreebuffAuthError } from "./quota.ts";
+import { getFreebuffRootAgentIdForModel } from "./models.ts";
+import {
+  freebuffSessionManager,
+  FreebuffSessionManagerError,
+} from "./sessionManager.ts";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import * as fs from "node:fs";
@@ -104,7 +117,19 @@ const PROVIDER_ORDER: Record<string, string> = {
   moonshotai: "Moonshot",
   "z-ai": "Z-AI",
   google: "Google",
+  anthropic: "Anthropic",
+  openai: "OpenAI",
+  "x-ai": "xAI",
 };
+
+/**
+ * User-Agent header stamped on every chat call to the upstream.
+ * Matches the SDK binary's `ai-sdk/openai-compatible/<v>/codebuff`
+ * pattern. The server does NOT validate the UA (Mission 1 case 4),
+ * but we send it for traceability.
+ */
+export const FREEBUFF_SDK_VERSION = "1.0.0";
+export const FREEBUFF_USER_AGENT = `ai-sdk/openai-compatible/${FREEBUFF_SDK_VERSION}/codebuff`;
 
 function providerNameFor(model: string): string {
   const key = model.split("/")[0]?.toLowerCase() ?? "";
@@ -119,10 +144,160 @@ function uuid(): string {
 }
 
 /**
- * Read the credentials.json and return the `default.authToken`.
- * Throws if no token is found.
+ * Module-level stable `client_id` for the OmniRoute process. The
+ * upstream correlates requests by `codebuff_metadata.client_id`, so
+ * it MUST stay constant across the lifetime of a single user session
+ * (per the SDK contract — `codebuff_metadata.client_id` is the
+ * session-level correlation id, NOT a per-request id).
+ *
+ * Generated lazily on first read.
+ *
+ * Exposed as `__resetStableClientId()` for tests so each `describe`
+ * block can start with a fresh correlation id.
  */
-async function readAuthToken(): Promise<string> {
+let STABLE_CLIENT_ID: string | undefined;
+function stableClientId(): string {
+  if (!STABLE_CLIENT_ID) STABLE_CLIENT_ID = uuid();
+  return STABLE_CLIENT_ID;
+}
+
+/** Test seam — reset the module-level stable `client_id`. */
+export function __resetStableClientId(): void {
+  STABLE_CLIENT_ID = undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Pure wire-shape helpers (exported for unit tests + reuse by callers that
+// already hold a seat — e.g. the agent-runs executor in
+// `open-sse/executors/freebuff.ts`).
+// ---------------------------------------------------------------------------
+
+export interface FreebuffChatBodyInput {
+  model: string;
+  messages: Array<{ role: string; content: string }>;
+  temperature?: number;
+  top_p?: number;
+  max_tokens?: number;
+  stream?: boolean;
+  /** Seat UUID stamped on `x-freebuff-instance-id` and
+   *  `codebuff_metadata.freebuff_instance_id`. */
+  instanceId: string;
+  /** Fingerprint id stamped on `x-codebuff-fingerprint` and
+   *  `codebuff_metadata.fingerprint_id`. */
+  fingerprintId?: string;
+  /** Stable client correlation id for `codebuff_metadata.client_id`. */
+  clientId?: string;
+  /** Override the per-request `runId` (rare — defaults to a uuid v4). */
+  runId?: string;
+  /** Override the per-request `user_input_id` (rare). */
+  userInputId?: string;
+  /** Override the per-request `trace_session_id` (rare). */
+  traceSessionId?: string;
+}
+
+/**
+ * Build the chat-completions request body for the Codebuff/Freebuff
+ * upstream.
+ *
+ * Body envelope (post v3.8.43, validated against www.codebuff.com):
+ *   runId, provider, codebuff_metadata MUST be at the TOP LEVEL — the
+ *   upstream returns 400 "No runId found in request body" when they are
+ *   nested under a `codebuff.*` wrapper. (See
+ *   `validation-scripts/final-validations.md` finding C3.)
+ *
+ * Required `codebuff_metadata` fields:
+ *   - fingerprint_id, client_id, cost_mode: "free",
+ *     user_input_id, agent, freebuff_instance_id, trace_session_id
+ *
+ * Required `provider` fields:
+ *   - order: [primary], allow_fallbacks: false, sort: "price"
+ */
+export function buildFreebuffChatBody(
+  input: FreebuffChatBodyInput,
+): {
+  body: Record<string, unknown>;
+  agentId: string;
+  runId: string;
+  userInputId: string;
+  traceSessionId: string;
+} {
+  const agentId = getFreebuffRootAgentIdForModel(input.model);
+  const runId = input.runId ?? uuid();
+  const userInputId = input.userInputId ?? uuid();
+  const traceSessionId = input.traceSessionId ?? uuid();
+  const providerName = providerNameFor(input.model);
+
+  const body: Record<string, unknown> = {
+    runId,
+    model: input.model,
+    messages: input.messages,
+    stream: input.stream ?? true,
+    stream_options: { include_usage: true },
+    max_tokens: input.max_tokens ?? 1024,
+    provider: {
+      order: [providerName],
+      allow_fallbacks: false,
+      sort: "price",
+    },
+    codebuff_metadata: {
+      fingerprint_id: input.fingerprintId ?? "unknown",
+      client_id: input.clientId ?? stableClientId(),
+      cost_mode: "free",
+      user_input_id: userInputId,
+      agent: agentId,
+      freebuff_instance_id: input.instanceId,
+      trace_session_id: traceSessionId,
+    },
+  };
+  if (input.temperature !== undefined) body.temperature = input.temperature;
+  if (input.top_p !== undefined) body.top_p = input.top_p;
+  return { body, agentId, runId, userInputId, traceSessionId };
+}
+
+/**
+ * Build the chat-completions request headers for the Codebuff/Freebuff
+ * upstream. Exported for tests + callers that already hold a seat.
+ */
+export function buildFreebuffChatHeaders(input: {
+  authToken: string;
+  instanceId: string;
+  model: string;
+  fingerprintId?: string;
+  fingerprintHash?: string;
+  stream: boolean;
+}): Record<string, string> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${input.authToken}`,
+    "Content-Type": "application/json",
+    Accept: input.stream ? "text/event-stream" : "application/json",
+    "user-agent": FREEBUFF_USER_AGENT,
+    "x-freebuff-instance-id": input.instanceId,
+    "x-freebuff-model": input.model,
+  };
+  if (input.fingerprintId) {
+    headers["x-codebuff-fingerprint"] = input.fingerprintId;
+  }
+  if (input.fingerprintHash) {
+    headers["x-codebuff-fingerprint-hash"] = input.fingerprintHash;
+  }
+  return headers;
+}
+
+/**
+ * Read credentials.json and return the full credential triple.
+ * Throws `FreebuffChatRequestError` if no usable authToken is found.
+ *
+ * Note: fingerprintId/fingerprintHash are optional — when absent, the
+ * `x-codebuff-fingerprint[-hash]` headers are simply not sent. The
+ * upstream does not require them (validated by Mission 1 case 5).
+ */
+interface FreebuffCredentials {
+  authToken: string;
+  fingerprintId?: string;
+  fingerprintHash?: string;
+}
+
+async function readCredentials(): Promise<FreebuffCredentials> {
   const fs = await import("node:fs/promises");
   let raw: string;
   try {
@@ -143,16 +318,20 @@ async function readAuthToken(): Promise<string> {
       500,
     );
   }
-  const token = (parsed as { default?: { authToken?: string } })?.default
-    ?.authToken;
-  if (!token) {
+  const def = (parsed as { default?: { authToken?: string; fingerprintId?: string; fingerprintHash?: string } })?.default;
+  const token = def?.authToken;
+  if (!token || token === "REFRESH_NEEDED" || token === "not-a-uuid") {
     throw new FreebuffChatRequestError(
-      `No default.authToken found in ${FREEBUFF_CREDENTIALS_PATH}`,
+      `No usable default.authToken found in ${FREEBUFF_CREDENTIALS_PATH} (got: ${token ? `"${token}"` : "missing"})`,
       401,
       "no_connection",
     );
   }
-  return token;
+  return {
+    authToken: token,
+    fingerprintId: def?.fingerprintId || undefined,
+    fingerprintHash: def?.fingerprintHash || undefined,
+  };
 }
 
 /**
@@ -171,88 +350,156 @@ async function readAuthToken(): Promise<string> {
 export async function sendFreebuffChat(
   request: FreebuffChatRequest,
 ): Promise<Response> {
-  const authToken = await readAuthToken();
+  const credentials = await readCredentials();
+  const { authToken } = credentials;
 
-  // Step 1 — acquire a slot.
-  const slot = await acquireFreebuffSlot(authToken, request.model);
-  if (slot.status !== "active") {
-    throw new FreebuffChatRequestError(
-      `Freebuff refused the session for model=${request.model}: ${slot.status}`,
-      429,
-      slot.status,
-    );
+  // Step 1 — acquire (or reuse) a seat via the session manager.
+  //
+  // The SessionManager caches the `instanceId` across calls within one
+  // OmniRoute process so concurrent chat requests for the same
+  // `(token, model)` share a single server-side seat (the server
+  // mutex would otherwise `superseded`-kill the previous one). It
+  // also schedules a proactive refresh at `expiresAt - 5 min` so the
+  // caller never observes an `ended → none` gap.
+  let seat;
+  try {
+    seat = await freebuffSessionManager.acquireSession({
+      authToken,
+      model: request.model,
+      fingerprint: credentials.fingerprintId
+        ? {
+            fingerprintId: credentials.fingerprintId,
+            fingerprintHash: credentials.fingerprintHash,
+          }
+        : undefined,
+    });
+  } catch (err) {
+    // 401 → FreebuffAuthError (re-auth required). Propagate as-is so
+    // the caller can route to a re-auth flow.
+    if (err instanceof FreebuffAuthError) {
+      throw err;
+    }
+    // SessionManager typed error → map to FreebuffChatRequestError for
+    // backwards compat with existing callers.
+    if (err instanceof FreebuffSessionManagerError) {
+      throw new FreebuffChatRequestError(
+        err.message,
+        err.status,
+        err.code as FreebuffSessionStatus | undefined,
+      );
+    }
+    throw err;
   }
-  const instanceId = slot.instanceId;
-  if (!instanceId) {
-    throw new FreebuffChatRequestError(
-      "Freebuff returned an active session without an instanceId",
-      500,
-      "active",
-    );
-  }
 
-  // Step 2 — dispatch the chat completion.
-  const runId = uuid();
-  const clientId = uuid();
-  const providerName = providerNameFor(request.model);
+  const instanceId = seat.instanceId;
 
-  const body = {
+  // Step 2 — build the wire-shape body and headers via the pure
+  // helpers (exported for tests). The body envelope is locked in
+  // `chatIntegration.ts` and re-validated against the live upstream
+  // (`validation-scripts/final-validations.md` C3): `runId`, `provider`,
+  // and `codebuff_metadata` MUST be at the TOP LEVEL — nested values
+  // trigger HTTP 400.
+  const stream = request.stream ?? true;
+  const { body } = buildFreebuffChatBody({
     model: request.model,
     messages: request.messages,
-    stream: request.stream ?? true,
-    max_tokens: request.max_tokens ?? 1024,
-    ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
-    ...(request.top_p !== undefined ? { top_p: request.top_p } : {}),
-    codebuff: {
-      codebuff_metadata: {
-        run_id: runId,
-        client_id: clientId,
-        cost_mode: "free",
-        freebuff_instance_id: instanceId,
-      },
-      provider: {
-        order: [providerName],
-        allow_fallbacks: false,
-      },
-    },
-  };
+    temperature: request.temperature,
+    top_p: request.top_p,
+    max_tokens: request.max_tokens,
+    stream,
+    instanceId,
+    fingerprintId: credentials.fingerprintId,
+  });
+  const headers = buildFreebuffChatHeaders({
+    authToken,
+    instanceId,
+    model: request.model,
+    fingerprintId: credentials.fingerprintId,
+    fingerprintHash: credentials.fingerprintHash,
+    stream,
+  });
 
   let upstream: Response;
   try {
     upstream = await fetch(`${FREEBUFF_API_BASE}/api/v1/chat/completions`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-        "Content-Type": "application/json",
-        Accept: request.stream === false ? "application/json" : "text/event-stream",
-      },
+      headers,
       body: JSON.stringify(body),
     });
   } catch (err) {
-    // Best-effort release before propagating.
-    await releaseFreebuffSlot(authToken).catch(() => undefined);
+    // Network error before we got any response: do NOT release the
+    // cached seat (we may just have hit a transient blip and the
+    // seat is still valid for ~1h). Just surface the error.
     throw new FreebuffChatRequestError(
       `Network error contacting Freebuff: ${(err as Error).message}`,
       503,
     );
   }
 
+  // 401 from the chat endpoint itself (token expired between POST /session
+  // and POST /chat) — invalidate the entire token's seat cache so the
+  // next caller triggers re-auth.
+  if (upstream.status === 401) {
+    freebuffSessionManager.invalidateAll(authToken, "auth_expired");
+    const errorBody = await upstream.text().catch(() => "");
+    throw new FreebuffChatRequestError(
+      `Freebuff upstream returned HTTP 401 — auth token expired: ${errorBody.slice(0, 200)}`,
+      401,
+    );
+  }
+
+  // 409 with body indicating the instance is no longer valid (server
+  // swept the row → typical after `superseded` or after `ended`).
+  // Invalidate the cached seat and surface a typed error so the
+  // caller can retry with a fresh acquisition.
+  if (upstream.status === 409) {
+    const errorBody = await upstream.text().catch(() => "");
+    let parsedBody: { status?: string } | null = null;
+    try {
+      parsedBody = JSON.parse(errorBody) as { status?: string };
+    } catch {
+      /* not JSON */
+    }
+    if (
+      parsedBody?.status === "superseded" ||
+      parsedBody?.status === "ended" ||
+      parsedBody?.status === "none"
+    ) {
+      freebuffSessionManager.invalidate(authToken, request.model, "superseded");
+      throw new FreebuffChatRequestError(
+        `Freebuff seat ${instanceId} for model=${request.model} is ${parsedBody.status}; please retry`,
+        upstream.status,
+        parsedBody.status as FreebuffSessionStatus,
+      );
+    }
+  }
+
   if (!upstream.ok || !upstream.body) {
     const errorBody = await upstream.text().catch(() => "");
-    await releaseFreebuffSlot(authToken).catch(() => undefined);
     throw new FreebuffChatRequestError(
       `Freebuff upstream returned HTTP ${upstream.status}: ${errorBody.slice(0, 200)}`,
       upstream.status,
     );
   }
 
-  // Step 3 — wrap the upstream body so the slot is released when the
-  // consumer finishes (or aborts) the stream.
-  const releasedRef = { released: false };
-  const release = () => {
-    if (releasedRef.released) return;
-    releasedRef.released = true;
-    void releaseFreebuffSlot(authToken).catch(() => undefined);
+  // Step 3 — wrap the upstream body. The seat is intentionally NOT
+  // released on stream end:
+  //
+  //   - The server-side seat has a 1 h flat TTL (C5). Deleting it
+  //     after every chat turn would force a fresh POST on the next
+  //     request and waste the TTL budget.
+  //   - The `freebuffSessionManager` keeps the cached `instanceId`
+  //     warm and proactively refreshes it at `expiresAt - 5 min`.
+  //   - Explicit release (sign-out, account switch, error path) goes
+  //     through `freebuffSessionManager.releaseSession(...)`.
+  //
+  // We still wrap the body so we can attach a `finalize` hook for
+  // callers that want to react to stream end (e.g. UI side-effects),
+  // but the hook is intentionally a no-op for the seat.
+  const finalizeRef = { finalized: false };
+  const finalize = () => {
+    if (finalizeRef.finalized) return;
+    finalizeRef.finalized = true;
   };
 
   const wrappedBody = upstream.body.pipeThrough(
@@ -261,10 +508,10 @@ export async function sendFreebuffChat(
         controller.enqueue(chunk);
       },
       flush() {
-        release();
+        finalize();
       },
       cancel() {
-        release();
+        finalize();
       },
     }),
   );

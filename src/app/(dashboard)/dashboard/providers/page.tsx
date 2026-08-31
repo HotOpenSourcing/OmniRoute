@@ -13,17 +13,26 @@ import {
 import { partitionNoAuthEntriesByBlocked } from "@/shared/utils/noAuthProviders";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getErrorCode, getRelativeTime } from "@/shared/utils";
+import {
+  isProviderConnectionConnected,
+  isProviderConnectionErrored,
+} from "@/shared/utils/providerConnectionStatus";
 import { pickDisplayValue } from "@/shared/utils/maskEmail";
 import useEmailPrivacyStore from "@/store/emailPrivacyStore";
 import { useNotificationStore } from "@/store/notificationStore";
 import { useTranslations } from "next-intl";
+import { useSyncedModelsByProvider } from "./hooks/useSyncedModelsByProvider";
 import {
   buildStaticProviderEntries,
   buildCompatibleProviderGroups,
+  connectionMatchesProviderCard,
   filterConfiguredProviderEntries,
   shouldFilterProviderEntriesForDisplayMode,
   shouldShowFirstProviderHint,
+  shouldShowProviderSection,
+  syncSearchToUrl,
   upsertProviderNodeById,
+  loadProviderPageData,
 } from "./providerPageUtils";
 import type { ProviderEntry } from "./providerPageUtils";
 import {
@@ -39,8 +48,9 @@ import {
 } from "@/lib/providers/codexFastTier";
 import AddCompatibleProviderModal from "./components/AddCompatibleProviderModal";
 import { CategoryDot } from "./components/CategoryDot";
+import { ImportProvidersFromFileModal } from "./components/ImportProvidersFromFileModal";
 import NoAuthProvidersSection from "./components/NoAuthProvidersSection";
-import ProviderCard from "./components/ProviderCard";
+import HighlightableProviderCard from "./components/HighlightableProviderCard";
 import ProviderCountBadge from "./components/ProviderCountBadge";
 import ProviderSummaryCard from "./components/ProviderSummaryCard";
 import {
@@ -178,6 +188,7 @@ export default function ProvidersPage() {
   const [showAddCompatibleModal, setShowAddCompatibleModal] = useState(false);
   const [showAddAnthropicCompatibleModal, setShowAddAnthropicCompatibleModal] = useState(false);
   const [showAddCcCompatibleModal, setShowAddCcCompatibleModal] = useState(false);
+  const [showImportFromFileModal, setShowImportFromFileModal] = useState(false);
   const [testingMode, setTestingMode] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<any>(null);
   const [providerDisplayMode, setProviderDisplayMode] = useState<ProviderDisplayMode>("all");
@@ -189,13 +200,13 @@ export default function ProvidersPage() {
   const [repairingEnv, setRepairingEnv] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [modelSearchQuery, setModelSearchQuery] = useState("");
+  const liveModelsByProviderId = useSyncedModelsByProvider();
   const [showFreeOnly, setShowFreeOnly] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   // #4240: media-category (serviceKind) filter — composes with activeCategory,
   // search and configured-only. null = no serviceKind filter.
   const [activeServiceKind, setActiveServiceKind] = useState<string | null>(null);
   const notify = useNotificationStore();
-  const hasSearchQuery = searchQuery.trim().length > 0 || modelSearchQuery.trim().length > 0;
   const sectionCategoryAliases: Record<string, string> = {
     cloud: "cloudagent",
     noauth: "no-auth",
@@ -204,9 +215,7 @@ export default function ProvidersPage() {
   };
   const showSection = (category: string) => {
     const normalizedCategory = sectionCategoryAliases[category] ?? category;
-    if (showFreeOnly) return normalizedCategory === "free";
-    if (hasSearchQuery && !activeCategory) return normalizedCategory !== "free";
-    return !activeCategory || activeCategory === normalizedCategory;
+    return shouldShowProviderSection(normalizedCategory, activeCategory, showFreeOnly);
   };
   const t = useTranslations("providers");
   const tc = useTranslations("common");
@@ -232,28 +241,22 @@ export default function ProvidersPage() {
   }, [searchParams]);
 
   useEffect(() => {
+    syncSearchToUrl(searchQuery);
+  }, [searchQuery]);
+
+  useEffect(() => {
     const fetchData = async () => {
       try {
-        const [connectionsRes, nodesRes, expirationsRes, settingsRes] = await Promise.all([
-          fetch("/api/providers"),
-          fetch("/api/provider-nodes"),
-          fetch("/api/providers/expiration"),
-          fetch("/api/settings", { cache: "no-store" }),
-        ]);
-        const connectionsData = await connectionsRes.json();
-        const nodesData = await nodesRes.json();
-        const expirationsData = await expirationsRes.json();
-        const settingsData = settingsRes.ok ? await settingsRes.json() : null;
-        if (connectionsRes.ok) setConnections(connectionsData.connections || []);
-        if (nodesRes.ok) {
-          setProviderNodes(nodesData.nodes || []);
-          setCcCompatibleProviderEnabled(nodesData.ccCompatibleProviderEnabled === true);
-        }
-        if (expirationsRes.ok && expirationsData) setExpirations(expirationsData);
-        if (settingsData && Array.isArray(settingsData.blockedProviders)) {
-          setBlockedProviders(settingsData.blockedProviders);
-        }
-        setCodexGlobalServiceMode(getCodexGlobalServiceMode(settingsData));
+        // Each request is time-bounded (see loadProviderPageData); a single
+        // stalled connection can no longer wedge `loading` on `true` and freeze
+        // the page on its skeleton forever.
+        const data = await loadProviderPageData();
+        setConnections(data.connections);
+        setProviderNodes(data.providerNodes);
+        setCcCompatibleProviderEnabled(data.ccCompatibleProviderEnabled);
+        if (data.expirations) setExpirations(data.expirations);
+        if (data.blockedProviders) setBlockedProviders(data.blockedProviders);
+        setCodexGlobalServiceMode(getCodexGlobalServiceMode(data.settings));
       } catch (error) {
         console.log("Error fetching data:", error);
       } finally {
@@ -326,32 +329,17 @@ export default function ProvidersPage() {
   };
 
   const getProviderStats = (providerId, authType) => {
-    const providerConnections = connections.filter((c) => {
-      if (c.provider !== providerId) return false;
-      if (authType === "free") return true;
-      return c.authType === authType;
-    }).filter((c) => {
-      // For Kiro provider, mask/hide disabled connections (isActive=false)
-      if (providerId === "kiro" && c.isActive === false) return false;
-      return true;
-    });
+    const providerConnections = connections.filter((c) =>
+      connectionMatchesProviderCard(c, providerId, authType)
+    );
 
-    // Helper: check if connection is effectively active (cooldown expired)
-    const getEffectiveStatus = (conn) => {
-      const isCooldown =
-        conn.rateLimitedUntil && new Date(conn.rateLimitedUntil).getTime() > Date.now();
-      return conn.testStatus === "unavailable" && !isCooldown ? "active" : conn.testStatus;
-    };
+    const connected = providerConnections.filter((connection) =>
+      isProviderConnectionConnected(connection)
+    ).length;
 
-    const connected = providerConnections.filter((c) => {
-      const status = getEffectiveStatus(c);
-      return status === "active" || status === "success";
-    }).length;
-
-    const errorConns = providerConnections.filter((c) => {
-      const status = getEffectiveStatus(c);
-      return status === "error" || status === "expired" || status === "unavailable";
-    });
+    const errorConns = providerConnections.filter((connection) =>
+      isProviderConnectionErrored(connection)
+    );
 
     const error = errorConns.length;
     const total = providerConnections.length;
@@ -397,8 +385,7 @@ export default function ProvidersPage() {
     // Count API keys in "warning" state across all connections
     const warning = providerConnections.reduce((warnCount, conn) => {
       const health = (conn as any).providerSpecificData?.apiKeyHealth as
-        | Record<string, { status: string }>
-        | undefined;
+        Record<string, { status: string }> | undefined;
       if (!health) return warnCount;
       return warnCount + Object.values(health).filter((h) => h.status === "warning").length;
     }, 0);
@@ -418,18 +405,14 @@ export default function ProvidersPage() {
 
   // Toggle all connections for a provider on/off
   const handleToggleProvider = async (providerId: string, authType: string, newActive: boolean) => {
-    const providerConns = connections.filter((c) => {
-      if (c.provider !== providerId) return false;
-      if (authType === "free") return true;
-      return c.authType === authType;
-    });
+    // Mirror getProviderStats: dual-auth providers (qoder, …) toggle BOTH their
+    // oauth and apikey/PAT connections from the single OAuth card.
+    const matchesToggle = (c: { provider: string; authType?: string }) =>
+      connectionMatchesProviderCard(c, providerId, authType as "oauth" | "free" | "apikey");
+    const providerConns = connections.filter(matchesToggle);
     // Optimistically update UI
     setConnections((prev) =>
-      prev.map((c) =>
-        c.provider === providerId && (authType === "free" || c.authType === authType)
-          ? { ...c, isActive: newActive }
-          : c
-      )
+      prev.map((c) => (matchesToggle(c) ? { ...c, isActive: newActive } : c))
     );
     // Fire API calls in parallel
     await Promise.allSettled(
@@ -516,7 +499,8 @@ export default function ProvidersPage() {
     searchQuery,
     showFreeOnly,
     modelSearchQuery,
-    activeServiceKind
+    activeServiceKind,
+    liveModelsByProviderId
   );
 
   const rawNoAuthEntriesAll = buildStaticProviderEntries("no-auth", getProviderStats);
@@ -533,7 +517,8 @@ export default function ProvidersPage() {
     searchQuery,
     showFreeOnly,
     modelSearchQuery,
-    activeServiceKind
+    activeServiceKind,
+    liveModelsByProviderId
   );
 
   const apiKeyProviderEntriesAll = buildStaticProviderEntries("apikey", getProviderStats);
@@ -551,7 +536,8 @@ export default function ProvidersPage() {
     searchQuery,
     showFreeOnly,
     modelSearchQuery,
-    activeServiceKind
+    activeServiceKind,
+    liveModelsByProviderId
   );
   const aggregatorProviderEntriesAll = apiKeyProviderEntriesAll.filter((entry) =>
     AGGREGATOR_PROVIDER_IDS.has(entry.providerId)
@@ -562,7 +548,8 @@ export default function ProvidersPage() {
     searchQuery,
     showFreeOnly,
     modelSearchQuery,
-    activeServiceKind
+    activeServiceKind,
+    liveModelsByProviderId
   );
   const imageProviderEntriesAll = apiKeyProviderEntriesAll.filter((entry) =>
     IMAGE_ONLY_PROVIDER_IDS.has(entry.providerId)
@@ -573,7 +560,8 @@ export default function ProvidersPage() {
     searchQuery,
     showFreeOnly,
     modelSearchQuery,
-    activeServiceKind
+    activeServiceKind,
+    liveModelsByProviderId
   );
   const enterpriseProviderEntriesAll = apiKeyProviderEntriesAll.filter((entry) =>
     ENTERPRISE_CLOUD_PROVIDER_IDS.has(entry.providerId)
@@ -584,7 +572,8 @@ export default function ProvidersPage() {
     searchQuery,
     showFreeOnly,
     modelSearchQuery,
-    activeServiceKind
+    activeServiceKind,
+    liveModelsByProviderId
   );
   const videoProviderEntriesAll = apiKeyProviderEntriesAll.filter((entry) =>
     VIDEO_PROVIDER_IDS.has(entry.providerId)
@@ -595,7 +584,8 @@ export default function ProvidersPage() {
     searchQuery,
     showFreeOnly,
     modelSearchQuery,
-    activeServiceKind
+    activeServiceKind,
+    liveModelsByProviderId
   );
   const embeddingRerankProviderEntriesAll = apiKeyProviderEntriesAll.filter((entry) =>
     EMBEDDING_RERANK_PROVIDER_IDS.has(entry.providerId)
@@ -606,7 +596,8 @@ export default function ProvidersPage() {
     searchQuery,
     showFreeOnly,
     modelSearchQuery,
-    activeServiceKind
+    activeServiceKind,
+    liveModelsByProviderId
   );
 
   const webCookieProviderEntriesAll = buildStaticProviderEntries("web-cookie", getProviderStats);
@@ -616,7 +607,8 @@ export default function ProvidersPage() {
     searchQuery,
     showFreeOnly,
     modelSearchQuery,
-    activeServiceKind
+    activeServiceKind,
+    liveModelsByProviderId
   );
 
   const localProviderEntriesAll = buildStaticProviderEntries("local", getProviderStats);
@@ -626,7 +618,8 @@ export default function ProvidersPage() {
     searchQuery,
     showFreeOnly,
     modelSearchQuery,
-    activeServiceKind
+    activeServiceKind,
+    liveModelsByProviderId
   );
 
   const searchProviderEntriesAll = buildStaticProviderEntries("search", getProviderStats);
@@ -636,7 +629,8 @@ export default function ProvidersPage() {
     searchQuery,
     showFreeOnly,
     modelSearchQuery,
-    activeServiceKind
+    activeServiceKind,
+    liveModelsByProviderId
   );
 
   const audioProviderEntriesAll = buildStaticProviderEntries("audio", getProviderStats);
@@ -646,7 +640,8 @@ export default function ProvidersPage() {
     searchQuery,
     showFreeOnly,
     modelSearchQuery,
-    activeServiceKind
+    activeServiceKind,
+    liveModelsByProviderId
   );
 
   const cloudAgentProviderEntriesAll = buildStaticProviderEntries("cloud-agent", getProviderStats);
@@ -656,7 +651,8 @@ export default function ProvidersPage() {
     searchQuery,
     showFreeOnly,
     modelSearchQuery,
-    activeServiceKind
+    activeServiceKind,
+    liveModelsByProviderId
   );
 
   const upstreamProxyEntriesAll = buildStaticProviderEntries("upstream-proxy", getProviderStats);
@@ -666,7 +662,8 @@ export default function ProvidersPage() {
     searchQuery,
     showFreeOnly,
     modelSearchQuery,
-    activeServiceKind
+    activeServiceKind,
+    liveModelsByProviderId
   );
 
   const compatibleProviderEntriesAll = [
@@ -698,7 +695,8 @@ export default function ProvidersPage() {
     searchQuery,
     showFreeOnly,
     modelSearchQuery,
-    activeServiceKind
+    activeServiceKind,
+    liveModelsByProviderId
   );
 
   const staticProviderEntriesAll = dedupeProviderEntries([
@@ -723,7 +721,8 @@ export default function ProvidersPage() {
     searchQuery,
     undefined,
     modelSearchQuery,
-    activeServiceKind
+    activeServiceKind,
+    liveModelsByProviderId
   );
 
   // IDE providers: subset of oauth/apikey providers that are editors/IDEs with
@@ -738,7 +737,8 @@ export default function ProvidersPage() {
     searchQuery,
     showFreeOnly,
     modelSearchQuery,
-    activeServiceKind
+    activeServiceKind,
+    liveModelsByProviderId
   );
 
   const oauthOnlyEntriesAll = oauthProviderEntriesAll
@@ -758,7 +758,8 @@ export default function ProvidersPage() {
     searchQuery,
     showFreeOnly,
     modelSearchQuery,
-    activeServiceKind
+    activeServiceKind,
+    liveModelsByProviderId
   );
 
   const compactProviderEntries = buildCompactProviderEntriesForPage({
@@ -832,7 +833,7 @@ export default function ProvidersPage() {
                 {providerText(t, "onboardingWizard", "Provider Onboarding Wizard")}
               </Button>
               <a
-                href="https://docs.omniroute.io/providers"
+                href="https://github.com/diegosouzapw/OmniRoute#-documentation"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg border border-border text-text-muted hover:text-text-main hover:bg-bg-subtle transition-colors"
@@ -859,6 +860,7 @@ export default function ProvidersPage() {
         }}
         onDisplayModeChange={setProviderDisplayMode}
         onNewProvider={() => router.push("/dashboard/providers/new")}
+        onImportFromFile={() => setShowImportFromFileModal(true)}
         searchQuery={searchQuery}
         setModelSearchQuery={setModelSearchQuery}
         setSearchQuery={setSearchQuery}
@@ -912,7 +914,7 @@ export default function ProvidersPage() {
             data-testid="provider-compact-grid"
           >
             {compactProviderEntries.map((entry) => (
-              <ProviderCard
+              <HighlightableProviderCard
                 key={`compact-${entry.providerId}`}
                 providerId={entry.providerId}
                 provider={entry.provider}
@@ -998,7 +1000,7 @@ export default function ProvidersPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3">
                   {compatibleProviderEntries.map(
                     ({ providerId, provider, stats, displayAuthType, toggleAuthType }) => (
-                      <ProviderCard
+                      <HighlightableProviderCard
                         key={providerId}
                         providerId={providerId}
                         provider={provider}
@@ -1072,7 +1074,7 @@ export default function ProvidersPage() {
                 {oauthProviderEntries
                   .filter((e) => !IDE_PROVIDER_IDS.has(e.providerId))
                   .map(({ providerId, provider, stats, displayAuthType, toggleAuthType }) => (
-                    <ProviderCard
+                    <HighlightableProviderCard
                       key={providerId}
                       providerId={providerId}
                       provider={provider}
@@ -1130,7 +1132,7 @@ export default function ProvidersPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3">
                   {ideProviderEntries.map(
                     ({ providerId, provider, stats, displayAuthType, toggleAuthType }) => (
-                      <ProviderCard
+                      <HighlightableProviderCard
                         key={`ide-${providerId}`}
                         providerId={providerId}
                         provider={provider}
@@ -1180,7 +1182,7 @@ export default function ProvidersPage() {
               <p className="text-sm text-text-muted -mt-2">{t("webCookieProvidersDesc")}</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3">
                 {webCookieProviderEntries.map(({ providerId, provider, stats, toggleAuthType }) => (
-                  <ProviderCard
+                  <HighlightableProviderCard
                     key={providerId}
                     providerId={providerId}
                     provider={provider}
@@ -1226,7 +1228,7 @@ export default function ProvidersPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3">
                 {freeSectionEntries.map(
                   ({ providerId, provider, stats, displayAuthType, toggleAuthType }) => (
-                    <ProviderCard
+                    <HighlightableProviderCard
                       key={`free-section-${providerId}`}
                       providerId={providerId}
                       provider={provider}
@@ -1279,7 +1281,7 @@ export default function ProvidersPage() {
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3">
                     {llmProviderEntries.map(
                       ({ providerId, provider, stats, displayAuthType, toggleAuthType }) => (
-                        <ProviderCard
+                        <HighlightableProviderCard
                           key={providerId}
                           providerId={providerId}
                           provider={provider}
@@ -1347,7 +1349,7 @@ export default function ProvidersPage() {
               <p className="text-sm text-text-muted -mt-2">{t("upstreamProxyProvidersDesc")}</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3">
                 {upstreamProxyEntries.map(({ providerId, provider, stats, toggleAuthType }) => (
-                  <ProviderCard
+                  <HighlightableProviderCard
                     key={providerId}
                     providerId={providerId}
                     provider={provider}
@@ -1377,7 +1379,7 @@ export default function ProvidersPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3">
                 {webFetchEntries.map(
                   ({ providerId, provider, stats, displayAuthType, toggleAuthType }) => (
-                    <ProviderCard
+                    <HighlightableProviderCard
                       key={`webfetch-${providerId}`}
                       providerId={providerId}
                       provider={provider}
@@ -1410,7 +1412,7 @@ export default function ProvidersPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3">
                 {aggregatorProviderEntries.map(
                   ({ providerId, provider, stats, displayAuthType, toggleAuthType }) => (
-                    <ProviderCard
+                    <HighlightableProviderCard
                       key={providerId}
                       providerId={providerId}
                       provider={provider}
@@ -1443,7 +1445,7 @@ export default function ProvidersPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3">
                 {enterpriseProviderEntries.map(
                   ({ providerId, provider, stats, displayAuthType, toggleAuthType }) => (
-                    <ProviderCard
+                    <HighlightableProviderCard
                       key={providerId}
                       providerId={providerId}
                       provider={provider}
@@ -1493,7 +1495,7 @@ export default function ProvidersPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3">
                 {cloudAgentProviderEntries.map(
                   ({ providerId, provider, stats, toggleAuthType }) => (
-                    <ProviderCard
+                    <HighlightableProviderCard
                       key={providerId}
                       providerId={providerId}
                       provider={provider}
@@ -1542,7 +1544,7 @@ export default function ProvidersPage() {
               <p className="text-sm text-text-muted -mt-2">{t("localProvidersDesc")}</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3">
                 {localProviderEntries.map(({ providerId, provider, stats, toggleAuthType }) => (
-                  <ProviderCard
+                  <HighlightableProviderCard
                     key={providerId}
                     providerId={providerId}
                     provider={provider}
@@ -1588,7 +1590,7 @@ export default function ProvidersPage() {
               <p className="text-sm text-text-muted -mt-2">{t("searchProvidersDesc")}</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3">
                 {searchProviderEntries.map(({ providerId, provider, stats, toggleAuthType }) => (
-                  <ProviderCard
+                  <HighlightableProviderCard
                     key={providerId}
                     providerId={providerId}
                     provider={provider}
@@ -1618,7 +1620,7 @@ export default function ProvidersPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3">
                 {embeddingRerankProviderEntries.map(
                   ({ providerId, provider, stats, displayAuthType, toggleAuthType }) => (
-                    <ProviderCard
+                    <HighlightableProviderCard
                       key={providerId}
                       providerId={providerId}
                       provider={provider}
@@ -1651,7 +1653,7 @@ export default function ProvidersPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3">
                 {imageProviderEntries.map(
                   ({ providerId, provider, stats, displayAuthType, toggleAuthType }) => (
-                    <ProviderCard
+                    <HighlightableProviderCard
                       key={providerId}
                       providerId={providerId}
                       provider={provider}
@@ -1700,7 +1702,7 @@ export default function ProvidersPage() {
               <p className="text-sm text-text-muted -mt-2">{t("audioProvidersDesc")}</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3">
                 {audioProviderEntries.map(({ providerId, provider, stats, toggleAuthType }) => (
-                  <ProviderCard
+                  <HighlightableProviderCard
                     key={providerId}
                     providerId={providerId}
                     provider={provider}
@@ -1730,7 +1732,7 @@ export default function ProvidersPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3">
                 {videoProviderEntries.map(
                   ({ providerId, provider, stats, displayAuthType, toggleAuthType }) => (
-                    <ProviderCard
+                    <HighlightableProviderCard
                       key={providerId}
                       providerId={providerId}
                       provider={provider}
@@ -1781,6 +1783,11 @@ export default function ProvidersPage() {
           }}
         />
       )}
+      <ImportProvidersFromFileModal
+        isOpen={showImportFromFileModal}
+        onClose={() => setShowImportFromFileModal(false)}
+        onImported={async () => setConnections((await loadProviderPageData()).connections)}
+      />
       {/* Test Results Modal */}
       {testResults && (
         <div
@@ -1789,7 +1796,7 @@ export default function ProvidersPage() {
         >
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <div
-            className="relative bg-bg-primary border border-border rounded-xl w-full max-w-150 max-h-[80vh] overflow-y-auto shadow-2xl"
+            className="relative bg-bg-primary border border-border rounded-xl w-full max-w-[600px] max-h-[80vh] overflow-y-auto shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-3 border-b border-border bg-bg-primary/95 backdrop-blur-sm rounded-t-xl">
@@ -1875,7 +1882,7 @@ function ProviderTestResultsView({ results }: { results: ProviderBatchTestResult
       {items.map((r, i) => (
         <div
           key={r.connectionId || i}
-          className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-black/3 dark:bg-white/3"
+          className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-black/[0.03] dark:bg-white/[0.03]"
         >
           <span
             className={`material-symbols-outlined text-[16px] ${

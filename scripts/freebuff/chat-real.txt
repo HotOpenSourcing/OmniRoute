@@ -1,0 +1,18 @@
+﻿
+=== TEST 1: deepseek/deepseek-v4-flash with full metadata ===
+node : (node:33176) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS 
+connections and HTTPS requests insecure by disabling certificate verification.
+Au caractère Ligne:1 : 1
++ node C:\Users\amine\OmniRoute\scripts\freebuff\test-chat-real.mjs 2>& ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ((node:33176) Wa...e verification.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+(Use `node --trace-warnings ...` to show where the warning was created)
+[400] {"message":"runId Not Found: cf13b555-3cd5-49fc-a150-caf0b1bfe5ca"}
+
+=== TEST 2: deepseek/deepseek-v4-flash streaming ===
+[400] {"message":"runId Not Found: 7c895ae1-dd95-4987-a159-c77c15f3d4f1"}
+
+=== TEST 3: mimo/mimo-v2.5 with full metadata ===
+[400] {"message":"runId Not Found: 8ca74145-9a49-469f-a7a0-a202a4f43ce8"}

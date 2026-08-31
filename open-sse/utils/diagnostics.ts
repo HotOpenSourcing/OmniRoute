@@ -122,6 +122,7 @@ export function synthOpenAIErrorChunk(opts: {
     error: {
       message: safeMessage,
       type: "upstream_empty_response",
+      code: "upstream_empty_response",
     },
   };
   return `data: ${JSON.stringify(body)}\n\n`;
@@ -256,6 +257,24 @@ export function detectMalformedNonStream(resp: unknown): MalformedReason | null 
     const c = choice as Record<string, unknown>;
     const msg = c?.message as Record<string, unknown> | undefined;
     if (typeof msg?.content === "string" && (msg.content as string).length > 0) return true;
+    // #5559: some OpenAI-compatible upstreams (e.g. Cline via OAuth) return
+    // `message.content` as an array of Anthropic-style content blocks rather than
+    // a plain string. An array with at least one non-empty text block is real
+    // output — without this it was falsely flagged as empty_choices → 502 + cooldown.
+    if (
+      Array.isArray(msg?.content) &&
+      (msg.content as unknown[]).some((block) => {
+        const b = block as Record<string, unknown> | null;
+        return (
+          !!b &&
+          typeof b === "object" &&
+          b.type === "text" &&
+          typeof b.text === "string" &&
+          (b.text as string).length > 0
+        );
+      })
+    )
+      return true;
     if (Array.isArray(msg?.tool_calls) && (msg.tool_calls as unknown[]).length > 0) return true;
     if (typeof msg?.reasoning_content === "string" && (msg.reasoning_content as string).length > 0)
       return true;
@@ -264,6 +283,28 @@ export function detectMalformedNonStream(resp: unknown): MalformedReason | null 
 
   if (!anyHasOutput) return "empty_choices";
   return null;
+}
+
+export function describeMalformedNonStream(
+  resp: unknown,
+  reason: MalformedReason
+): { message: string; code: string; type: string } {
+  const body = resp && typeof resp === "object" ? (resp as Record<string, unknown>) : null;
+  if (body?.object === "response" && body.status === "failed") {
+    return {
+      message: "upstream reported a failed response without usable output",
+      code: "upstream_response_failed",
+      type: "upstream_response_error",
+    };
+  }
+  return {
+    message:
+      reason === "no_terminal"
+        ? "upstream response did not reach a terminal state"
+        : "upstream returned an empty response without usable output",
+    code: "upstream_empty_response",
+    type: "upstream_response_error",
+  };
 }
 
 // ── Test-only export ─────────────────────────────────────────────────────────

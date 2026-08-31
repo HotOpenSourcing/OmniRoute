@@ -8,6 +8,7 @@ import {
 import { freebuff, FREEBUFF_OAUTH_CONFIG } from "@/lib/oauth/providers/freebuff";
 import { generateFreebuffFingerprint } from "@/lib/oauth/freebuff/fingerprint";
 import {
+  effectiveTokenExpiresAt,
   freebuffConnectionSchema,
   type FreebuffConnection,
 } from "@/shared/schemas/providers/freebuff";
@@ -392,16 +393,18 @@ export const freebuffSessionServerResponseSchema = z.discriminatedUnion(
       model: z.string().min(1),
       admittedAt: z.string().datetime(),
       expiresAt: z.string().datetime(),
-      remainingMs: z.number().int().nonnegative(),
+      remainingMs: z.number().nonnegative(),
       rateLimit: z
         .object({
           model: z.string(),
-          limit: z.number().int().nonnegative(),
+          limit: z.number().nonnegative(),
           period: z.enum(["pacific_day", "pacific_week"]),
           resetTimeZone: z.string(),
           resetAt: z.string().datetime(),
-          windowHours: z.number().int().nonnegative().optional(),
-          recentCount: z.number().int().nonnegative(),
+          windowHours: z.number().nonnegative().optional(),
+          // Upstream sends fractional values (e.g. 2.1) — accept any
+          // non-negative number, not just integers.
+          recentCount: z.number().nonnegative(),
         })
         .optional(),
     }),
@@ -563,5 +566,101 @@ export async function deleteFreebuffSession(
       body || `HTTP ${res.status} from ${sessionEndpoint()}`,
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Connection status (token TTL + re-auth warning)
+//
+// Captured in `validation-scripts/final-validations.md` C6: the Freebuff
+// `authToken` has a hard 1-hour TTL and the upstream exposes NO refresh
+// endpoint — the only path is to re-run OAuth PKCE or paste a fresh
+// `credentials.json`. These helpers let the dashboard surface a "session
+// expiring soon" banner ~5 min before the token dies.
+// ---------------------------------------------------------------------------
+
+/**
+ * Status snapshot for a single Freebuff connection. Computed lazily from
+ * `tokenExpiresAt` / `loginCompletedAt` so the dashboard can render a
+ * banner without each caller having to import the schema helpers.
+ */
+export interface FreebuffConnectionStatus {
+  connectionId: string;
+  /** Unix ms when the `authToken` expires, or `null` if unknown. */
+  tokenExpiresAt: number | null;
+  /** Wall-clock ms remaining until expiry. Negative = already expired. */
+  remainingMs: number | null;
+  /** True when `remainingMs <= warningMarginMs`. */
+  isExpiring: boolean;
+  /** True when no TTL info is available — caller should warn the user. */
+  hasUnknownTtl: boolean;
+  /**
+   * Convenience label for the dashboard. One of:
+   *   - `"active"`     : > 5 min remaining
+   *   - `"expiring"`   : <= 5 min remaining (banner time)
+   *   - `"expired"`    : <= 0 (will fail; user must re-auth)
+   *   - `"unknown"`    : no TTL info available
+   */
+  state: "active" | "expiring" | "expired" | "unknown";
+}
+
+/**
+ * Compute the status snapshot for a given connection. `nowMs` and
+ * `warningMarginMs` are injected for testability.
+ */
+export function deriveFreebuffConnectionStatus(
+  connectionId: string,
+  connection: FreebuffConnection,
+  nowMs: number = Date.now(),
+  warningMarginMs: number = 5 * 60 * 1000,
+): FreebuffConnectionStatus {
+  const expiresAt = effectiveTokenExpiresAt(connection);
+  if (expiresAt === undefined) {
+    return {
+      connectionId,
+      tokenExpiresAt: null,
+      remainingMs: null,
+      isExpiring: false,
+      hasUnknownTtl: true,
+      state: "unknown",
+    };
+  }
+  const remainingMs = expiresAt - nowMs;
+  const state: FreebuffConnectionStatus["state"] =
+    remainingMs <= 0
+      ? "expired"
+      : remainingMs <= warningMarginMs
+        ? "expiring"
+        : "active";
+  return {
+    connectionId,
+    tokenExpiresAt: expiresAt,
+    remainingMs,
+    isExpiring: state !== "active",
+    hasUnknownTtl: false,
+    state,
+  };
+}
+
+/**
+ * Return the status for a single Freebuff connection by id.
+ */
+export async function getFreebuffConnectionStatus(
+  connectionId: string,
+): Promise<FreebuffConnectionStatus> {
+  const conn = await loadFreebuffConnection(connectionId);
+  return deriveFreebuffConnectionStatus(connectionId, conn);
+}
+
+/**
+ * Return the status for every Freebuff connection. Used by the dashboard
+ * to render a global "X connections expiring soon" badge.
+ */
+export async function listFreebuffConnectionStatuses(): Promise<
+  FreebuffConnectionStatus[]
+> {
+  const all = await listFreebuffConnections();
+  return all.map(({ id, connection }) =>
+    deriveFreebuffConnectionStatus(id, connection),
+  );
 }
 

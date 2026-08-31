@@ -1,0 +1,45 @@
+﻿
+=== START AGENT RUN (agentId: base) ===
+node : (node:33148) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS 
+connections and HTTPS requests insecure by disabling certificate verification.
+Au caractère Ligne:1 : 1
++ node C:\Users\amine\OmniRoute\scripts\freebuff\test-chat-with-run.mjs ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ((node:33148) Wa...e verification.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+(Use `node --trace-warnings ...` to show where the warning was created)
+[200] {
+  "runId": "9c6c9cf2-457e-4e2a-b36d-3763ef25a0ab"
+}
+
+=== CHAT COMPLETION (runId: 9c6c9cf2-457e-4e2a-b36d-3763ef25a0ab) ===
+[403] {"error":"free_mode_invalid_agent_model","message":"Free mode is only available for specific agent and model combinations."}
+
+=== FINISH AGENT RUN (runId: 9c6c9cf2-457e-4e2a-b36d-3763ef25a0ab, status: ERROR) ===
+[400] {
+  "error": "Invalid request body",
+  "details": {
+    "_errors": [],
+    "status": {
+      "_errors": [
+        "Invalid option: expected one of \"completed\"|\"failed\"|\"cancelled\""
+      ]
+    },
+    "totalSteps": {
+      "_errors": [
+        "Invalid input: expected number, received undefined"
+      ]
+    },
+    "directCredits": {
+      "_errors": [
+        "Invalid input: expected number, received undefined"
+      ]
+    },
+    "totalCredits": {
+      "_errors": [
+        "Invalid input: expected number, received undefined"
+      ]
+    }
+  }
+}

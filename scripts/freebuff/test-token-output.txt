@@ -1,0 +1,114 @@
+﻿=== TESTING AUTH TOKEN ACROSS ENDPOINTS ===
+
+
+--- GET /api/auth/me ---
+node : (node:21320) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS 
+connections and HTTPS requests insecure by disabling certificate verification.
+Au caractère Ligne:1 : 1
++ node C:\Users\amine\OmniRoute\scripts\freebuff\test-token.mjs 2>&1 |  ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ((node:21320) Wa...e verification.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ❓ [400] auth: Bearer dea815ba-d53a-4ade-8790
+     Error: This action with HTTP GET is not supported by NextAuth.js
+  ❓ [400] Authorization: dea815ba-d53a-4ade-8790-0b638f
+     Error: This action with HTTP GET is not supported by NextAuth.js
+  ❓ [400] x-codebuff-token: dea815ba-d53a-4ade-8790-0b638f
+     Error: This action with HTTP GET is not supported by NextAuth.js
+  ❓ [400] Cookie: authToken=dea815ba-d53a-4ade-8
+     Error: This action with HTTP GET is not supported by NextAuth.js
+  ❓ [400] (no auth)
+     Error: This action with HTTP GET is not supported by NextAuth.js
+
+--- GET /api/v1/auth/me ---
+  ❌ [404] auth: Bearer dea815ba-d53a-4ade-8790
+     <!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><li
+  ❌ [404] Authorization: dea815ba-d53a-4ade-8790-0b638f
+     <!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><li
+  ❌ [404] x-codebuff-token: dea815ba-d53a-4ade-8790-0b638f
+     <!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><li
+  ❌ [404] Cookie: authToken=dea815ba-d53a-4ade-8
+     <!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><li
+  ❌ [404] (no auth)
+     <!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><li
+
+--- GET /api/v1/me ---
+  🔒 [401] auth: Bearer dea815ba-d53a-4ade-8790
+     {"error":"Missing or invalid Authorization header"}
+  🔒 [401] Authorization: dea815ba-d53a-4ade-8790-0b638f
+     {"error":"Missing or invalid Authorization header"}
+  🔒 [401] x-codebuff-token: dea815ba-d53a-4ade-8790-0b638f
+     {"error":"Missing or invalid Authorization header"}
+  🔒 [401] Cookie: authToken=dea815ba-d53a-4ade-8
+     {"error":"Missing or invalid Authorization header"}
+  🔒 [401] (no auth)
+     {"error":"Missing or invalid Authorization header"}
+
+--- GET /api/v1/user ---
+  ❌ [404] auth: Bearer dea815ba-d53a-4ade-8790
+     <!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><li
+  ❌ [404] Authorization: dea815ba-d53a-4ade-8790-0b638f
+     <!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><li
+  ❌ [404] x-codebuff-token: dea815ba-d53a-4ade-8790-0b638f
+     <!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><li
+  ❌ [404] Cookie: authToken=dea815ba-d53a-4ade-8
+     <!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><li
+  ❌ [404] (no auth)
+     <!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><li
+
+--- GET /api/v1/account ---
+  ❌ [404] auth: Bearer dea815ba-d53a-4ade-8790
+     <!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><li
+  ❌ [404] Authorization: dea815ba-d53a-4ade-8790-0b638f
+     <!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><li
+  ❌ [404] x-codebuff-token: dea815ba-d53a-4ade-8790-0b638f
+     <!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><li
+  ❌ [404] Cookie: authToken=dea815ba-d53a-4ade-8
+     <!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><li
+  ❌ [404] (no auth)
+     <!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><li
+
+--- GET /api/v1/credits ---
+  ❌ [404] auth: Bearer dea815ba-d53a-4ade-8790
+     <!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><li
+  ❌ [404] Authorization: dea815ba-d53a-4ade-8790-0b638f
+     <!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><li
+  ❌ [404] x-codebuff-token: dea815ba-d53a-4ade-8790-0b638f
+     <!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><li
+  ❌ [404] Cookie: authToken=dea815ba-d53a-4ade-8
+     <!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><li
+  ❌ [404] (no auth)
+     <!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><li
+
+--- GET /api/v1/usage ---
+  ❓ [405] auth: Bearer dea815ba-d53a-4ade-8790
+  ❓ [405] Authorization: dea815ba-d53a-4ade-8790-0b638f
+  ❓ [405] x-codebuff-token: dea815ba-d53a-4ade-8790-0b638f
+  ❓ [405] Cookie: authToken=dea815ba-d53a-4ade-8
+  ❓ [405] (no auth)
+
+--- GET /api/v1/models ---
+  ❌ [404] auth: Bearer dea815ba-d53a-4ade-8790
+     <!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><li
+  ❌ [404] Authorization: dea815ba-d53a-4ade-8790-0b638f
+     <!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><li
+  ❌ [404] x-codebuff-token: dea815ba-d53a-4ade-8790-0b638f
+     <!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><li
+  ❌ [404] Cookie: authToken=dea815ba-d53a-4ade-8
+     <!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><li
+  ❌ [404] (no auth)
+     <!DOCTYPE html><html lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" href="/_next/static/media/bb3ef058b751a6ad-s.p.woff2" as="font" crossorigin="" type="font/woff2"/><li
+
+--- POST /api/v1/chat/completions ---
+  🔒 [401] auth: Bearer dea815ba-d53a-4ade-8790
+     {"message":"Unauthorized"}
+  🔒 [401] Authorization: dea815ba-d53a-4ade-8790-0b638f
+     {"message":"Unauthorized"}
+  🔒 [401] x-codebuff-token: dea815ba-d53a-4ade-8790-0b638f
+     {"message":"Unauthorized"}
+  🔒 [401] Cookie: authToken=dea815ba-d53a-4ade-8
+     {"message":"Unauthorized"}
+  🔒 [401] (no auth)
+     {"message":"Unauthorized"}
