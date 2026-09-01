@@ -3,6 +3,7 @@ import { generatePKCE } from "../utils/pkce";
 import { freebuffUuidSchema } from "@/shared/schemas/providers/freebuff";
 import { resolveFreebuffBaseUrl } from "@/lib/providers/freebuff/base";
 import { generateFreebuffFingerprint } from "../freebuff/fingerprint";
+import { resolvePublicCred } from "@omniroute/open-sse/utils/publicCreds.ts";
 
 export const FREEBUFF_OAUTH_CONFIG = {
   id: "freebuff",
@@ -14,7 +15,7 @@ export const FREEBUFF_OAUTH_CONFIG = {
   meUrl: "https://www.codebuff.com/api/v1/me",
   sessionUrl: "https://www.codebuff.com/api/v1/freebuff/session",
   streakUrl: "https://www.codebuff.com/api/v1/freebuff/streak",
-  clientId: "codebuff-cli",
+  clientId: resolvePublicCred("freebuff_id", "FREEBUFF_OAUTH_CLIENT_ID"),
   pollIntervalMs: 2000,
   pollTimeoutMs: 300000,
 } as const;

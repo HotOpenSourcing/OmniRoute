@@ -215,6 +215,8 @@ const EMBEDDED_DEFAULTS = {
     20, 18, 3, 21, 70, 66, 3, 13, 11, 1, 72, 69, 87, 88, 95, 87, 88, 17, 94, 20, 67, 92, 27, 72, 68,
     3, 10, 92, 6, 21, 21, 84, 95, 14, 15, 88, 70, 95, 77,
   ],
+  // Freebuff / Codebuff CLI — public client id
+  freebuff_id: [12, 2, 10, 12, 16, 26, 19, 18, 72, 78, 28, 28],
 } as const;
 
 export type EmbeddedDefaultKey = keyof typeof EMBEDDED_DEFAULTS;
