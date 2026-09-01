@@ -14,27 +14,10 @@ const apiKeysDb = await import("../../src/lib/db/apiKeys.ts");
 const ORIGINAL_OMNIROUTE_API_KEY = process.env.OMNIROUTE_API_KEY;
 const ORIGINAL_ROUTER_API_KEY = process.env.ROUTER_API_KEY;
 
-async function removeDirWithRetry(targetDir, attempts = 10) {
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    try {
-      if (fs.existsSync(targetDir)) {
-        fs.rmSync(targetDir, { recursive: true, force: true });
-      }
-      return;
-    } catch (error) {
-      if ((error?.code === "EBUSY" || error?.code === "EPERM") && attempt < attempts - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
-        continue;
-      }
-      throw error;
-    }
-  }
-}
-
 async function reset() {
   core.resetDbInstance();
   apiKeysDb.resetApiKeyState();
-  await removeDirWithRetry(TEST_DATA_DIR);
+  fs.rmSync(TEST_DATA_DIR, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   fs.mkdirSync(TEST_DATA_DIR, { recursive: true });
   delete process.env.OMNIROUTE_API_KEY;
   delete process.env.ROUTER_API_KEY;
@@ -44,10 +27,10 @@ test.beforeEach(async () => {
   await reset();
 });
 
-test.after(async () => {
+test.after(() => {
   core.resetDbInstance();
   apiKeysDb.resetApiKeyState();
-  await removeDirWithRetry(TEST_DATA_DIR);
+  fs.rmSync(TEST_DATA_DIR, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   if (ORIGINAL_OMNIROUTE_API_KEY === undefined) delete process.env.OMNIROUTE_API_KEY;
   else process.env.OMNIROUTE_API_KEY = ORIGINAL_OMNIROUTE_API_KEY;
   if (ORIGINAL_ROUTER_API_KEY === undefined) delete process.env.ROUTER_API_KEY;
